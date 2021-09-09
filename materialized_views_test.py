@@ -251,7 +251,7 @@ class TestMaterializedViews(Tester):
         drop_views(session, views)
         self._assert_view_meta(session, views, exists=False)
 
-    #@reuse_cluster
+    @reuse_cluster(new_cluster=True)
     def test_create(self):
         """Test the materialized view creation"""
         session = self.prepare(user_table=True)
@@ -260,7 +260,7 @@ class TestMaterializedViews(Tester):
                                        "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         assert len(result) == 1, "Expecting 1 materialized view == got" + str(result)
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_gcgs_validation(self):
         """Verify that it's not possible to create or set a too low gc_grace_seconds on MVs"""
         session = self.prepare(user_table=True)
@@ -299,7 +299,7 @@ class TestMaterializedViews(Tester):
                        "updates. Setting gc_grace_seconds too low might cause undelivered updates"
                        " to expire before being replayed.")
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_insert(self):
         """Test basic insertions"""
         session = self.prepare(user_table=True)
@@ -318,7 +318,7 @@ class TestMaterializedViews(Tester):
         result = list(session.execute("SELECT * FROM users_by_state WHERE state='MA';"))
         assert len(result) == 0, "Expecting {} users, got {}".format(0 == len(result))
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_populate_mv_after_insert(self):
         """Test that a view is OK when created with existing data"""
         session = self.prepare(consistency_level=ConsistencyLevel.QUORUM)
@@ -343,12 +343,12 @@ class TestMaterializedViews(Tester):
 
     @pytest.mark.xfail(reason="Should be addressed with CASSANDRA-15845")
     @since('4.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_populate_mv_after_insert_wide_rows_version40(self):
         self.test_populate_mv_after_insert_wide_rows()
 
     @since('3.0', max_version='3.X')
-    #@reuse_cluster
+    @reuse_cluster
     def test_populate_mv_after_insert_wide_rows(self):
         """Test that a view is OK when created with existing data with wide rows"""
         session = self.prepare(consistency_level=ConsistencyLevel.QUORUM)
@@ -371,7 +371,7 @@ class TestMaterializedViews(Tester):
             for j in range(10000):
                 assert_one(session, "SELECT * FROM t_by_v WHERE id = {} AND v = {}".format(i, j), [j, i])
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_crc_check_chance(self):
         """Test that crc_check_chance parameter is properly populated after mv creation and update"""
         session = self.prepare()
@@ -386,7 +386,7 @@ class TestMaterializedViews(Tester):
 
         assert_crc_check_chance_equal(session, "t_by_v", 0.3, view=True)
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_prepared_statement(self):
         """Test basic insertions with prepared statement"""
         session = self.prepare(user_table=True)
@@ -416,7 +416,7 @@ class TestMaterializedViews(Tester):
         result = list(session.execute(selectPrepared.bind(['MA'])))
         assert len(result) == 0, "Expecting {} users, got {}".format(0, len(result))
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_immutable(self):
         """Test that a materialized view is immutable"""
         session = self.prepare(user_table=True)
@@ -441,7 +441,7 @@ class TestMaterializedViews(Tester):
         assert_invalid(session, "ALTER TABLE users_by_state ADD first_name varchar",
                        "Cannot use ALTER TABLE on Materialized View")
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_drop_mv(self):
         """Test that we can drop a view properly"""
         session = self.prepare(user_table=True)
@@ -461,7 +461,7 @@ class TestMaterializedViews(Tester):
                                        "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         assert len(result) == 1, "Expecting {} materialized view, got {}".format(1, len(result))
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_drop_column(self):
         """Test that we cannot drop a column if it is used by a MV"""
         session = self.prepare(user_table=True)
@@ -476,7 +476,7 @@ class TestMaterializedViews(Tester):
             "Cannot drop column state on base table with materialized views."
         )
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_drop_table(self):
         """Test that we cannot drop a table without deleting its MVs first"""
         session = self.prepare(user_table=True)
@@ -502,7 +502,7 @@ class TestMaterializedViews(Tester):
                                        "WHERE keyspace_name='ks' AND base_table_name='users' ALLOW FILTERING")))
         assert len(result) == 0, "Expecting {} materialized view, got {}".format(1, len(result))
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_clustering_column(self):
         """Test that we can use clustering columns as primary key for a materialized view"""
         session = self.prepare(consistency_level=ConsistencyLevel.QUORUM)
@@ -832,6 +832,7 @@ class TestMaterializedViews(Tester):
         for i in range(1100):
             assert_one(session, "SELECT * FROM t_by_v WHERE v = {}".format(-i), [-i, i])
 
+    @reuse_cluster(new_cluster=True)
     def test_allow_filtering(self):
         """Test that allow filtering works as usual for a materialized view"""
         session = self.prepare()
@@ -866,7 +867,7 @@ class TestMaterializedViews(Tester):
                 ['a', i, i, 3.0]
             )
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_secondary_index(self):
         """Test that secondary indexes cannot be created on a materialized view"""
         session = self.prepare()
@@ -877,7 +878,7 @@ class TestMaterializedViews(Tester):
         assert_invalid(session, "CREATE INDEX ON t_by_v (v2)",
                        "Secondary indexes are not supported on materialized views")
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_ttl(self):
         """
         Test that TTL works as expected for a materialized view
@@ -899,7 +900,7 @@ class TestMaterializedViews(Tester):
         rows = list(session.execute("SELECT * FROM t_by_v2"))
         assert len(rows) == 0, "Expected 0 rows but got {}".format(len(rows))
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_query_all_new_column(self):
         """
         Test that a materialized view created with a 'SELECT *' works as expected when adding a new column
@@ -926,7 +927,7 @@ class TestMaterializedViews(Tester):
             ['TX', 'user1', 1968, None, 'f', 'ch@ngem3a', None]
         )
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_query_new_column(self):
         """
         Test that a materialized view created with 'SELECT <col1, ...>' works as expected when adding a new column
@@ -956,7 +957,7 @@ class TestMaterializedViews(Tester):
             ['TX', 'user1']
         )
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_rename_column(self):
         """
         Test that a materialized view created with a 'SELECT *' works as expected when renaming a column
@@ -1024,7 +1025,7 @@ class TestMaterializedViews(Tester):
             ['TX', 'user1', 1968, 'f', 'ch@ngem3a', None]
         )
 
-    #@reuse_cluster
+    @reuse_cluster(new_cluster=True)
     def test_lwt(self):
         """Test that lightweight transaction behave properly with a materialized view"""
         session = self.prepare()
@@ -1332,11 +1333,12 @@ class TestMaterializedViews(Tester):
             assert node.grep_log('Marking view', filename='debug.log', from_mark=mark)
             self.check_logs_for_errors()
 
+    @reuse_cluster(new_cluster=True)
     @since('3.0')
     def test_mv_with_default_ttl_with_flush(self):
         self._test_mv_with_default_ttl(True)
 
-    #@reuse_cluster
+    @reuse_cluster
     @since('3.0')
     def test_mv_with_default_ttl_without_flush(self):
         self._test_mv_with_default_ttl(False)
@@ -1436,13 +1438,13 @@ class TestMaterializedViews(Tester):
 
     @flaky
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_no_base_column_in_view_pk_complex_timestamp_with_flush(self):
         self._test_no_base_column_in_view_pk_complex_timestamp(flush=True)
 
     @pytest.mark.skip(reason="Frequently fails in CI. Skipping until fixed as tracked by CASSANDRA-14148")
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_no_base_column_in_view_pk_complex_timestamp_without_flush(self):
         self._test_no_base_column_in_view_pk_complex_timestamp(flush=False)
 
@@ -1546,12 +1548,12 @@ class TestMaterializedViews(Tester):
         assert_none(session, "SELECT * FROM mv")
 
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_base_column_in_view_pk_complex_timestamp_with_flush(self):
         self._test_base_column_in_view_pk_complex_timestamp(flush=True)
 
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_base_column_in_view_pk_complex_timestamp_without_flush(self):
         self._test_base_column_in_view_pk_complex_timestamp(flush=False)
 
@@ -1682,11 +1684,12 @@ class TestMaterializedViews(Tester):
         self._test_expired_liveness_with_limit(rf=1, nodes=1)
 
     @since('3.0')
+    @reuse_cluster(new_cluster=True)
     def test_expired_liveness_with_limit_rf1_nodes3(self):
         self._test_expired_liveness_with_limit(rf=1, nodes=3)
 
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_expired_liveness_with_limit_rf3(self):
         self._test_expired_liveness_with_limit(rf=3, nodes=3)
 
@@ -1735,12 +1738,12 @@ class TestMaterializedViews(Tester):
         assert_all(session, "SELECT k,a,b FROM mv", [[50, 50, 50], [99, 99, 99]])
 
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_base_column_in_view_pk_commutative_tombstone_with_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=True)
 
     @since('3.0')
-    #@reuse_cluster
+    @reuse_cluster
     def test_base_column_in_view_pk_commutative_tombstone_without_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=False)
 
@@ -1794,7 +1797,7 @@ class TestMaterializedViews(Tester):
         assert_none(session, "SELECT * FROM t_by_v")
         assert_one(session, "SELECT * FROM t", [1, None, None, None])
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_view_tombstone(self):
         """
         Test that a materialized views properly tombstone

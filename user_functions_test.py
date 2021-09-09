@@ -50,8 +50,8 @@ class TestUserFunctions(Tester):
             create_ks(session, 'ks', rf)
         return session
 
-    @reuse_cluster
-    def not_test_migration(self):
+    @reuse_cluster(new_cluster=True)
+    def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
 
@@ -142,7 +142,7 @@ class TestUserFunctions(Tester):
                        "Type mismatch: cannot convert from double to UUID")
 
     @reuse_cluster
-    def not_test_udf_overload(self):
+    def test_udf_overload(self):
 
         session = self.prepare(nodes=3)
 
@@ -176,6 +176,7 @@ class TestUserFunctions(Tester):
         # should now work - unambiguous
         session.execute("DROP FUNCTION overloaded")
 
+    @reuse_cluster(new_cluster=True)
     def test_udf_scripting(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")

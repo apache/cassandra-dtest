@@ -132,7 +132,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    @reuse_cluster
+    @reuse_cluster(new_cluster=True)
     def testupdate_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, s int STATIC, PRIMARY KEY (k, c))",
