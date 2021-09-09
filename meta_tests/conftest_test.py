@@ -62,11 +62,10 @@ class TestConfTest(object):
     @pytest.mark.parametrize("item,config",
                              [(upgrade_test, "execute_upgrade_tests_only"),
                               (resource_intensive_test, "only_resource_intensive_tests")])
-    @pytest.mark.parametrize("sufficient_resources", [True, False])
-    def test_include_if_config_only(self, item, config, sufficient_resources):
+    def test_include_if_config_only(self, item, config):
         dtest_config = DTestConfigMock()
         dtest_config.set(config)
-        assert not SkipConditions(dtest_config, sufficient_resources).is_skippable(item)
+        assert not SkipConditions(dtest_config, True).is_skippable(item)
 
     @pytest.mark.parametrize("item",
                              [regular_test, upgrade_test, resource_intensive_test, vnodes_test,
@@ -100,12 +99,10 @@ class TestConfTest(object):
         dtest_config.set(config)
         assert SkipConditions(dtest_config, sufficient_resources).is_skippable(self.resource_intensive_test)
 
-    @pytest.mark.parametrize("config", ["force_execution_of_resource_intensive_tests",
-                                        "only_resource_intensive_tests"])
     @pytest.mark.parametrize("sufficient_resources", [True, False])
-    def test_include_resource_intensive_if_any_resources(self, config, sufficient_resources):
+    def test_include_resource_intensive_if_any_resources(self, sufficient_resources):
         dtest_config = DTestConfigMock()
-        dtest_config.set(config)
+        dtest_config.set("force_execution_of_resource_intensive_tests")
         assert not SkipConditions(dtest_config, sufficient_resources).is_skippable(self.resource_intensive_test)
 
     def test_skip_resource_intensive_wins(self):
