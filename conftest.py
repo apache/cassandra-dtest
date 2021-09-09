@@ -372,10 +372,10 @@ def fixture_dtest_setup(request,
     # - Not wanting to reuse clusters
     # - Reusing clusters but explicitly asking for a new one
     # - Wanting to reuse but env doesn't allow reusing
-    # - Wanting to reuse but no reusable cluster was present
+    # - Wanting to reuse but no reusable cluster available
 
     logger.info("Reuse cluster: %s", reuse_option)
-    cant_reuse_reason = can_reuse_cluster_reason(request, reusable_dtest_setup)
+    cant_reuse_reason = can_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class)
     cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
     missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == "REUSE_CLUSTER_YES"
     if reuse_option == "REUSE_CLUSTER_NO"\
@@ -433,6 +433,8 @@ def fixture_dtest_setup(request,
                 failed = True
                 pytest.fail(msg='Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
                             .format(errors=str.join(", ", errors)), pytrace=False)
+        for node in dtest_setup.cluster.nodelist():
+            node.mark_log_for_errors()
     finally:
         try:
             # save the logs for inspection
@@ -445,9 +447,8 @@ def fixture_dtest_setup(request,
                 safe_cluster_cleanup(request, dtest_setup)
                 reusable_dtest_setup = None
 
-def can_reuse_cluster_reason(request, dtest_setup):
-    global last_test_class
 
+def can_reuse_cluster_reason(request, dtest_setup, last_test_class):
     if dtest_setup is None:
         return "Can't reuse bc reusable cluster is None"
 
@@ -464,12 +465,14 @@ def can_reuse_cluster_reason(request, dtest_setup):
 
     return None
 
+
 def safe_cluster_cleanup(request, dtest_setup):
     if dtest_setup is not None:
         try:
             dtest_setup.cleanup_cluster(request)
         except FileNotFoundError:
             pass
+
 
 def drop_test_ks(dtest_setup):
     wait_schema_agreement = False
