@@ -2711,12 +2711,15 @@ class TestAuthRoles(Tester):
 class TestAuthUnavailable(Tester):
     """
     * These tests verify behavior when backends for authentication & authorization are unable to pull data from the
-    * system_auth keyspace. Failure scenarios are simulated based on the assumption that internal queries for role
-    * hierarchies and role properties of the "cassandra" super-user get CL=QUORUM (other roles get CL=LOCAL_ONE). And so
-    * we expect these internal queries to fail when one of two nodes are down and system_auth have RF=2. Though the
-    * permissions cache is used in these tests, it is always populated by permissions derived from the super-user status
-    * (all applicable to resource) of the "cassandra" user. The network_authorizer is always disabled to make sure the
-    * queries utilize the role/permissions cache only.
+    * system_auth keyspace. Failure scenarios are simulated based on the default CL for auth being LOCAL_QUORUM for reads,
+    * EACH_QUORUM for writes. We expect these internal queries to fail when one of the two nodes are down and system_auth
+    * has RF=2. Though the permissions cache is used in these tests, it is always populated by permissions derived from
+    * the super-user status (all applicable to resource) of the "cassandra" user. The network_authorizer is always disabled
+    * to make sure the queries utilize the role/permissions cache only.
+    *
+    * Notably, the default CL changed from a combination of ONE, LOCAL_ONE, and QUORUM <= 4.0 to the above in version 4.1+;
+    * we simply relax the constraint on the expected CL found in the error message to allow these tests to satisfy both
+    * release regimes.
     """
 
     def test_authentication_handle_unavailable(self):
@@ -2750,7 +2753,7 @@ class TestAuthUnavailable(Tester):
             # AuthenticationFailed from server
             assert re.search("code=0100", str(e))
             # Message from server
-            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level", str(e))
 
     def test_authentication_through_cache_handle_unavailable(self):
         """
@@ -2789,7 +2792,7 @@ class TestAuthUnavailable(Tester):
             # AuthenticationFailed from server
             assert re.search("code=0100", str(e))
             # Message from server
-            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level QUORUM", str(e))
+            assert re.search("Unable to perform authentication:.* Cannot achieve consistency level", str(e))
 
     @since('4.0')
     def test_authentication_from_cache_while_unavailable(self):
@@ -2880,7 +2883,7 @@ class TestAuthUnavailable(Tester):
 
         node1.stop()
 
-        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level", expected=Unauthorized)
 
     def test_authorization_through_cache_handle_unavailable(self):
         """
@@ -2914,7 +2917,7 @@ class TestAuthUnavailable(Tester):
         # Wait for cache to timeout
         time.sleep(1)
 
-        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level QUORUM", expected=Unauthorized)
+        assert_exception(cassandra, "SELECT * from ks.cf", matching="Unable to perform authorization of super-user permission: Cannot achieve consistency level", expected=Unauthorized)
 
     def test_authorization_from_cache_while_unavailable(self):
         """
