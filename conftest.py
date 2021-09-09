@@ -354,11 +354,8 @@ def fixture_dtest_setup(request,
                         fixture_dtest_cluster_name,
                         fixture_dtest_create_cluster_func,
                         fixture_dtest_reuse_cluster):
-
     #TODO
-    #Docker clean-up
     #Byteman cleanup
-    #logging of reusable debug traces
 
     # Use reuse_option = "REUSE_CLUSTER_NO" to fully disable node-reusage
     reuse_option = fixture_dtest_reuse_cluster
@@ -368,6 +365,7 @@ def fixture_dtest_setup(request,
     global reusable_dtest_setup # Reusable cluster/nodes/config
     global last_test_class
 
+    #logger.info("Reuse cluster1:")
     initial_environment = copy.deepcopy(os.environ)
 
     # Create new node if:
@@ -375,8 +373,10 @@ def fixture_dtest_setup(request,
     # - Reusing clusters but explicitly asking for a new one
     # - Wanting to reuse but env doesn't allow reusing
     # - Wanting to reuse but no reusable cluster was present
-    print("****************************Reuse cluster: " + reuse_option)
-    cant_reuse = reusable_dtest_setup is not None and not can_reuse_cluster(request, reusable_dtest_setup)
+
+    logger.info("Reuse cluster: %s", reuse_option)
+    cant_reuse_reason = can_reuse_cluster_reason(request, reusable_dtest_setup)
+    cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
     missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == "REUSE_CLUSTER_YES"
     if reuse_option == "REUSE_CLUSTER_NO"\
             or reuse_option == "REUSE_CLUSTER_CREATE"\
@@ -385,15 +385,15 @@ def fixture_dtest_setup(request,
 
         reason = "non-reusable requested" if reuse_option == "REUSE_CLUSTER_NO" else "reusable requested"
         if cant_reuse:
-            reason = "Can't reuse"
+            reason = "Can't reuse bc " + cant_reuse_reason
         if missing_reuse_cluster:
             reason = "Requested reusable cluster but none present"
 
-        print("****************************Cleaning previous cluster if needed")
+        logger.info("Cleaning previous cluster if needed")
         safe_cluster_cleanup(request, reusable_dtest_setup)
         reusable_dtest_setup = None
 
-        print("****************************Creating new cluster reason: " + reason)
+        logger.info("Creating new cluster reason: %s", reason)
         dtest_setup = setup_cluster(dtest_config,
                                     fixture_dtest_setup_overrides,
                                     fixture_dtest_cluster_name,
@@ -445,27 +445,24 @@ def fixture_dtest_setup(request,
                 safe_cluster_cleanup(request, dtest_setup)
                 reusable_dtest_setup = None
 
-def can_reuse_cluster(request, dtest_setup):
+def can_reuse_cluster_reason(request, dtest_setup):
     global last_test_class
 
     if dtest_setup is None:
-        print("******************Can't reuse bc reusable cluster is None")
-        return False
+        return "Can't reuse bc reusable cluster is None"
 
     # Can't reuse if some nodes down
     if dtest_setup is not None \
             and len([node for node in dtest_setup.cluster.nodelist() if
                     node.is_live()]) != len(dtest_setup.cluster.nodelist()):
-        print("******************Can't reuse bc num live nodes doesn't match")
-        return True
+        return "Can't reuse bc num live nodes doesn't match"
 
     # When passing tests as line items to pytest a 'class' fixture won't work hence this hack
     current_test_class = str(request.cls.__name__)
     if last_test_class is not None and last_test_class != current_test_class:
-        print("******************Can't reuse bc new test class: " + last_test_class + " -> " + current_test_class)
-        return False;
+        return "Can't reuse bc new test class: " + last_test_class + " -> " + current_test_class
 
-    return True
+    return None
 
 def safe_cluster_cleanup(request, dtest_setup):
     if dtest_setup is not None:
