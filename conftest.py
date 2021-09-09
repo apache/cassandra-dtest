@@ -381,9 +381,9 @@ def fixture_dtest_setup(request,
             or cant_reuse\
             or missing_reuse_cluster:
 
-        reason = "non-reusable requested" if reuse_option == "REUSE_CLUSTER_NO" else "reusable requested"
+        reason = ("non-reusable" if reuse_option == "REUSE_CLUSTER_NO" else "reusable") + " requested"
         if cant_reuse:
-            reason = "Can't reuse bc " + cant_reuse_reason
+            reason = cant_reuse_reason
         if missing_reuse_cluster:
             reason = "Requested reusable cluster but none present"
 
