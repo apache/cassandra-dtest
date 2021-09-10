@@ -548,9 +548,12 @@ class SkipConditions:
     def __init__(self, dtest_config, sufficient_resources):
         self.skip_upgrade_tests = not dtest_config.execute_upgrade_tests and not dtest_config.execute_upgrade_tests_only
         self.skip_non_upgrade_tests = dtest_config.execute_upgrade_tests_only
-        self.skip_resource_intensive_tests = (
+        self.skip_resource_intensive_due_to_resources = (
             not dtest_config.force_execution_of_resource_intensive_tests
-            and not sufficient_resources) or dtest_config.skip_resource_intensive_tests
+            and not sufficient_resources)
+        self.skip_resource_intensive_tests = (
+            self.skip_resource_intensive_due_to_resources
+            or dtest_config.skip_resource_intensive_tests)
         self.skip_non_resource_intensive_tests = dtest_config.only_resource_intensive_tests
         self.skip_vnodes_tests = not dtest_config.use_vnodes
         self.skip_no_vnodes_tests = dtest_config.use_vnodes
@@ -606,10 +609,10 @@ def pytest_collection_modifyitems(items, config):
     sufficient_resources = sufficient_system_resources_for_resource_intensive_tests()
     skip_conditions = SkipConditions(dtest_config, sufficient_resources)
 
-    if skip_conditions.skip_resource_intensive_tests:
+    if skip_conditions.skip_resource_intensive_due_to_resources:
         logger.info("Resource intensive tests will be skipped because "
-                    "it was requested to skip or there is not enough system resource "
-                    "and --force-resource-intensive-tests were not specified")
+                    "there is not enough system resources "
+                    "and --force-resource-intensive-tests was not specified")
 
     for item in items:
         deselect_test = SkipConditions.is_skippable(skip_conditions, item)
