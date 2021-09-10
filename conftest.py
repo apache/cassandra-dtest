@@ -362,7 +362,7 @@ def fixture_dtest_setup(request,
     #reuse_option = "REUSE_CLUSTER_NO"
 
     dtest_setup = None
-    global reusable_dtest_setup # Reusable cluster/nodes/config
+    global reusable_dtest_setup
     global last_test_class
 
     initial_environment = copy.deepcopy(os.environ)
