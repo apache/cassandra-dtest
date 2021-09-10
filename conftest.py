@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 from distutils.version import LooseVersion
 # Python 3 imports
+from enum import Enum
 from itertools import zip_longest
 
 import ccmlib.repository
@@ -123,18 +124,23 @@ def fixture_dtest_setup_overrides(dtest_config):
     """
     return DTestSetupOverrides()
 
+class Reuse_cluster(Enum):
+    REUSE_CLUSTER_NO = 1
+    REUSE_CLUSTER_CREATE = 2
+    REUSE_CLUSTER_YES = 3
+
 @pytest.fixture(scope='function', autouse=True)
 def fixture_dtest_reuse_cluster(request):
     marker = request.node.get_closest_marker("reuse_cluster")
 
     if marker is None:
-        return "REUSE_CLUSTER_NO"
+        return Reuse_cluster.REUSE_CLUSTER_NO
 
     start_new_cluster = marker.kwargs.get('new_cluster', False)
     if start_new_cluster:
-        return "REUSE_CLUSTER_CREATE"
+        return Reuse_cluster.REUSE_CLUSTER_CREATE
     else:
-        return "REUSE_CLUSTER_YES"
+        return Reuse_cluster.REUSE_CLUSTER_YES
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -357,9 +363,9 @@ def fixture_dtest_setup(request,
     #TODO
     #Byteman cleanup
 
-    # Use reuse_option = "REUSE_CLUSTER_NO" to fully disable node-reusage
+    # Use reuse_option = Reuse_cluster.REUSE_CLUSTER_NO to fully disable node-reusage
     reuse_option = fixture_dtest_reuse_cluster
-    #reuse_option = "REUSE_CLUSTER_NO"
+    #reuse_option = Reuse_cluster.REUSE_CLUSTER_NO
 
     dtest_setup = None
     global reusable_dtest_setup
@@ -373,15 +379,15 @@ def fixture_dtest_setup(request,
     # - Wanting to reuse but env doesn't allow reusing
     # - Wanting to reuse but no reusable cluster available
     logger.info("Reuse cluster: %s", reuse_option)
-    cant_reuse_reason = can_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class)
+    cant_reuse_reason = cant_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class)
     cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
-    missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == "REUSE_CLUSTER_YES"
-    if reuse_option == "REUSE_CLUSTER_NO"\
-            or reuse_option == "REUSE_CLUSTER_CREATE"\
+    missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES
+    if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO\
+            or reuse_option == Reuse_cluster.REUSE_CLUSTER_CREATE\
             or cant_reuse\
             or missing_reuse_cluster:
 
-        reason = ("non-reusable" if reuse_option == "REUSE_CLUSTER_NO" else "reusable") + " requested"
+        reason = ("non-reusable" if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO else "reusable") + " requested"
         if cant_reuse:
             reason = cant_reuse_reason
         if missing_reuse_cluster:
@@ -398,10 +404,10 @@ def fixture_dtest_setup(request,
                                     fixture_dtest_create_cluster_func,
                                     False)
 
-        if reuse_option == "REUSE_CLUSTER_CREATE" or missing_reuse_cluster:
+        if reuse_option == Reuse_cluster.REUSE_CLUSTER_CREATE or missing_reuse_cluster:
             reusable_dtest_setup = dtest_setup
 
-    elif reusable_dtest_setup is not None and reuse_option == "REUSE_CLUSTER_YES":
+    elif reusable_dtest_setup is not None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES:
         drop_test_ks(reusable_dtest_setup)
         dtest_setup = reusable_dtest_setup
     else:
@@ -441,12 +447,12 @@ def fixture_dtest_setup(request,
         except Exception as e:
             logger.error("Error saving log:", str(e))
         finally:
-            if failed or reuse_option == "REUSE_CLUSTER_NO":
+            if failed or reuse_option == Reuse_cluster.REUSE_CLUSTER_NO:
                 safe_cluster_cleanup(request, dtest_setup)
                 reusable_dtest_setup = None
 
 
-def can_reuse_cluster_reason(request, dtest_setup, last_test_class):
+def cant_reuse_cluster_reason(request, dtest_setup, last_test_class):
     if dtest_setup is None:
         return "Can't reuse bc reusable cluster is None"
 

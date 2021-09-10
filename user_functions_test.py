@@ -50,7 +50,7 @@ class TestUserFunctions(Tester):
             create_ks(session, 'ks', rf)
         return session
 
-    #@reuse_cluster(new_cluster=True)
+    @reuse_cluster(new_cluster=True)
     def test_migration(self):
         """ Test migration of user functions """
         cluster = self.cluster
@@ -141,7 +141,7 @@ class TestUserFunctions(Tester):
                        "CREATE FUNCTION bad_sin ( input double ) CALLED ON NULL INPUT RETURNS uuid LANGUAGE java AS 'return Math.sin(input);';",
                        "Type mismatch: cannot convert from double to UUID")
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_udf_overload(self):
 
         session = self.prepare(nodes=3)
@@ -176,7 +176,7 @@ class TestUserFunctions(Tester):
         # should now work - unambiguous
         session.execute("DROP FUNCTION overloaded")
 
-    #@reuse_cluster(new_cluster=True)
+    @reuse_cluster(new_cluster=True)
     def test_udf_scripting(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
@@ -200,7 +200,7 @@ class TestUserFunctions(Tester):
 
         assert_one(session, "select plustwo(key) from nums where key = 3", [5])
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_default_aggregate(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
@@ -214,7 +214,7 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT avg(val) FROM nums", [5.0])
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_aggregate_udf(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val int);")
@@ -234,7 +234,7 @@ class TestUserFunctions(Tester):
 
         assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_udf_with_udt(self):
         """
         Test UDFs that operate on non-frozen UDTs.
@@ -266,7 +266,7 @@ class TestUserFunctions(Tester):
             assert_invalid(session, "drop type test;")
 
     @since('2.2')
-    #@reuse_cluster
+    @reuse_cluster
     def test_udf_with_udt_keyspace_isolation(self):
         """
         Ensure functions dont allow a UDT from another keyspace
@@ -293,7 +293,7 @@ class TestUserFunctions(Tester):
             "Statement on keyspace user_ks cannot refer to a user type in keyspace ks"
         )
 
-    #@reuse_cluster
+    @reuse_cluster
     def test_aggregate_with_udt_keyspace_isolation(self):
         """
         Ensure aggregates dont allow a UDT from another keyspace
