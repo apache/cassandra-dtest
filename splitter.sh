@@ -21,8 +21,18 @@ then
 fi
 
 #Get the numbers per no/reusage
-linesReuse=`wc -l $reusableTestsFile | cut -d " " -f 1`
-linesRenew=`wc -l $renewableTestsFile | cut -d " " -f 1`
+if [ ! -f $reusableTestsFile ]
+then
+  linesReuse=0
+else
+  linesReuse=`wc -l $reusableTestsFile | cut -d " " -f 1`
+fi
+if [ ! -f $renewableTestsFile ]
+then
+  linesRenew=0
+else
+  linesRenew=`wc -l $renewableTestsFile | cut -d " " -f 1`
+fi
 totalTests=`expr $linesReuse + $linesRenew`
 testsPerSplit=`expr $totalTests / $splits`
 echo "Reuse cluster tests: " $linesReuse
