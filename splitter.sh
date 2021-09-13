@@ -1,17 +1,22 @@
 #!/bin/bash
 
+set -x
+
 chunk=$1
 splits=$2
+reusableTestsFile=$3
+renewableTestsFile=$4
+outFile=$5
 
-if [ -z "$chunk" ] || [ -z "$splits" ]
+if [ -z "$chunk" ] || [ -z "$splits" ] || [ -z "$reusableTestsFile" ] || [ -z "$renewableTestsFile" ] || [ -z "$outFile" ]
 then
-  echo "Usage: splitter.sh <chunk> <splits>"
+  echo "Usage: splitter.sh <chunk> <splits> <reusableTestsFile> <renewableTestsFile> <outFile>"
   exit 1
 fi
 
 #Get the numbers per no/reusage
-linesReuse=`wc -l reuseClusterTests.txt | cut -d " " -f 1`
-linesRenew=`wc -l renewClusterTests.txt | cut -d " " -f 1`
+linesReuse=`wc -l $reusableTestsFile | cut -d " " -f 1`
+linesRenew=`wc -l $renewableTestsFile | cut -d " " -f 1`
 totalTests=`expr $linesReuse + $linesRenew`
 testsPerSplit=`expr $totalTests / $splits`
 echo "Reuse cluster tests: " $linesReuse
@@ -27,12 +32,12 @@ echo "Reuse cluster splits: " $reuseClusterSplits
 echo "Renew cluster splits: " $renewClusterSplits
 
 #Split non reusable cluster tests with round robin to spread weight of heavy test classes
-split -n r/$renewClusterSplits --suffix-length=6 --numeric-suffixes=1 --additional-suffix=testSplitsRR renewClusterTests.txt
+split -n r/$renewClusterSplits --suffix-length=6 --numeric-suffixes=1 --additional-suffix=testSplitsRR $renewableTestsFile
 rm renewClusterTestsRR.txt
 cat x*testSplitsRR >> renewClusterTestsRR.txt
 
 #Put reusable tests first and the RR non-reusable later. awk needed bc sometimes some file had no newline at the end
-awk 1 reuseClusterTests.txt > test_list.txt
+awk 1 $reusableTestsFile > test_list.txt
 awk 1 renewClusterTestsRR.txt >> test_list.txt
 rm x*testSplitsRR
 
@@ -41,3 +46,6 @@ printf -v formattedChunk "%06d" $chunk
 mySplitFile="x${formattedChunk}testSplits"
 echo "My split is: " $mySplitFile
 cp $mySplitFile test_list.txt
+cp test_list.txt $outFile
+
+rm renewClusterTestsRR.txt
