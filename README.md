@@ -106,6 +106,9 @@ new one. So the annotation is the they way to opt in/out node reusage.
 
 Using ``new_cluster=True`` for the first test in the 'string' is mandatory for CI test spitting to work correctly.
 
+To disable node reusage on a class comment out the annotations. To completely disable it in conftest.py::fixture_dtest_setup 
+you have a flag to do so.
+
 Writing Tests
 -------------
 
