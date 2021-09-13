@@ -14,6 +14,12 @@ then
   exit 1
 fi
 
+#Circle chunks start a 0, jenkins chunks start at 1
+if [ "$CIRCLECI" = true ]
+then
+  chunk=`expr $chunk + 1`
+fi
+
 #Get the numbers per no/reusage
 linesReuse=`wc -l $reusableTestsFile | cut -d " " -f 1`
 linesRenew=`wc -l $renewableTestsFile | cut -d " " -f 1`
@@ -34,18 +40,17 @@ echo "Renew cluster splits: " $renewClusterSplits
 #Split non reusable cluster tests with round robin to spread weight of heavy test classes
 split -n r/$renewClusterSplits --suffix-length=6 --numeric-suffixes=1 --additional-suffix=testSplitsRR $renewableTestsFile
 rm renewClusterTestsRR.txt
-cat x*testSplitsRR >> renewClusterTestsRR.txt
+awk 1 x*testSplitsRR >> renewClusterTestsRR.txt
 
 #Put reusable tests first and the RR non-reusable later. awk needed bc sometimes some file had no newline at the end
-awk 1 $reusableTestsFile > test_list.txt
-awk 1 renewClusterTestsRR.txt >> test_list.txt
+awk 1 $reusableTestsFile > test_list_arranged.txt
+awk 1 renewClusterTestsRR.txt >> test_list_arranged.txt
 rm x*testSplitsRR
 
-split -n l/$splits --suffix-length=6 --numeric-suffixes=1 --additional-suffix=testSplits test_list.txt
+split -n l/$splits --suffix-length=6 --numeric-suffixes=1 --additional-suffix=testSplits test_list_arranged.txt
 printf -v formattedChunk "%06d" $chunk
 mySplitFile="x${formattedChunk}testSplits"
 echo "My split is: " $mySplitFile
-cp $mySplitFile test_list.txt
-cp test_list.txt $outFile
+cp $mySplitFile $outFile
 
 rm renewClusterTestsRR.txt
