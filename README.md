@@ -82,13 +82,29 @@ the ``--count`` option. For example, to run a test class 10 times:
 
     pytest --count=10 --cassandra-dir=~/path/to/cassandra pending_range_test.py
 
+Use ``--log-cli-level=DEBUG`` to get log messages emitted from the test
+
+    pytest --log-cli-level=DEBUG --cassandra-dir=~/path/to/cassandra pending_range_test.py
+
 Existing tests are probably the best place to start to look at how to write
 tests.
 
+Node reusage
+------------
 Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
+
+As dtests can be very heavy in order to speed up things noreusage has been implemented. Basically a test starts a cluster
+and the string of annotated tests immediately after that one will reuse that cluster. Big time and costs (for paid CI 
+services) can be achieved by doing so.
+
+The first test that sets up the reusable cluster must be annotated with ``@reuse_cluster(new_cluster=True)``. Following 
+tests must be annotated with ``@reuse_cluster``. Any non-annotated test will dispose any reusable cluster and start a 
+new one. So the annotation is the they way to opt in/out node reusage.
+
+Using ``new_cluster=True`` for the first test in the 'string' is mandatory for CI test spitting to work correctly.
 
 Writing Tests
 -------------

@@ -362,6 +362,7 @@ def fixture_dtest_setup(request,
                         fixture_dtest_reuse_cluster):
     #TODO
     #Byteman cleanup
+    #Auto detect configuration options
 
     # Use reuse_option = Reuse_cluster.REUSE_CLUSTER_NO to fully disable node-reusage
     reuse_option = fixture_dtest_reuse_cluster

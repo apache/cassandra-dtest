@@ -20,6 +20,7 @@ from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from tools.paging import PageAssertionMixin, PageFetcher
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ class BasePagingTester(Tester):
         supports_v5 = self.supports_v5_protocol(self.cluster.version())
         protocol_version = 5 if supports_v5 else None
         cluster = self.cluster
-        cluster.populate(3).start()
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1,
                                               protocol_version=protocol_version,
@@ -425,6 +427,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 @since('2.0')
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
+    @reuse_cluster(new_cluster=True)
     def test_paging_a_single_wide_row(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -450,6 +453,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert pf.num_results_all(), [3000, 3000, 3000, 1000]
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="value")
 
+    @reuse_cluster
     def test_paging_across_multi_wide_rows(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -476,6 +480,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert pf.num_results_all(), [3000, 3000, 3000, 1000]
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="value")
 
+    @reuse_cluster
     def test_paging_using_secondary_indexes(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -514,6 +519,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert pf.num_results_all() == [400, 200]
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="sometext")
 
+    @reuse_cluster
     def test_paging_with_in_orderby_and_two_partition_keys(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -522,6 +528,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert_invalid(session, "select * from paging_test where col_1=1 and col_2 IN (1, 2) order by col_3 desc;", expected=InvalidRequest)
         assert_invalid(session, "select * from paging_test where col_2 IN (1, 2) and col_1=1 order by col_3 desc;", expected=InvalidRequest)
 
+    @reuse_cluster
     @since('3.10')
     def test_group_by_paging(self):
         """
@@ -864,6 +871,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             assert res == [[1, 2, 1, 3],
                                    [1, 4, 2, 6]]
 
+    @reuse_cluster
     @since('3.10')
     def test_group_by_with_range_name_query_paging(self):
         """
@@ -940,6 +948,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             assert res == [[1, 1, 2, 2, 2],
                                    [2, 1, 3, 2, 3]]
 
+    @reuse_cluster
     @since('3.10')
     def test_group_by_with_static_columns_paging(self):
         """
@@ -1448,6 +1457,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
             assert res == [[1, 1, 4, 3]]
 
+    @reuse_cluster
     @since('2.0.6')
     def test_static_columns_paging(self):
         """
@@ -1653,6 +1663,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                 if "s2" in selector:
                     assert [42] * 10 == [r.s2 for r in results]
 
+    @reuse_cluster
     @since('2.0.6')
     def test_paging_using_secondary_indexes_with_static_cols(self):
         session = self.prepare()
@@ -1692,6 +1703,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         assert pf.num_results_all() == [400, 200]
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="sometext")
 
+    @reuse_cluster
     def test_static_columns_with_empty_non_static_columns_paging(self):
         """
         @jira_ticket CASSANDRA-10381.
@@ -1710,6 +1722,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         results = list(session.execute("SELECT * FROM test WHERE a IN (0, 1, 2, 3, 4)"))
         assert [0, 1, 2, 3, 4] == sorted([r.s for r in results])
 
+    @reuse_cluster
     def test_select_in_clause_with_duplicate_keys(self):
         """
         @jira_ticket CASSANDRA-12420
@@ -1735,6 +1748,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                        [1, 2, 1, 1],
                                        [1, 2, 2, 2]]
 
+    @reuse_cluster
     @since('3.0.0')
     def test_paging_with_filtering(self):
         """
@@ -1909,6 +1923,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [2, 3, 4, 5],
                                               [3, 3, 4, 5]])
 
+    @reuse_cluster
     @since('3.6')
     def test_paging_with_filtering_on_counter_columns(self):
         """
@@ -1918,6 +1933,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_counter_columns(session, False)
 
+    @reuse_cluster
     @since("3.6", max_version="3.X")  # Compact Storage
     def test_paging_with_filtering_on_counter_columns_compact(self):
         """
@@ -1999,6 +2015,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                  [3, 3, 4, 5],
                                                                                                                  [4, 3, 4, 5]], ignore_order=True)
 
+    @reuse_cluster
     @since('3.6')
     def test_paging_with_filtering_on_clustering_columns(self):
         """
@@ -2008,6 +2025,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, False)
 
+    @reuse_cluster
     @since('3.6', max_version="3.X")  # Compact Storage
     def test_paging_with_filtering_on_clustering_columns_compact(self):
         """
@@ -2017,6 +2035,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_clustering_columns(session, True)
 
+    @reuse_cluster
     @since('3.6')
     def test_paging_with_filtering_on_clustering_columns_with_contains(self):
         """
@@ -2096,6 +2115,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                             [3, 0, {1: 2}, 3],
                                                                                                             [4, 0, {1: 2}, 3]], ignore_order=True)
 
+    @reuse_cluster
     @since('3.6')
     def test_paging_with_filtering_on_static_columns(self):
         """
@@ -2135,6 +2155,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                        [3, 6, 4, 7],
                                                                                                                        [3, 5, 4, 6]])
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key(self):
         """
@@ -2236,6 +2257,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             # Single partition query with ORDER BY and LIMIT
             assert_invalid(session, "SELECT * FROM test WHERE a <= 0 AND c >= 1 ORDER BY b DESC LIMIT 2 ALLOW FILTERING", expected=InvalidRequest)
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_with_limit(self):
         """
@@ -2304,6 +2326,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [3, 3, 4, 5],
                                               [4, 3, 4, 5]])
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_counter_columns(self):
         """
@@ -2314,6 +2337,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self._test_paging_with_filtering_on_partition_key_on_counter_columns(session, False)
 
+    @reuse_cluster
     @since('3.10', max_version="3.X")  # Compact Storage
     def test_paging_with_filtering_on_partition_key_on_counter_columns_compact(self):
         """
@@ -2407,6 +2431,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [1, 4, 5, 6],
                                               [4, 4, 5, 6]])
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_clustering_columns(self):
         """
@@ -2416,6 +2441,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, False)
 
+    @reuse_cluster
     @since('3.10', max_version="3.X")
     def test_paging_with_filtering_on_partition_key_on_clustering_columns_compact(self):
         """
@@ -2425,6 +2451,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session = self.prepare(row_factory=tuple_factory)
         self._test_paging_with_filtering_on_partition_key_on_clustering_columns(session, True)
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_clustering_columns_with_contains(self):
         """
@@ -2505,6 +2532,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                               [3, 0, {1: 2}, 3],
                                               [4, 0, {1: 2}, 3]])
 
+    @reuse_cluster
     @since('3.10')
     def test_paging_with_filtering_on_partition_key_on_static_columns(self):
         """
@@ -2538,6 +2566,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
             assert_invalid(session, "SELECT * FROM test WHERE s > 1 AND a < 2 AND b > 4 ORDER BY b DESC ALLOW FILTERING", expected=InvalidRequest)
 
+    @reuse_cluster
     @since('2.1.14', max_version="3.X")  # Compact Storage
     def test_paging_on_compact_table_with_tombstone_on_first_column(self):
         """
@@ -2561,6 +2590,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                        [4, None, 1],
                                                        [3, None, 1]])
 
+    @reuse_cluster
     def test_paging_with_no_clustering_columns(self):
         """
         test paging for tables without clustering columns
@@ -2571,6 +2601,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
         session.execute("CREATE TABLE test (a int primary key, b int)")
         self._test_paging_with_no_clustering_columns('test', session)
 
+    @reuse_cluster
     @since("2.0", max_version="3.X")
     def test_paging_with_no_clustering_columns_compact(self):
         """
@@ -2635,6 +2666,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                         [2],
                                                                                                         [3]])
 
+    @reuse_cluster
     @since('3.6')
     def test_per_partition_limit_paging(self):
         """
@@ -2718,6 +2750,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             assert_all(session, "SELECT * FROM test WHERE a = 1 AND b > 1 ORDER BY b DESC PER PARTITION LIMIT 2 ALLOW FILTERING", [[1, 4, 4],
                                                                                                                                    [1, 3, 3]])
 
+    @reuse_cluster
     def test_paging_for_range_name_queries(self):
         """
         test paging for range name queries
@@ -2729,6 +2762,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
         self._test_paging_for_range_name_queries('test', session)
 
+    @reuse_cluster
     @since("2.0", max_version="3.X")  # Compact Storage
     def test_paging_for_range_name_queries_compact(self):
         """
@@ -2782,6 +2816,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
                                                                                                                           [3, 2, 1, 5],
                                                                                                                           [3, 2, 2, 5]])
 
+    @reuse_cluster
     @flaky
     @since('2.1')
     def test_paging_with_empty_row_and_empty_static_columns(self):
@@ -2833,6 +2868,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
 
+    @reuse_cluster(new_cluster=True)
     def test_data_change_impacting_earlier_page(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -2867,6 +2903,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
 
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @reuse_cluster
     def test_data_change_impacting_later_page(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -2902,6 +2939,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         expected_data.append({'id': 2, 'mytext': 'foo'})
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
 
+    @reuse_cluster
     def test_row_TTL_expiry_during_paging(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -2946,6 +2984,7 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         assert pf.pagecount() == 3
         assert pf.num_results_all() == [300, 300, 200]
 
+    @reuse_cluster
     def test_cell_TTL_expiry_during_paging(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -3197,6 +3236,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             page_data = pf.page_data(i + 1)
             assert page_data == expected_pages_data[i]
 
+    @reuse_cluster(new_cluster=True)
     def test_single_partition_deletions(self):
         """Test single partition deletions """
         self.session = self.prepare()
@@ -3235,6 +3275,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         expected_data = [row for row in expected_data if row['id'] != 4]
         self.check_all_paging_results(expected_data, 2, [25, 15])
 
+    @reuse_cluster
     def test_multiple_partition_deletions(self):
         """Test multiple partition deletions """
         self.session = self.prepare()
@@ -3248,6 +3289,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         expected_data = [row for row in expected_data if row['id'] == 1]
         self.check_all_paging_results(expected_data, 2, [25, 15])
 
+    @reuse_cluster
     def test_single_row_deletions(self):
         """Test single row deletions """
         self.session = self.prepare()
@@ -3294,6 +3336,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 7,
                                       [25, 25, 25, 25, 25, 25, 25])
 
+    @reuse_cluster
     @pytest.mark.skip(reason="Feature In Development")
     def test_multiple_row_deletions(self):
         """
@@ -3316,6 +3359,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 20])
 
+    @reuse_cluster
     def test_single_cell_deletions(self):
         """Test single cell deletions """
         self.session = self.prepare()
@@ -3363,6 +3407,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
+    @reuse_cluster
     def test_multiple_cell_deletions(self):
         """Test multiple cell deletions """
         self.session = self.prepare()
@@ -3398,6 +3443,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         self.check_all_paging_results(expected_data, 8,
                                       [25, 25, 25, 25, 25, 25, 25, 25])
 
+    @reuse_cluster
     def test_ttl_deletions(self):
         """Test ttl deletions. Paging over a query that has only tombstones """
         self.session = self.prepare()
@@ -3417,6 +3463,42 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
                                       [25, 25, 25, 25, 25, 25, 25, 25])
         time.sleep(ttl_seconds)
         self.check_all_paging_results([], 0, [])
+
+    @reuse_cluster
+    @since('2.2.6')
+    def test_deletion_with_distinct_paging(self):
+        """
+        Test that deletion does not affect paging for distinct queries.
+
+        @jira_ticket CASSANDRA-10010
+        """
+        self.session = self.prepare()
+        create_ks(self.session, 'test_paging_size', 2)
+        self.session.execute("CREATE TABLE paging_test ( "
+                             "k int, s int static, c int, v int, "
+                             "PRIMARY KEY (k, c) )")
+
+        for whereClause in ('', 'WHERE k IN (0, 1, 2, 3)'):
+            for i in range(4):
+                for j in range(2):
+                    self.session.execute("INSERT INTO paging_test (k, s, c, v) VALUES (%s, %s, %s, %s)", (i, i, j, j))
+
+            self.session.default_fetch_size = 2
+            result = self.session.execute("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
+            result = list(result)
+            assert 4 == len(result)
+
+            future = self.session.execute_async("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
+
+            # this will fetch the first page
+            fetcher = PageFetcher(future)
+
+            # delete the first row in the last partition that was returned in the first page
+            self.session.execute("DELETE FROM paging_test WHERE k = %s AND c = %s", (result[1]['k'], 0))
+
+            # finish paging
+            fetcher.request_all()
+            assert [2, 2] == fetcher.num_results_all()
 
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
@@ -3459,38 +3541,3 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             failure_msg = ("Scanned over.* tombstones during query.* query aborted")
 
         self.cluster.wait_for_any_log(failure_msg, 25)
-
-    @since('2.2.6')
-    def test_deletion_with_distinct_paging(self):
-        """
-        Test that deletion does not affect paging for distinct queries.
-
-        @jira_ticket CASSANDRA-10010
-        """
-        self.session = self.prepare()
-        create_ks(self.session, 'test_paging_size', 2)
-        self.session.execute("CREATE TABLE paging_test ( "
-                             "k int, s int static, c int, v int, "
-                             "PRIMARY KEY (k, c) )")
-
-        for whereClause in ('', 'WHERE k IN (0, 1, 2, 3)'):
-            for i in range(4):
-                for j in range(2):
-                    self.session.execute("INSERT INTO paging_test (k, s, c, v) VALUES (%s, %s, %s, %s)", (i, i, j, j))
-
-            self.session.default_fetch_size = 2
-            result = self.session.execute("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
-            result = list(result)
-            assert 4 == len(result)
-
-            future = self.session.execute_async("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
-
-            # this will fetch the first page
-            fetcher = PageFetcher(future)
-
-            # delete the first row in the last partition that was returned in the first page
-            self.session.execute("DELETE FROM paging_test WHERE k = %s AND c = %s", (result[1]['k'], 0))
-
-            # finish paging
-            fetcher.request_all()
-            assert [2, 2] == fetcher.num_results_all()
