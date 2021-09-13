@@ -4,7 +4,7 @@ import pytest
 import logging
 
 from dtest import Tester, MAJOR_VERSION_4
-from sstable_generation_loading_test import TestBaseSStableLoader
+from sstable_generation_loading_test import BaseSStableLoaderTester
 from thrift_bindings.thrift010.Cassandra import (ConsistencyLevel, Deletion,
                                            Mutation, SlicePredicate,
                                            SliceRange)
@@ -464,7 +464,7 @@ class TestBootstrapAfterUpgrade(TestStorageEngineUpgrade):
 
 @pytest.mark.upgrade_test
 @since('3.0', max_version='3.99')
-class TestLoadKaSStables(TestBaseSStableLoader):
+class TestLoadKaSStables(BaseSStableLoaderTester):
     upgrade_test = True
     upgrade_from = '2.1.20'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
@@ -472,7 +472,7 @@ class TestLoadKaSStables(TestBaseSStableLoader):
 
 @pytest.mark.upgrade_test
 @since('3.0', max_version='3.99')
-class TestLoadKaCompactSStables(TestBaseSStableLoader):
+class TestLoadKaCompactSStables(BaseSStableLoaderTester):
     upgrade_test = True
     upgrade_from = '2.1.20'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
@@ -481,7 +481,7 @@ class TestLoadKaCompactSStables(TestBaseSStableLoader):
 
 @pytest.mark.upgrade_test
 @since('3.0', max_version='3.99')
-class TestLoadLaSStables(TestBaseSStableLoader):
+class TestLoadLaSStables(BaseSStableLoaderTester):
     upgrade_test = True
     upgrade_from = '2.2.13'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
@@ -489,7 +489,7 @@ class TestLoadLaSStables(TestBaseSStableLoader):
 
 @pytest.mark.upgrade_test
 @since('3.0', max_version='3.99')
-class TestLoadLaCompactSStables(TestBaseSStableLoader):
+class TestLoadLaCompactSStables(BaseSStableLoaderTester):
     upgrade_test = True
     upgrade_from = '2.2.13'
     jvm_args = LEGACY_SSTABLES_JVM_ARGS
@@ -498,25 +498,25 @@ class TestLoadLaCompactSStables(TestBaseSStableLoader):
 
 @pytest.mark.upgrade_test
 @since('4.0', max_version='4.99')
-class TestLoadMdSStables(TestBaseSStableLoader):
+class TestLoadMdSStables(BaseSStableLoaderTester):
     upgrade_from = '3.0.17'
 
 
 @pytest.mark.upgrade_test
 @since('4.0', max_version='4.99')
-class TestLoadMdCompactSStables(TestBaseSStableLoader):
+class TestLoadMdCompactSStables(BaseSStableLoaderTester):
     upgrade_from = '3.0.17'
     test_compact = True
 
 
 @pytest.mark.upgrade_test
 @since('4.0', max_version='4.99')
-class TestLoadMdThreeOneOneSStables(TestBaseSStableLoader):
+class TestLoadMdThreeOneOneSStables(BaseSStableLoaderTester):
     upgrade_from = '3.11.3'
 
 
 @pytest.mark.upgrade_test
 @since('4.0', max_version='4.99')
-class TestLoadMdThreeOneOneCompactSStables(TestBaseSStableLoader):
+class TestLoadMdThreeOneOneCompactSStables(BaseSStableLoaderTester):
     upgrade_from = '3.11.3'
     test_compact = True

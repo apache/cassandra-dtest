@@ -1,12 +1,12 @@
 import pytest
 
-from bootstrap_test import TestBootstrap
+from bootstrap_test import BootstrapTester
 
 since = pytest.mark.since
 
 
 @pytest.mark.upgrade_test
-class TestBootstrapUpgrade(TestBootstrap):
+class TestBootstrapUpgrade(BootstrapTester):
 
     """
     @jira_ticket CASSANDRA-11841

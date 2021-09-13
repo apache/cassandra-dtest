@@ -28,7 +28,8 @@ since = pytest.mark.since
 ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
-class TestBootstrap(Tester):
+
+class BootstrapTester(Tester):
     byteman_submit_path_pre_4_0 = './byteman/pre4.0/stream_failure.btm'
     byteman_submit_path_4_0 = './byteman/4.0/stream_failure.btm'
 
@@ -1097,3 +1098,13 @@ class TestBootstrap(Tester):
         # 3. check host_id in other node's table
         session1 = self.patient_exclusive_cql_connection(node1)
         assert_one(session1, "SELECT host_id FROM system.peers_v2 WHERE peer = {}".format(address2), [uuid.UUID(host_id)])
+
+
+class TestBootstrap(BootstrapTester):
+    """
+    This child class is a helper for PyTest to pick up the test methods.
+    Since the same test methods are executed as part of upgrade, this helper child class is
+    necessary to avoid double execution of the same tests.
+    It is necessary to put some dummy expression in this child class.
+    """
+    pass
