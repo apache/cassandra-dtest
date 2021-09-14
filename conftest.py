@@ -380,7 +380,7 @@ def fixture_dtest_setup(request,
     # - Wanting to reuse but env doesn't allow reusing
     # - Wanting to reuse but no reusable cluster available
     logger.info("Reuse cluster: %s", reuse_option)
-    cant_reuse_reason = cant_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class)
+    cant_reuse_reason = cant_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class, dtest_config)
     cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
     missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES
     if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO\
@@ -405,9 +405,7 @@ def fixture_dtest_setup(request,
                                     fixture_dtest_create_cluster_func,
                                     False)
 
-        if reuse_option == Reuse_cluster.REUSE_CLUSTER_CREATE or missing_reuse_cluster:
-            reusable_dtest_setup = dtest_setup
-
+        reusable_dtest_setup = dtest_setup
     elif reusable_dtest_setup is not None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES:
         drop_test_ks(reusable_dtest_setup)
         dtest_setup = reusable_dtest_setup
@@ -453,7 +451,7 @@ def fixture_dtest_setup(request,
                 reusable_dtest_setup = None
 
 
-def cant_reuse_cluster_reason(request, dtest_setup, last_test_class):
+def cant_reuse_cluster_reason(request, dtest_setup, last_test_class, dtest_config):
     if dtest_setup is None:
         return "Can't reuse bc reusable cluster is None"
 
@@ -467,6 +465,11 @@ def cant_reuse_cluster_reason(request, dtest_setup, last_test_class):
     current_test_class = str(request.cls.__name__)
     if last_test_class is not None and last_test_class != current_test_class:
         return "Can't reuse bc new test class: " + last_test_class + " -> " + current_test_class
+
+    #Only reuse nodes starting at 4.0
+    current_vesion = dtest_config.cassandra_version_from_build
+    if loose_version_compare(LooseVersion('4.0.1'), current_vesion) > 0:
+        return "Can't reuse bc current version: " + str(current_vesion) + " is not gt 4.0.1 "
 
     return None
 
