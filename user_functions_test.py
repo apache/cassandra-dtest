@@ -40,9 +40,7 @@ class TestUserFunctions(Tester):
             cluster.populate(nodes).start()
             node1 = cluster.nodelist()[0]
             time.sleep(0.2)
-            print("*** Started nodes: " + str(nodes))
         else:
-            print("*** Reusing nodes: " + str(nodes))
             node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
