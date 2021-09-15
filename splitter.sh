@@ -34,11 +34,6 @@ else
   linesRenew=`wc -l $renewableTestsFile | cut -d " " -f 1`
 fi
 
-echo REUSABLE FILE
-cat $reusableTestsFile
-echo RENEWABLE FILE
-cat $renewableTestsFile
-
 totalTests=`expr $linesReuse + $linesRenew`
 testsPerSplit=`expr $totalTests / $splits`
 echo "Reuse cluster tests: " $linesReuse
