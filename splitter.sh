@@ -14,10 +14,10 @@ then
   exit 1
 fi
 
-#Circle chunks start a 0, jenkins chunks start at 1
-if [ "$CIRCLECI" = true ]
+if [ `grep -f $reusableTestsFile $renewableTestsFile | wc -l` -gt 0 ]
 then
-  chunk=`expr $chunk + 1`
+  echo "There are tests that are in both reuse and renew files. That sould be impossible"
+  exit 1
 fi
 
 #Get the numbers per no/reusage

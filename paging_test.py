@@ -48,6 +48,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
     and validation of page size setting.
     """
 
+    @reuse_cluster(new_cluster=True)
     def test_with_no_results(self):
         """
         No errors when a page is requested and query has no results.
@@ -66,6 +67,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         assert [] == pf.all_data()
         assert not pf.has_more_pages
 
+    @reuse_cluster
     def test_with_less_results_than_page_size(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -91,6 +93,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         assert not pf.has_more_pages
         assert len(expected_data) == len(pf.all_data())
 
+    @reuse_cluster
     def test_with_more_results_than_page_size(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -123,6 +126,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="id")
 
+    @reuse_cluster
     def test_with_equal_results_to_page_size(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -151,6 +155,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
         # make sure expected and actual have same data elements (ignoring order)
         assert_lists_equal_ignoring_order(expected_data, pf.all_data(), sort_key="id")
 
+    @reuse_cluster
     def test_undefined_page_size_default(self):
         """
         If the page size isn't sent then the default fetch size is used.
@@ -187,6 +192,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
 
+    @reuse_cluster(new_cluster=True)
     def test_with_order_by(self):
         """"
         Paging over a single partition with ordering should work.
@@ -237,6 +243,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
             stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc", consistency_level=CL.ALL)
             session.execute(stmt)
 
+    @reuse_cluster
     def test_with_order_by_reversed(self):
         """"
         Paging over a single partition with ordering and a reversed clustering order.
@@ -295,6 +302,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
         # these should be equal (in the same order)
         assert pf.all_data() == list(reversed(expected_data))
 
+    @reuse_cluster
     def test_with_limit(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
@@ -378,6 +386,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
         run_scenarios(scenarios, handle_scenario, deferred_exceptions=(AssertionError,))
 
+    @reuse_cluster
     def test_with_allow_filtering(self):
         session = self.prepare()
         create_ks(session, 'test_paging_size', 2)
