@@ -17,14 +17,17 @@ def create_c1c2_table(tester, session, read_repair=None):
     create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'}, read_repair=read_repair)
 
 
-def insert_c1c2(session, keys=None, n=None, consistency=ConsistencyLevel.QUORUM):
+def insert_c1c2(session, ks=None, keys=None, n=None, consistency=ConsistencyLevel.QUORUM):
     if (keys is None and n is None) or (keys is not None and n is not None):
         raise ValueError("Expected exactly one of 'keys' or 'n' arguments to not be None; "
                          "got keys={keys}, n={n}".format(keys=keys, n=n))
     if n:
         keys = list(range(n))
 
-    statement = session.prepare("INSERT INTO cf (key, c1, c2) VALUES (?, 'value1', 'value2')")
+    fully_qualified_cf = "cf"
+    if ((ks is not None) and (not ks)):
+        fully_qualified_cf = "{ks}.cf".format(ks)
+    statement = session.prepare("INSERT INTO {fully_qualified_cf} (key, c1, c2) VALUES (?, 'value1', 'value2')".format(fully_qualified_cf))
     statement.consistency_level = consistency
 
     execute_concurrent_with_args(session, statement, [['k{}'.format(k)] for k in keys])
