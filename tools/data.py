@@ -25,9 +25,9 @@ def insert_c1c2(session, ks=None, keys=None, n=None, consistency=ConsistencyLeve
         keys = list(range(n))
 
     fully_qualified_cf = "cf"
-    if ((ks is not None) and (not ks)):
-        fully_qualified_cf = "{ks}.cf".format(ks)
-    statement = session.prepare("INSERT INTO {fully_qualified_cf} (key, c1, c2) VALUES (?, 'value1', 'value2')".format(fully_qualified_cf))
+    if ((ks is not None) and (not (not ks))):
+        fully_qualified_cf = "{ks}.cf".format(ks=ks)
+    statement = session.prepare("INSERT INTO {fully_qualified_cf} (key, c1, c2) VALUES (?, 'value1', 'value2')".format(fully_qualified_cf=fully_qualified_cf))
     statement.consistency_level = consistency
 
     execute_concurrent_with_args(session, statement, [['k{}'.format(k)] for k in keys])
