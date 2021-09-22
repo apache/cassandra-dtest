@@ -359,6 +359,31 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             node3.watch_log_for('Use cassandra.replace_address if you want to replace this node', from_mark=mark, timeout=20)
             mark = node3.mark_log()
 
+    @since('3.0')
+    def test_fail_when_seed(self):
+        """
+        When a node is a seed replace should fail
+        @jira_ticket CASSANDRA-14463
+        """
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Exception encountered during startup']
+
+        self._setup(n=3)
+        node1, node2, node3 = self.cluster.nodelist()
+        self.cluster.seeds.append(node3.address())
+
+        node3.stop(gently=False)
+        mark = node3.mark_log()
+
+        for d in chain([os.path.join(node3.get_path(), "commitlogs")],
+                       [os.path.join(node3.get_path(), "saved_caches")],
+                       node3.data_directories()):
+            if os.path.exists(d):
+                rmtree(d)
+
+        node3.start(jvm_args=["-Dcassandra.replace_address=" + node3.address()], wait_other_notice=False)
+        node3.watch_log_for('Replacing a node without bootstrapping risks invalidating consistency guarantees', from_mark=mark, timeout=20)
+
     @since('3.6')
     def test_unsafe_replace(self):
         """
