@@ -227,8 +227,8 @@ class TestOfflineTools(Tester):
         Test on potential situations: deleted sstables, corrupted sstables
         """
         cluster = self.cluster
-        cluster.populate(3).start()
-        node1, node2, node3 = cluster.nodelist()
+        cluster.populate(1).start()
+        node1 = cluster.nodelist()[0]
 
         # test on nonexistent keyspace
         try:
@@ -238,16 +238,16 @@ class TestOfflineTools(Tester):
             assert e.exit_status == 1, str(e.exit_status)
 
         # test on nonexistent sstables:
-        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=3)',
+        node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
         (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
         assert rc == 0, str(rc)
 
         # Generate multiple sstables and test works properly in the simple case
-        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)',
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
         node1.flush()
-        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=3)',
+        node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
         node1.flush()
         cluster.stop()
@@ -297,10 +297,10 @@ class TestOfflineTools(Tester):
             (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'])
             assert False, "sstable verify did not fail; rc={}\nout={}\nerr={}".format(str(rc), out, error)
         except ToolError as e:
-            # Process sstableverify output to normalize paths in string to Python casing as above
-            error = re.sub("(?<=WARNING: Corrupted SSTable : ).*", lambda match: os.path.normcase(match.group(0)), str(e))
-
-            assert re.search("WARNING: Corrupted SSTable : " + sstable1, error)
+            m = re.match("(?ms).*Corrupted SSTable : (?P<sstable>\S+)", str(e))
+            assert m is not None, str(e)
+            # MacOS might use the "private" prefix.
+            assert os.path.normcase(m.group('sstable')).replace("/private/var/folders", "/var/folders") == sstable1
             assert e.exit_status == 1, str(e.exit_status)
 
     def test_sstableexpiredblockers(self):
