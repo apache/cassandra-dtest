@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 class AbstractTestAuth(Tester):
 
     def role_creator_permissions(self, creator, role):
-        if self.dtest_config.cassandra_version_from_build <= '4.0':
-            permissions = ('ALTER', 'DROP', 'AUTHORIZE')
-        else:
+        if self.dtest_config.cassandra_version_from_build >= '3.0':
             permissions = ('ALTER', 'DROP', 'DESCRIBE', 'AUTHORIZE')
+        else:
+            permissions = ('ALTER', 'DROP', 'DESCRIBE')
         return [(creator, role, perm) for perm in permissions]
 
 
