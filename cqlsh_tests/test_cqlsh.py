@@ -8,6 +8,7 @@ import datetime
 import locale
 import os
 import re
+import stat
 import subprocess
 import sys
 import logging
@@ -43,7 +44,11 @@ class CqlshMixin():
     cqlsh_debug_enabled = False
 
     def verify_output(self, query, node, expected):
-        output, err = self.run_cqlsh(node, query, ['-u', 'cassandra', '-p', 'cassandra'])
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
+
+        output, err = self.run_cqlsh(node, query, cqlsh_options)
         if common.is_win():
             output = output.replace('\r', '')
 
@@ -2184,6 +2189,102 @@ Tracing session:""")
         assert output_lines[-2].strip() == ''
         assert output_lines[-1].strip() == "({} rows)".format(num_rows)
 
+    @since('4.1')
+    def test_passwd_warnings(self):
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(1)
+        self.cluster.start()
+        node1, = self.cluster.nodelist()
+        node1.watch_log_for('Created default superuser')
+
+        session = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
+        session.execute("CREATE KEYSPACE ks WITH REPLICATION={'class':'SimpleStrategy','replication_factor':1};")
+
+        # Ensure cqlsh warn about password in command line options
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+        assert 'password on the command line' in cqlsh_stderr
+        assert cqlsh_stderr.count('\n') == 4, 'Unexpected warning or error message found in stderr'
+
+        # Ensure the '--insecure-password-without-warning' option suppresses the above warning
+        cqlsh_options.append('--insecure-password-without-warning')
+        _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+        assert cqlsh_stderr == ''
+
+        with NamedTemporaryFile(mode='wt') as cqlshrcfile:
+            # Ensure no warnings or errors is shown if username and password are not in the cqlshrc file
+            cqlshrcfile.write('[authentication]\nkeyspace=ks\n')
+            cqlshrcfile.flush()
+            os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+            cqlsh_options = ['--cqlshrc', cqlshrcfile.name, '-u', 'cassandra', '-p', 'cassandra', '--insecure-password-without-warning']
+            _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+            assert cqlsh_stderr == ''
+
+            # Ensure the deprecation warning shows when user and/or password is found in the cqlshrc file
+            cqlshrcfile.seek(0)
+            cqlshrcfile.truncate()
+            cqlshrcfile.write('[authentication]\nusername=cassandra\n')
+            cqlshrcfile.flush()
+            os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+            cqlsh_options = ['--cqlshrc', cqlshrcfile.name, '-p', 'cassandra', '--insecure-password-without-warning']
+            _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+            assert 'insecure cqlshrc file' not in cqlsh_stderr
+            assert 'Credentials in the cqlshrc file is deprecated' in cqlsh_stderr
+            assert cqlsh_stderr.count('\n') == 4, 'Unexpected warning or error message found in stderr'
+
+            # Ensure the insecure cqlshrc warning shows when password is found in an insecure cqlshrc file
+            cqlshrcfile.seek(0)
+            cqlshrcfile.truncate()
+            cqlshrcfile.write('[authentication]\npassword=cassandra\n')
+            cqlshrcfile.flush()
+            os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+            cqlsh_options = ['--cqlshrc', cqlshrcfile.name, '-u', 'cassandra']
+            _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+            assert 'insecure cqlshrc file' in cqlsh_stderr
+            assert 'Credentials in the cqlshrc file is deprecated' in cqlsh_stderr
+            assert cqlsh_stderr.count('\n') == 5, 'Unexpected warning or error message found in stderr'
+
+            # Ensure the insecure cqlshrc warning doesn't show when password is found in a secure cqlshrc file
+            os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR)
+            _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+            assert 'insecure cqlshrc file' not in cqlsh_stderr
+            assert 'Credentials in the cqlshrc file is deprecated' in cqlsh_stderr
+            assert cqlsh_stderr.count('\n') == 4, 'Unexpected warning or error message found in stderr'
+
+            with NamedTemporaryFile(mode='wt') as credentialsfile:
+                # Ensure the credentials file specified in the command line options is used
+                credentialsfile.write('[plain_text_auth]\nusername=cassandra\npassword=cassandra\n')
+                credentialsfile.flush()
+                os.chmod(credentialsfile.name, stat.S_IRUSR | stat.S_IWUSR)
+                cqlsh_options = ['--credentials', credentialsfile.name]
+                _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+                assert cqlsh_stderr == ''
+
+                # Ensure the credentials file specified in the cqlshrc is used
+                cqlshrcfile.seek(0)
+                cqlshrcfile.truncate()
+                cqlshrcfile.write('[authentication]\ncredentials={}\n'.format(credentialsfile.name))
+                cqlshrcfile.flush()
+                os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                cqlsh_options = ['--cqlshrc', cqlshrcfile.name]
+                _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+                assert cqlsh_stderr == ''
+
+                # Ensure the inseucre credentials file is not used, and fallback to the credentials in the deprecated cqlshrc file
+                cqlshrcfile.seek(0)
+                cqlshrcfile.truncate()
+                cqlshrcfile.write('[authentication]\ncredentials={}\nusername=user1\npassword=badpass\n'.format(credentialsfile.name))
+                cqlshrcfile.flush()
+                os.chmod(cqlshrcfile.name, stat.S_IRUSR | stat.S_IWUSR)
+                os.chmod(credentialsfile.name, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                cqlsh_options = ['--cqlshrc', cqlshrcfile.name]
+                _, cqlsh_stderr = self.run_cqlsh(node1, cmds='quit', cqlsh_options=cqlsh_options)
+                assert "Credentials file '{}' exists but is not used".format(credentialsfile.name) in cqlsh_stderr
+                assert 'Credentials in the cqlshrc file is deprecated' in cqlsh_stderr
+                assert 'Provided username user1 and/or password are incorrect' in cqlsh_stderr
+
+
 
 class TestCqlshSmoke(Tester, CqlshMixin):
     """
@@ -2512,7 +2613,9 @@ class TestCqlLogin(Tester, CqlshMixin):
         create_ks(self.session, 'ks1', 1)
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
-
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
         cqlsh_stdout, cqlsh_stderr, _ = self.node1.run_cqlsh(
             '''
             USE ks1;
@@ -2520,7 +2623,7 @@ class TestCqlLogin(Tester, CqlshMixin):
             LOGIN user1 'changeme';
             DESCRIBE TABLES;
             ''',
-            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+            cqlsh_options=cqlsh_options)
         assert [x for x in cqlsh_stdout.split() if x], ['ks1table' == 'ks1table']
         assert cqlsh_stderr == ''
 
@@ -2530,6 +2633,8 @@ class TestCqlLogin(Tester, CqlshMixin):
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
 
         cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
         cmd = "LOGIN user1 'badpass';"
         if self.cluster.version() >= LooseVersion('3.0'):
             _, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
@@ -2547,6 +2652,8 @@ class TestCqlLogin(Tester, CqlshMixin):
         create_cf(self.session, 'ks1table')
         self.session.execute("CREATE USER user1 WITH PASSWORD 'changeme';")
         cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
 
         if self.cluster.version() >= LooseVersion('2.2'):
             query = '''
@@ -2589,7 +2696,9 @@ class TestCqlLogin(Tester, CqlshMixin):
             USE ks1;
             DESCRIBE TABLES;
             '''
-        cqlsh_options=['-u', 'cassandra', '-p', 'cassandra']
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
         if self.cluster.version() >= LooseVersion('3.0'):
             cqlsh_stdout, cqlsh_stderr, _ = util.run_cqlsh_safe(self.node1,
                                                                 cmds=cmds,
@@ -2610,13 +2719,16 @@ class TestCqlLogin(Tester, CqlshMixin):
 
         Verifies that it is possible to list roles after a successful login.
         """
+        cqlsh_options = ['-u', 'cassandra', '-p', 'cassandra']
+        if self.cluster.version() >= '4.1':
+            cqlsh_options.append('--insecure-password-without-warning')
         out, err, _ = self.node1.run_cqlsh(
             '''
             CREATE ROLE super WITH superuser = true AND password = 'p' AND login = true;
             LOGIN super 'p';
             LIST ROLES;
             ''',
-            cqlsh_options=['-u', 'cassandra', '-p', 'cassandra'])
+            cqlsh_options=cqlsh_options)
         assert 'super' in out
         assert '' == err
 
