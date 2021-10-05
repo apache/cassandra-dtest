@@ -198,10 +198,11 @@ class BootstrapTester(Tester):
         # Shouldn't fail due to streaming socket timeout timeout
         assert_bootstrap_state(self, node2, 'COMPLETED')
 
-        for node in cluster.nodelist():
-            assert node.grep_log('Scheduling keep-alive task with 2s period.', filename='debug.log')
-            assert node.grep_log('Sending keep-alive', filename='debug.log')
-            assert node.grep_log('Received keep-alive', filename='debug.log')
+        if cluster.version() < '4.0':
+            for node in cluster.nodelist():
+                assert node.grep_log('Scheduling keep-alive task with 2s period.', filename='debug.log')
+                assert node.grep_log('Sending keep-alive', filename='debug.log')
+                assert node.grep_log('Received keep-alive', filename='debug.log')
 
     def test_simple_bootstrap_nodata(self):
         """

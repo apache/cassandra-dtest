@@ -835,8 +835,10 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     # Remove the skip annotation in the superclass we just derived from, we will add it back if we actually intend
     # to skip with a better message
     newcls.pytestmark = [mark for mark in newcls.pytestmark if not mark.name == "skip"]
-    if not upgrade_applies_to_env:
-        newcls.pytestmark.append(pytest.mark.skip("test not applicable to env"))
+    #if not upgrade_applies_to_env:
+        #print("boo")
+        #newcls.pytestmark.append(pytest.mark.skip("test not applicable to env"))
+    print(newcls.pytestmark)
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
