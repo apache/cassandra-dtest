@@ -3,6 +3,7 @@ import pytest
 import logging
 
 from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
+from cassandra.query import SimpleStatement
 
 from dtest import Tester
 from thrift_bindings.thrift010 import ttypes as thrift_types
@@ -228,3 +229,46 @@ class TestWriteFailures(Tester):
                           thrift_types.ConsistencyLevel.ALL)
 
         client.transport.close()
+
+
+@since('3.0')
+class TestMultiDCWriteFailures(Tester):
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            "is too large for the maximum size of",  # 3.0+
+            "Encountered an oversized mutation",     # 4.0+
+            "ERROR WRITE_FAILURE",     # Logged in DEBUG mode for write failures
+            "MigrationStage"           # This occurs sometimes due to node down (because of restart)
+        )
+
+    def _test_oversized_mutation(self, consistency_level):
+        """
+        Test that multi-DC write failures return operation failed rather than a timeout.
+        @jira_ticket CASSANDRA-16334.
+        """
+
+        cluster = self.cluster
+        cluster.populate([3, 3])
+        cluster.set_configuration_options(values={'max_mutation_size_in_kb': 128})
+        cluster.start()
+
+        node1 = cluster.nodelist()[0]
+        session = self.patient_exclusive_cql_connection(node1)
+
+        session.execute("CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 3};")
+        session.execute("CREATE TABLE test.test (key int PRIMARY KEY, val blob);")
+
+        payload = '1' * 1024 * 256
+        statement = SimpleStatement("""
+            INSERT INTO test.test (key, val) VALUES (1, textAsBlob('{}'))
+            """.format(payload), consistency_level=consistency_level)
+
+        with pytest.raises(WriteFailure) as cm:
+            session.execute(statement)
+
+    def test_oversized_mutation_local_one(self):
+        self._test_oversized_mutation(ConsistencyLevel.LOCAL_ONE)
+
+    def test_oversized_mutation_one(self):
+        self._test_oversized_mutation(ConsistencyLevel.ONE)
