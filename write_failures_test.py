@@ -231,6 +231,12 @@ class TestWriteFailures(Tester):
         client.transport.close()
 
 
+def assert_write_failure(session, query, consistency_level):
+    statement = SimpleStatement(query, consistency_level=consistency_level)
+    with pytest.raises(WriteFailure):
+        session.execute(statement)
+
+
 @since('3.0')
 class TestMultiDCWriteFailures(Tester):
     @pytest.fixture(autouse=True)
@@ -242,33 +248,25 @@ class TestMultiDCWriteFailures(Tester):
             "MigrationStage"           # This occurs sometimes due to node down (because of restart)
         )
 
-    def _test_oversized_mutation(self, consistency_level):
+    def test_oversized_mutation(self):
         """
         Test that multi-DC write failures return operation failed rather than a timeout.
         @jira_ticket CASSANDRA-16334.
         """
 
         cluster = self.cluster
-        cluster.populate([3, 3])
+        cluster.populate([2, 2])
         cluster.set_configuration_options(values={'max_mutation_size_in_kb': 128})
         cluster.start()
 
         node1 = cluster.nodelist()[0]
         session = self.patient_exclusive_cql_connection(node1)
 
-        session.execute("CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 3};")
-        session.execute("CREATE TABLE test.test (key int PRIMARY KEY, val blob);")
+        session.execute("CREATE KEYSPACE k WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 2}")
+        session.execute("CREATE TABLE k.t (key int PRIMARY KEY, val blob)")
 
         payload = '1' * 1024 * 256
-        statement = SimpleStatement("""
-            INSERT INTO test.test (key, val) VALUES (1, textAsBlob('{}'))
-            """.format(payload), consistency_level=consistency_level)
+        query = "INSERT INTO k.t (key, val) VALUES (1, textAsBlob('{}'))".format(payload)
 
-        with pytest.raises(WriteFailure) as cm:
-            session.execute(statement)
-
-    def test_oversized_mutation_local_one(self):
-        self._test_oversized_mutation(ConsistencyLevel.LOCAL_ONE)
-
-    def test_oversized_mutation_one(self):
-        self._test_oversized_mutation(ConsistencyLevel.ONE)
+        assert_write_failure(session, query, ConsistencyLevel.LOCAL_ONE)
+        assert_write_failure(session, query, ConsistencyLevel.ONE)
