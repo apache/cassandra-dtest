@@ -8,6 +8,7 @@ from cassandra.query import SimpleStatement
 from dtest import Tester
 from thrift_bindings.thrift010 import ttypes as thrift_types
 from thrift_test import get_thrift_client
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -270,3 +271,7 @@ class TestMultiDCWriteFailures(Tester):
 
         assert_write_failure(session, query, ConsistencyLevel.LOCAL_ONE)
         assert_write_failure(session, query, ConsistencyLevel.ONE)
+
+        # verify that no hints are created
+        with JolokiaAgent(node1) as jmx:
+            assert 0 == jmx.read_attribute(make_mbean('metrics', type='Storage', name='TotalHints'), 'Count')
