@@ -96,18 +96,13 @@ test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
 
-Starting at 4.0, as dtests can be very heavy in order to speed up things noreusage has been implemented. Basically a 
-test starts a cluster and the string of annotated tests immediately after that one will reuse that cluster. Big time 
+Starting at 4.0, as dtests can be very heavy, in order to speed up things node reusage has been implemented. Basically a 
+test starts a cluster and the tests in the same annotated class will reuse that cluster. Big time 
 and costs (for paid CI services) can be achieved by doing so.
 
-The first test that sets up the reusable cluster must be annotated with ``@reuse_cluster(new_cluster=True)``. Following 
-tests must be annotated with ``@reuse_cluster``. Any non-annotated test will dispose any reusable cluster and start a 
-new one. So the annotation is the they way to opt in/out node reusage.
+You only have to annotate a class with ``@reuse_cluster``. Results are undefined if this annotation is used at method level.
 
-Using ``new_cluster=True`` for the first test in the 'string' is mandatory for CI test spitting to work correctly.
-
-To disable node reusage on a class comment out the annotations. To completely disable it in conftest.py::fixture_dtest_setup 
-you have a flag to do so.
+You can disable node reusage completely in conftest.py::fixture_dtest_setup if you needed to do so while debugging i.e.
 
 Writing Tests
 -------------
