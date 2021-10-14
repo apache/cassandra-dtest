@@ -6,6 +6,7 @@ import platform
 import re
 import shutil
 import time
+from cassandra import OperationTimedOut
 from datetime import datetime
 from distutils.version import LooseVersion
 # Python 3 imports
@@ -486,22 +487,25 @@ def drop_test_ks(dtest_setup):
     wait_schema_agreement = False
     session = None
 
-    if len(dtest_setup.cluster.nodelist()) != 0:
-        node1 = dtest_setup.cluster.nodelist()[0]
-        if node1.is_running():
-            # Clear KS
-            session = dtest_setup.cql_connection(node1, user='cassandra', password='cassandra')
-            query = "select * from system_schema.keyspaces"
-            rows = session.execute(query=query, timeout=120)
-            for row in rows:
-                ks = str(row.keyspace_name)
-                if not ks.startswith("system"):
-                    query = "drop keyspace " + ks
-                    session.execute(query=query, timeout=120)
-                    wait_schema_agreement = True
+    try:
+        if len(dtest_setup.cluster.nodelist()) != 0:
+            node1 = dtest_setup.cluster.nodelist()[0]
+            if node1.is_running():
+                # Clear KS
+                session = dtest_setup.cql_connection(node1, user='cassandra', password='cassandra')
+                query = "select * from system_schema.keyspaces"
+                rows = session.execute(query=query, timeout=120)
+                for row in rows:
+                    ks = str(row.keyspace_name)
+                    if not ks.startswith("system"):
+                        query = "drop keyspace " + ks
+                        session.execute(query=query, timeout=120)
+                        wait_schema_agreement = True
 
-    if wait_schema_agreement:
-        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        if wait_schema_agreement:
+            session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+    except OperationTimedOut:
+        pass
 
 
 def setup_cluster(dtest_config,

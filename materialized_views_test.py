@@ -186,6 +186,26 @@ class TestMaterializedViewsBase(Tester):
                 assert_none(session, "SELECT * FROM system_distributed.view_build_status")
         assert_none(session, "SELECT * FROM {}".format(self._build_progress_table()))
 
+    def check_trace_events(self, trace, expect_digest):
+        # we should see multiple requests get enqueued prior to index scan
+        # execution happening
+
+        # Look for messages like:
+        #  4.0+        Digest mismatch: Mismatch for key DecoratedKey
+        # <4.0         Digest mismatch: org.apache.cassandra.service.DigestMismatchException: Mismatch for key DecoratedKey
+        regex = r"Digest mismatch: ([a-zA-Z.]+:\s)?Mismatch for key DecoratedKey"
+        for event in trace.events:
+            desc = event.description
+            match = re.match(regex, desc)
+            if match:
+                if expect_digest:
+                    break
+                else:
+                    pytest.fail("Encountered digest mismatch when we shouldn't")
+        else:
+            if expect_digest:
+                pytest.fail("Didn't find digest mismatch")
+
 
 class TestMaterializedViewsNoReuseNodes(TestMaterializedViewsBase):
 
@@ -2570,26 +2590,6 @@ class TestMaterializedViewsExpiredLiveness(TestMaterializedViewsBase):
         assert_one(session, "SELECT k,a,b FROM mv limit 1", [50, 50, 50])
         assert_all(session, "SELECT k,a,b FROM mv limit 2", [[50, 50, 50], [99, 99, 99]])
         assert_all(session, "SELECT k,a,b FROM mv", [[50, 50, 50], [99, 99, 99]])
-
-    def check_trace_events(self, trace, expect_digest):
-        # we should see multiple requests get enqueued prior to index scan
-        # execution happening
-
-        # Look for messages like:
-        #  4.0+        Digest mismatch: Mismatch for key DecoratedKey
-        # <4.0         Digest mismatch: org.apache.cassandra.service.DigestMismatchException: Mismatch for key DecoratedKey
-        regex = r"Digest mismatch: ([a-zA-Z.]+:\s)?Mismatch for key DecoratedKey"
-        for event in trace.events:
-            desc = event.description
-            match = re.match(regex, desc)
-            if match:
-                if expect_digest:
-                    break
-                else:
-                    pytest.fail("Encountered digest mismatch when we shouldn't")
-        else:
-            if expect_digest:
-                pytest.fail("Didn't find digest mismatch")
 
 
 # For read verification
