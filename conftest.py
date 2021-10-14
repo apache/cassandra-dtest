@@ -489,7 +489,8 @@ def drop_test_ks(dtest_setup):
     if len(dtest_setup.cluster.nodelist()) != 0:
         node1 = dtest_setup.cluster.nodelist()[0]
         if node1.is_running():
-            session = dtest_setup.cql_connection(node1)
+            # Clear KS
+            session = dtest_setup.cql_connection(node1, user='cassandra', password='cassandra')
             query = "select * from system_schema.keyspaces"
             rows = session.execute(query=query, timeout=120)
             for row in rows:
