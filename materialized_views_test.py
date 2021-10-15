@@ -2392,10 +2392,6 @@ class TestMaterializedViewsReuse3NodesHHOff(TestMaterializedViewsBase):
         assert 0 == len(result.current_rows)
 
     @since('3.0')
-    def test_expired_liveness_with_limit_rf1_nodes1(self):
-        self._test_expired_liveness_with_limit(rf=1, nodes=1)
-
-    @since('3.0')
     def test_base_column_in_view_pk_commutative_tombstone_with_flush(self):
         self._test_base_column_in_view_pk_commutative_tombstone_(flush=True)
 
@@ -2539,6 +2535,10 @@ class TestMaterializedViewsReuse3NodesHHOff(TestMaterializedViewsBase):
 
 
 class TestMaterializedViewsExpiredLiveness(TestMaterializedViewsBase):
+    @since('3.0')
+    def test_expired_liveness_with_limit_rf1_nodes1(self):
+        self._test_expired_liveness_with_limit(rf=1, nodes=1)
+
     @since('3.0')
     def test_expired_liveness_with_limit_rf1_nodes3(self):
         self._test_expired_liveness_with_limit(rf=1, nodes=3)
