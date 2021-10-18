@@ -34,6 +34,7 @@ from tools.misc import ImmutableMapping, generate_ssl_stores
 
 from . import util
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
@@ -97,8 +98,8 @@ class CqlshMixin():
             logger.debug("Cqlsh command stderr:\n" + stderr)
         return stdout, stderr
 
-class TestCqlsh(Tester, CqlshMixin):
 
+class TestCqlshBase(Tester, CqlshMixin):
     # override cluster options to enable user defined functions
     # currently only needed for test_describe
     @pytest.fixture
@@ -126,171 +127,6 @@ class TestCqlsh(Tester, CqlshMixin):
         if hasattr(self, 'tempfile') and not common.is_win():
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
-
-    @pytest.mark.depends_cqlshlib
-    @since('2.1.9')
-    def test_pycodestyle_compliance(self):
-        """
-        @jira_ticket CASSANDRA-10066
-        Checks that cqlsh is compliant with pycodestyle (formally known as pep8) with the following command:
-        pycodestyle --ignore E501,E402,E731,W503 pylib/cqlshlib/*.py bin/cqlsh.py
-        """
-        cluster = self.cluster
-
-        if cluster.version() < LooseVersion('2.2'):
-            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh')
-        else:
-            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh.py')
-
-        cqlshlib_path = os.path.join(cluster.get_install_dir(), 'pylib', 'cqlshlib')
-        cqlshlib_paths = os.listdir(cqlshlib_path)
-        cqlshlib_paths = [os.path.join(cqlshlib_path, x) for x in cqlshlib_paths if '.py' in x and '.pyc' not in x]
-
-        cmds = ['pycodestyle', '--ignore', 'E501,E402,E731,W503', cqlsh_path] + cqlshlib_paths
-
-        logger.debug(cmds)
-
-        # 3.7 adds a text=True option which converts stdout/stderr to str type, until then
-        # when printing out need to convert in order to avoid assert failing as the type
-        # does not have an encoding
-        p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = p.communicate()
-
-        assert 0 == len(stdout), stdout.decode("utf-8")
-        assert 0 == len(stderr), stderr.decode("utf-8")
-
-    def test_simple_insert(self):
-
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-
-        node1.run_cqlsh(cmds="""
-            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-            use simple;
-            create TABLE simple (id int PRIMARY KEY , value text ) ;
-            insert into simple (id, value) VALUES (1, 'one');
-            insert into simple (id, value) VALUES (2, 'two');
-            insert into simple (id, value) VALUES (3, 'three');
-            insert into simple (id, value) VALUES (4, 'four');
-            insert into simple (id, value) VALUES (5, 'five')""")
-
-        session = self.patient_cql_connection(node1)
-        rows = list(session.execute("select id, value from simple.simple"))
-
-        assert {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'} == {k: v for k, v in rows}
-
-    def test_tls(self):
-        """ Test that TLSv1.2 connections work CASSANDRA-16695 """
-        generate_ssl_stores(self.fixture_dtest_setup.test_path)
-        self.cluster.set_configuration_options({
-            'client_encryption_options': {
-            'enabled': True,
-            'optional': False,
-            'protocol': 'TLSv1.2',
-            'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
-            'keystore_password': 'cassandra'
-            }
-        })
-
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-
-        out, err = self.run_cqlsh(node1, cmds="DESCRIBE KEYSPACES", cqlsh_options=['--ssl'], env_vars={'SSL_CERTFILE': os.path.join(self.fixture_dtest_setup.test_path, 'ccm_node.cer')})
-        assert err == ''
-
-
-    def test_lwt(self):
-        """
-        Test LWT inserts and updates.
-
-        @jira_ticket CASSANDRA-11003
-        """
-
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-
-        node1.run_cqlsh(cmds="""
-            CREATE KEYSPACE lwt WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-            CREATE TABLE lwt.lwt (id int PRIMARY KEY , value text)""")
-
-        def assert_applied(stmt, node=node1):
-            expected_substring = '[applied]'
-            output, _ = self.run_cqlsh(node, stmt)
-            msg = '{exp} not found in output from {stmt}: {routput}'.format(
-                exp=repr(expected_substring),
-                stmt=repr(stmt),
-                routput=repr(output)
-            )
-            assert expected_substring in output, msg
-
-        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
-        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
-        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'one'")
-        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'zzz'")
-
-    @since('2.2')
-    def test_past_and_future_dates(self):
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-
-        node1.run_cqlsh(cmds="""
-            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-            use simple;
-            create TABLE simpledate (id int PRIMARY KEY , value timestamp ) ;
-            insert into simpledate (id, value) VALUES (1, '2143-04-19 11:21:01+0000');
-            insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
-
-        session = self.patient_cql_connection(node1)
-        list(session.execute("select id, value from simple.simpledate"))
-
-        output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
-
-        if self.cluster.version() >= LooseVersion('3.4'):
-            assert "2143-04-19 11:21:01.000000+0000" in output
-            assert "1943-04-19 11:21:01.000000+0000" in output
-        else:
-            assert "2143-04-19 11:21:01+0000" in output
-            assert "1943-04-19 11:21:01+0000" in output
-
-    @since('3.4')
-    def test_sub_second_precision(self):
-        """
-        Test that we can query at millisecond precision.
-        @jira_ticket 10428
-        """
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-
-        node1.run_cqlsh(cmds="""
-            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-            use simple;
-            create TABLE testsubsecond (id int, subid timestamp, value text, primary key (id, subid));
-            insert into testsubsecond (id, subid, value) VALUES (1, '1943-06-19 11:21:01.123+0000', 'abc');
-            insert into testsubsecond (id, subid, value) VALUES (2, '1943-06-19 11:21:01+0000', 'def')""")
-
-        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
-                                         "WHERE id = 1 AND subid = '1943-06-19 11:21:01.123+0000'")
-
-        logger.debug(output)
-        assert "1943-06-19 11:21:01.123000+0000" in output
-        assert "1943-06-19 11:21:01.000000+0000" not in output
-
-        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
-                                         "WHERE id = 2 AND subid = '1943-06-19 11:21:01+0000'")
-
-        logger.debug(output)
-        assert "1943-06-19 11:21:01.000000+0000" in output
-        assert "1943-06-19 11:21:01.123000+0000" not in output
 
     def verify_glass(self, node):
         session = self.patient_cql_connection(node)
@@ -414,10 +250,827 @@ class TestCqlsh(Tester, CqlshMixin):
         assert output.count(' ⠊⠀⠉⠁⠝⠀⠑⠁⠞⠀⠛⠇⠁⠎⠎⠀⠁⠝⠙⠀⠊⠞⠀⠙⠕⠑⠎⠝⠞⠀⠓⠥⠗⠞⠀⠍⠑') == 16
         assert output.count('᚛᚛ᚉᚑᚅᚔᚉᚉᚔᚋ ᚔᚈᚔ ᚍᚂᚐᚅᚑ ᚅᚔᚋᚌᚓᚅᚐ᚜') == 2
 
-    def test_eat_glass(self):
+    def get_describe_aggregate_output(self):
+        if self.cluster.version() >= LooseVersion("4.0"):
+            return """
+                 CREATE AGGREGATE test.average(int)
+                     SFUNC average_state
+                     STYPE tuple<int, bigint>
+                     FINALFUNC average_final
+                     INITCOND (0, 0);
+                 """
+
+        return """
+         CREATE AGGREGATE test.average(int)
+             SFUNC average_state
+             STYPE frozen<tuple<int, bigint>>
+             FINALFUNC average_final
+             INITCOND (0, 0);
+         """
+
+    def get_keyspace_output(self):
+        return [
+            "CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
+            self.get_test_table_output(),
+            self.get_users_table_output()]
+
+    def get_test_table_output(self, has_val=True, has_val_idx=True):
+        create_table = None
+        if has_val:
+            create_table = """
+                 CREATE TABLE test.test (
+                     id int,
+                     col int,
+                     val text,
+                 PRIMARY KEY (id, col)
+                 """
+        else:
+            create_table = """
+                 CREATE TABLE test.test (
+                     id int,
+                     col int,
+                 PRIMARY KEY (id, col)
+                 """
+
+        if self.cluster.version() >= LooseVersion('4.0'):
+            create_table += """
+         ) WITH CLUSTERING ORDER BY (col ASC)
+             AND additional_write_policy = '99p'
+             AND bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND cdc = false
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND default_time_to_live = 0
+             AND extensions = {}
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair = 'BLOCKING'
+             AND speculative_retry = '99p';
+         """
+        elif self.cluster.version() >= LooseVersion('3.9'):
+            create_table += """
+         ) WITH CLUSTERING ORDER BY (col ASC)
+             AND bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99PERCENTILE';
+         """
+        elif self.cluster.version() >= LooseVersion('3.0'):
+            create_table += """
+         ) WITH CLUSTERING ORDER BY (col ASC)
+             AND bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99PERCENTILE';
+         """
+        else:
+            create_table += """
+         ) WITH CLUSTERING ORDER BY (col ASC)
+             AND bloom_filter_fp_chance = 0.01
+             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99.0PERCENTILE';
+         """
+
+        col_idx_def = self.get_index_output('test_col_idx', 'test', 'test', 'col')
+        expected_output = [create_table, col_idx_def]
+        if has_val_idx:
+            expected_output.append(self.get_index_output('test_val_idx', 'test', 'test', 'val'))
+        return expected_output
+
+    def get_users_table_output(self):
+        quoted_index_output = self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname')
+        myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
+        create_table = None
+
+        if self.cluster.version() >= LooseVersion('4.0'):
+            create_table = """
+         CREATE TABLE test.users (
+             userid text PRIMARY KEY,
+             age int,
+             firstname text,
+             lastname text
+         ) WITH additional_write_policy = '99p'
+             AND bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND cdc = false
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND default_time_to_live = 0
+             AND extensions = {}
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair = 'BLOCKING'
+             AND speculative_retry = '99p';
+         """
+        elif self.cluster.version() >= LooseVersion('3.9'):
+            create_table = """
+         CREATE TABLE test.users (
+             userid text PRIMARY KEY,
+             age int,
+             firstname text,
+             lastname text
+         ) WITH bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99PERCENTILE';
+         """
+        elif self.cluster.version() >= LooseVersion('3.0'):
+            create_table = """
+         CREATE TABLE test.users (
+             userid text PRIMARY KEY,
+             age int,
+             firstname text,
+             lastname text
+         ) WITH bloom_filter_fp_chance = 0.01
+             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+             AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND crc_check_chance = 1.0
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99PERCENTILE';
+         """
+        else:
+            create_table = """
+         CREATE TABLE test.users (
+             userid text PRIMARY KEY,
+             age int,
+             firstname text,
+             lastname text
+         ) WITH bloom_filter_fp_chance = 0.01
+             AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
+             AND comment = ''
+             AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
+             AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+             AND dclocal_read_repair_chance = 0.1
+             AND default_time_to_live = 0
+             AND gc_grace_seconds = 864000
+             AND max_index_interval = 2048
+             AND memtable_flush_period_in_ms = 0
+             AND min_index_interval = 128
+             AND read_repair_chance = 0.0
+             AND speculative_retry = '99.0PERCENTILE';
+         """
+        return [create_table, quoted_index_output, myindex_output]
+
+    def get_index_output(self, index, ks, table, col):
+        # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
+        # from 3.0.14 & 3.11
+        if index[0] == '"' and index[-1] == '"':
+            version = self.cluster.version()
+            if version >= LooseVersion('3.11'):
+                pass
+            elif LooseVersion('3.1') > version >= LooseVersion('3.0.14'):
+                pass
+            else:
+                index = index[1:-1]
+        return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+
+    def get_users_by_state_mv_output(self):
+        if self.cluster.version() >= LooseVersion('4.0'):
+            return """
+                 CREATE MATERIALIZED VIEW test.users_by_state AS
+                 SELECT *
+                 FROM test.users
+                 WHERE state IS NOT NULL AND username IS NOT NULL
+                 PRIMARY KEY (state, username)
+                 WITH CLUSTERING ORDER BY (username ASC)
+                 AND additional_write_policy = '99p'
+                 AND bloom_filter_fp_chance = 0.01
+                 AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                 AND cdc = false
+                 AND comment = ''
+                 AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                 AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                 AND crc_check_chance = 1.0
+                 AND default_time_to_live = 0
+                 AND extensions = {}
+                 AND gc_grace_seconds = 864000
+                 AND max_index_interval = 2048
+                 AND memtable_flush_period_in_ms = 0
+                 AND min_index_interval = 128
+                 AND read_repair = 'BLOCKING'
+                 AND speculative_retry = '99p';
+                """
+        elif self.cluster.version() >= LooseVersion('3.9'):
+            return """
+                 CREATE MATERIALIZED VIEW test.users_by_state AS
+                 SELECT *
+                 FROM test.users
+                 WHERE state IS NOT NULL AND username IS NOT NULL
+                 PRIMARY KEY (state, username)
+                 WITH CLUSTERING ORDER BY (username ASC)
+                 AND bloom_filter_fp_chance = 0.01
+                 AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                 AND comment = ''
+                 AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                 AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                 AND crc_check_chance = 1.0
+                 AND dclocal_read_repair_chance = 0.1
+                 AND default_time_to_live = 0
+                 AND gc_grace_seconds = 864000
+                 AND max_index_interval = 2048
+                 AND memtable_flush_period_in_ms = 0
+                 AND min_index_interval = 128
+                 AND read_repair_chance = 0.0
+                 AND speculative_retry = '99PERCENTILE';
+                """
+        else:
+            return """
+                 CREATE MATERIALIZED VIEW test.users_by_state AS
+                 SELECT *
+                 FROM test.users
+                 WHERE state IS NOT NULL AND username IS NOT NULL
+                 PRIMARY KEY (state, username)
+                 WITH CLUSTERING ORDER BY (username ASC)
+                 AND bloom_filter_fp_chance = 0.01
+                 AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                 AND comment = ''
+                 AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                 AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                 AND crc_check_chance = 1.0
+                 AND dclocal_read_repair_chance = 0.1
+                 AND default_time_to_live = 0
+                 AND gc_grace_seconds = 864000
+                 AND max_index_interval = 2048
+                 AND memtable_flush_period_in_ms = 0
+                 AND min_index_interval = 128
+                 AND read_repair_chance = 0.0
+                 AND speculative_retry = '99PERCENTILE';
+                """
+
+    def execute(self, cql, expected_output=None, expected_err=None, env_vars=None, output_is_ordered=True,
+                err_is_ordered=True):
+        logger.debug(cql)
+
+        node1, = self.cluster.nodelist()
+        output, err = self.run_cqlsh(node1, cql, env_vars=env_vars)
+
+        if err:
+            if expected_err:
+                err = err[10:]  # strip <stdin>:2:
+                if err_is_ordered:
+                    self.check_response(err, expected_err)
+                else:
+                    self.check_response_unordered(err, expected_err)
+                return
+            else:
+                assert False, err
+
+        if expected_output:
+            if output_is_ordered:
+                self.check_response(output, expected_output)
+            else:
+                self.check_response_unordered(output, expected_output)
+
+        return output
+
+    def check_response(self, response, expected_response):
+        lines = [s.strip() for s in response.split("\n") if s.strip()]
+        expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
+        assert expected_lines == lines
+
+    def strip_default_time_to_live(self, describe_statement):
+        """
+        Remove default_time_to_live options from output of DESCRIBE
+        statements. The resulting string may be reused as a CREATE
+        statement.
+        Useful after CASSANDRA-14071, which removed
+        default_time_to_live options from CREATE MATERIALIZED VIEW
+        statements.
+        """
+        describe_statement = re.sub(r"( AND)? default_time_to_live = [\d\.]+", "", describe_statement)
+        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
+        return describe_statement
+
+    def check_response_unordered(self, response, expected_response):
+        """
+        Assert that a response matches a concatenation of expected
+        strings in an arbitrary order. This is useful for features
+        such as DESCRIBE KEYSPACE, where output is arbitrarily
+        ordered.
+        expected_response should be a list of strings that form the
+        expected output.
+        """
+
+        def consume_expected(observed, expected):
+            unconsumed = observed
+            if isinstance(expected, list):
+                for unit in expected:
+                    unconsumed = consume_expected(unconsumed, unit)
+            else:
+                expected_stripped = "\n".join([s.strip() for s in expected.split("\n") if s.strip()])
+                assert unconsumed.find(expected_stripped) >= 0
+                unconsumed = unconsumed.replace(expected_stripped, "")
+            return unconsumed
+
+        stripped_response = "\n".join([s.strip() for s in response.split("\n") if s.strip()])
+        unconsumed = consume_expected(stripped_response, expected_response)
+        assert unconsumed.replace("\n", "") == ""
+
+    def strip_read_repair_chance(self, describe_statement):
+        """
+        Remove read_repair_chance and dclocal_read_repair_chance options
+        from output of DESCRIBE statements. The resulting string may be
+        reused as a CREATE statement.
+        Useful after CASSANDRA-13910, which removed read_repair_chance
+        options from CREATE statements but did not remove them completely
+        from the system.
+        """
+        describe_statement = re.sub(r"( AND)? (dclocal_)?read_repair_chance = [\d\.]+", "", describe_statement)
+        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
+        return describe_statement
+
+
+class TestCqlsh(TestCqlshBase):
+
+    def test_tls(self):
+        """ Test that TLSv1.2 connections work CASSANDRA-16695 """
+        generate_ssl_stores(self.fixture_dtest_setup.test_path)
+        self.cluster.set_configuration_options({
+            'client_encryption_options': {
+            'enabled': True,
+            'optional': False,
+            'protocol': 'TLSv1.2',
+            'keystore': os.path.join(self.fixture_dtest_setup.test_path, 'keystore.jks'),
+            'keystore_password': 'cassandra'
+            }
+        })
 
         self.cluster.populate(1)
         self.cluster.start()
+
+        node1, = self.cluster.nodelist()
+
+        out, err = self.run_cqlsh(node1, cmds="DESCRIBE KEYSPACES", cqlsh_options=['--ssl'], env_vars={'SSL_CERTFILE': os.path.join(self.fixture_dtest_setup.test_path, 'ccm_node.cer')})
+        assert err == ''
+
+    def test_list_queries(self):
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': '0'}
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(1)
+        self.cluster.start()
+        node1, = self.cluster.nodelist()
+        node1.watch_log_for('Created default superuser')
+
+        conn = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
+        conn.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        conn.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
+        conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
+        conn.execute("GRANT ALL ON ks.t1 TO user1")
+
+        if self.cluster.version() >= LooseVersion('4.0'):
+            self.verify_output("LIST USERS", node1, """
+ name      | super | datacenters
+-----------+-------+-------------
+ cassandra |  True |         ALL
+     user1 | False |         ALL
+
+(2 rows)
+""")
+        elif self.cluster.version() >= LooseVersion('2.2'):
+            self.verify_output("LIST USERS", node1, """
+ name      | super
+-----------+-------
+ cassandra |  True
+     user1 | False
+
+(2 rows)
+""")
+        else:
+            self.verify_output("LIST USERS", node1, """
+ name      | super
+-----------+-------
+     user1 | False
+ cassandra |  True
+
+(2 rows)
+""")
+
+        if self.cluster.version() >= LooseVersion('2.2'):
+            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
+ role  | username | resource      | permission
+-------+----------+---------------+------------
+ user1 |    user1 | <table ks.t1> |      ALTER
+ user1 |    user1 | <table ks.t1> |       DROP
+ user1 |    user1 | <table ks.t1> |     SELECT
+ user1 |    user1 | <table ks.t1> |     MODIFY
+ user1 |    user1 | <table ks.t1> |  AUTHORIZE
+
+(5 rows)
+""")
+        else:
+            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
+ username | resource      | permission
+----------+---------------+------------
+    user1 | <table ks.t1> |     CREATE
+    user1 | <table ks.t1> |      ALTER
+    user1 | <table ks.t1> |       DROP
+    user1 | <table ks.t1> |     SELECT
+    user1 | <table ks.t1> |     MODIFY
+    user1 | <table ks.t1> |  AUTHORIZE
+
+(6 rows)
+""")
+
+    @since('3.0')
+    def test_describe_mv(self):
+        """
+        @jira_ticket CASSANDRA-9961
+        """
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
+        self.cluster.populate(1)
+        self.cluster.start()
+
+        self.execute(
+            cql="""
+                CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
+                CREATE TABLE test.users (username varchar, password varchar, gender varchar,
+                session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username));
+                CREATE MATERIALIZED VIEW test.users_by_state AS
+                SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)
+                """)
+
+        output = self.execute(cql="DESCRIBE KEYSPACE test")
+        assert "users_by_state" in output
+
+        self.execute(cql='DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='DESCRIBE test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW users_by_state', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE users_by_state', expected_output=self.get_users_by_state_mv_output())
+
+        # test quotes
+        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW "users_by_state"', expected_output=self.get_users_by_state_mv_output())
+        self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
+
+    @since('2.2')
+    def test_client_warnings(self):
+        """
+        Tests for CASSANDRA-9399, check client warnings:
+        - an unlogged batch across multiple partitions should generate a WARNING if there are more than
+        unlogged_batch_across_partitions_warn_threshold partitions.
+
+        Execute two unlogged batches: one only with fewer partitions and the other one with more than
+        unlogged_batch_across_partitions_warn_threshold partitions.
+
+        Check that only the second one generates a client warning.
+
+        @jira_ticket CASSNADRA-9399
+        @jira_ticket CASSANDRA-9303
+        @jira_ticket CASSANDRA-11529
+        """
+        max_partitions_per_batch = 5
+        self.cluster.populate(3)
+        self.cluster.set_configuration_options({
+            'unlogged_batch_across_partitions_warn_threshold': str(max_partitions_per_batch)})
+
+        self.cluster.start()
+
+        node1 = self.cluster.nodelist()[0]
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+                CREATE KEYSPACE client_warnings WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+                USE client_warnings;
+                CREATE TABLE test (id int, val text, PRIMARY KEY (id))""")
+
+        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
+
+        session = self.patient_cql_connection(node1)
+        prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
+
+        batch_without_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
+        batch_with_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
+
+        for i in range(max_partitions_per_batch + 1):
+            batch_with_warning.add(prepared, (i,))
+            if i < max_partitions_per_batch:
+                batch_without_warning.add(prepared, (i,))
+
+        fut = session.execute_async(batch_without_warning)
+        fut.result()  # wait for batch to complete before checking warnings
+        assert fut.warnings is None
+
+        fut = session.execute_async(batch_with_warning)
+        fut.result()  # wait for batch to complete before checking warnings
+        logger.debug(fut.warnings)
+        assert fut.warnings is not None
+        assert 1 == len(fut.warnings)
+        expected_fut_warning = (
+                    "Unlogged batch covering {} partitions detected against table [client_warnings.test]. " +
+                    "You should use a logged batch for atomicity, or asynchronous writes for performance.") \
+            .format(max_partitions_per_batch + 1)
+        assert expected_fut_warning == fut.warnings[0]
+
+    @since('3.0.19')
+    def test_protocol_version_restriction(self):
+        """
+        @jira_ticket CASSANDRA-15193
+        """
+        self.fixture_dtest_setup.ignore_log_patterns = (
+            r'.*Unknown exception in client networking.*',
+            r'.*Invalid or unsupported protocol version \(4\).*',
+        )
+        self.cluster.populate(1)
+        self.cluster.set_configuration_options({'native_transport_max_negotiable_protocol_version': str(3)})
+        self.cluster.start()
+
+        node1, = self.cluster.nodelist()
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
+        # yaml property is deprecated from 4.0 and has no effect
+        if node1.get_cassandra_version() < '4.0':
+            assert "Native protocol v3" in stdout
+
+        node1, = self.cluster.nodelist()
+        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=4', '--tty'])
+        # yaml property is deprecated from 4.0 and has no effect
+        if node1.get_cassandra_version() < '4.0':
+            assert "ProtocolError returned from server while using explicitly set client protocol_version 4" in stderr
+
+    def test_update_schema_with_down_node(self):
+        """
+        Test that issuing a DML statement after a DDL statement will work with a down node
+        @jira_ticket CASSANDRA-9689
+        """
+        self.cluster.populate(3)
+        self.cluster.start()
+
+        node1, node2, node3 = self.cluster.nodelist()
+        node2.stop(wait_other_notice=True)
+
+        # --request-timeout option needed on 2.1 due to CASSANDRA-10686
+        cqlsh_opts = [] if self.cluster.version() >= LooseVersion('2.2') else ['--request-timeout=6']
+
+        stdout, stderr = self.run_cqlsh(node1, cmds="""
+                  CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
+                  DESCRIBE KEYSPACES""", cqlsh_options=cqlsh_opts)
+        assert "training" in stdout
+
+        stdout, stderr = self.run_cqlsh(node1, """USE training;
+                                                      CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
+                                                      describe tables""", cqlsh_options=cqlsh_opts)
+        assert "mytable" in stdout
+
+    @since('3.0')
+    def test_materialized_view(self):
+        """
+        Test operations on a materialized view: create, describe, select from, drop, create using describe output.
+        @jira_ticket CASSANDRA-9961 and CASSANDRA-10348
+        """
+        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
+        self.cluster.populate(1)
+        self.cluster.start()
+        node1, = self.cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        create_ks(session, 'test', 1)
+
+        session.execute("""CREATE TABLE test.users (username varchar, password varchar, gender varchar,
+                    session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username))""")
+
+        session.execute("""CREATE MATERIALIZED VIEW test.users_by_state AS
+                    SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)""")
+
+        insert_stmt = "INSERT INTO users (username, password, gender, state, birth_year) VALUES "
+        session.execute(insert_stmt + "('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
+        session.execute(insert_stmt + "('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
+        session.execute(insert_stmt + "('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
+        session.execute(insert_stmt + "('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
+
+        describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        assert 0 == len(err), err
+
+        select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
+        assert 0 == len(err), err
+        logger.debug(select_out)
+
+        drop_out, err = self.run_cqlsh(node1,
+                                       "DROP MATERIALIZED VIEW test.users_by_state; DESCRIBE KEYSPACE test; DESCRIBE table test.users")
+        assert 0 == len(err), err
+        assert "CREATE MATERIALIZED VIEW users_by_state" not in drop_out
+
+        describe_after_drop_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        assert 0 == len(describe_after_drop_out.strip()), describe_after_drop_out
+        assert "Materialized view 'users_by_state' not found" in err
+
+        create_statement = 'USE test; ' + ' '.join(describe_out.splitlines()).strip()[:-1]
+        create_statement = self.strip_default_time_to_live(create_statement)
+        create_statement = self.strip_read_repair_chance(create_statement)
+        out, err = self.run_cqlsh(node1, create_statement)
+        assert 0 == len(err), err
+
+        reloaded_describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
+        assert 0 == len(err), err
+        assert describe_out == reloaded_describe_out
+
+        reloaded_select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
+        assert 0 == len(err), err
+        assert select_out == reloaded_select_out
+
+
+@reuse_cluster
+class TestCqlshReuse(TestCqlshBase):
+    def try_reuse_node(self):
+        cluster = self.cluster
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(1).start()
+
+    @pytest.mark.depends_cqlshlib
+    @since('2.1.9')
+    def test_pycodestyle_compliance(self):
+        """
+        @jira_ticket CASSANDRA-10066
+        Checks that cqlsh is compliant with pycodestyle (formally known as pep8) with the following command:
+        pycodestyle --ignore E501,E402,E731,W503 pylib/cqlshlib/*.py bin/cqlsh.py
+        """
+        cluster = self.cluster
+
+        if cluster.version() < LooseVersion('2.2'):
+            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh')
+        else:
+            cqlsh_path = os.path.join(cluster.get_install_dir(), 'bin', 'cqlsh.py')
+
+        cqlshlib_path = os.path.join(cluster.get_install_dir(), 'pylib', 'cqlshlib')
+        cqlshlib_paths = os.listdir(cqlshlib_path)
+        cqlshlib_paths = [os.path.join(cqlshlib_path, x) for x in cqlshlib_paths if '.py' in x and '.pyc' not in x]
+
+        cmds = ['pycodestyle', '--ignore', 'E501,E402,E731,W503', cqlsh_path] + cqlshlib_paths
+
+        logger.debug(cmds)
+
+        # 3.7 adds a text=True option which converts stdout/stderr to str type, until then
+        # when printing out need to convert in order to avoid assert failing as the type
+        # does not have an encoding
+        p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+
+        assert 0 == len(stdout), stdout.decode("utf-8")
+        assert 0 == len(stderr), stderr.decode("utf-8")
+
+    def test_simple_insert(self):
+        self.try_reuse_node()
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE simple (id int PRIMARY KEY , value text ) ;
+            insert into simple (id, value) VALUES (1, 'one');
+            insert into simple (id, value) VALUES (2, 'two');
+            insert into simple (id, value) VALUES (3, 'three');
+            insert into simple (id, value) VALUES (4, 'four');
+            insert into simple (id, value) VALUES (5, 'five')""")
+
+        session = self.patient_cql_connection(node1)
+        rows = list(session.execute("select id, value from simple.simple"))
+
+        assert {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five'} == {k: v for k, v in rows}
+
+    def test_lwt(self):
+        """
+        Test LWT inserts and updates.
+
+        @jira_ticket CASSANDRA-11003
+        """
+        self.try_reuse_node()
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE lwt WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            CREATE TABLE lwt.lwt (id int PRIMARY KEY , value text)""")
+
+        def assert_applied(stmt, node=node1):
+            expected_substring = '[applied]'
+            output, _ = self.run_cqlsh(node, stmt)
+            msg = '{exp} not found in output from {stmt}: {routput}'.format(
+                exp=repr(expected_substring),
+                stmt=repr(stmt),
+                routput=repr(output)
+            )
+            assert expected_substring in output, msg
+
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("INSERT INTO lwt.lwt (id, value) VALUES (1, 'one') IF NOT EXISTS")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'one'")
+        assert_applied("UPDATE lwt.lwt SET value = 'one' WHERE id = 1 IF value = 'zzz'")
+
+    @since('2.2')
+    def test_past_and_future_dates(self):
+        self.try_reuse_node()
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE simpledate (id int PRIMARY KEY , value timestamp ) ;
+            insert into simpledate (id, value) VALUES (1, '2143-04-19 11:21:01+0000');
+            insert into simpledate (id, value) VALUES (2, '1943-04-19 11:21:01+0000')""")
+
+        session = self.patient_cql_connection(node1)
+        list(session.execute("select id, value from simple.simpledate"))
+
+        output, err = self.run_cqlsh(node1, 'use simple; SELECT * FROM simpledate')
+
+        if self.cluster.version() >= LooseVersion('3.4'):
+            assert "2143-04-19 11:21:01.000000+0000" in output
+            assert "1943-04-19 11:21:01.000000+0000" in output
+        else:
+            assert "2143-04-19 11:21:01+0000" in output
+            assert "1943-04-19 11:21:01+0000" in output
+
+    @since('3.4')
+    def test_sub_second_precision(self):
+        """
+        Test that we can query at millisecond precision.
+        @jira_ticket 10428
+        """
+        self.try_reuse_node()
+
+        node1, = self.cluster.nodelist()
+
+        node1.run_cqlsh(cmds="""
+            CREATE KEYSPACE simple WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+            use simple;
+            create TABLE testsubsecond (id int, subid timestamp, value text, primary key (id, subid));
+            insert into testsubsecond (id, subid, value) VALUES (1, '1943-06-19 11:21:01.123+0000', 'abc');
+            insert into testsubsecond (id, subid, value) VALUES (2, '1943-06-19 11:21:01+0000', 'def')""")
+
+        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                         "WHERE id = 1 AND subid = '1943-06-19 11:21:01.123+0000'")
+
+        logger.debug(output)
+        assert "1943-06-19 11:21:01.123000+0000" in output
+        assert "1943-06-19 11:21:01.000000+0000" not in output
+
+        output, err, _ = node1.run_cqlsh(cmds="use simple; SELECT * FROM testsubsecond "
+                                         "WHERE id = 2 AND subid = '1943-06-19 11:21:01+0000'")
+
+        logger.debug(output)
+        assert "1943-06-19 11:21:01.000000+0000" in output
+        assert "1943-06-19 11:21:01.123000+0000" not in output
+
+    def test_eat_glass(self):
+
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -539,8 +1192,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
     def test_source_glass(self):
 
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -553,8 +1205,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         Ensure that syntax errors involving unicode are handled correctly.
         @jira_ticket CASSANDRA-11626
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -576,8 +1227,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         Ensure that invalid request errors involving unicode are handled correctly.
         @jira_ticket CASSANDRA-11626
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -600,8 +1250,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
         """
         CASSANDRA-7196. Make sure the server returns empty values and CQLSH prints them properly
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -682,7 +1331,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert expected in output, "Output \n {0} \n doesn't contain expected\n {1}".format(output, expected)
 
     def test_tracing_from_system_traces(self):
-        self.cluster.populate(1).start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -703,7 +1352,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         assert 'Tracing session: ' not in out
 
     def test_select_element_inside_udt(self):
-        self.cluster.populate(1).start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
@@ -739,82 +1388,11 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
     # If enabled, log all stdout/stderr of cqlsh commands
     cqlsh_debug_enabled = False
 
-    def test_list_queries(self):
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms': '0'}
-        self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(1)
-        self.cluster.start()
-        node1, = self.cluster.nodelist()
-        node1.watch_log_for('Created default superuser')
-
-        conn = self.patient_cql_connection(node1, user='cassandra', password='cassandra')
-        conn.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
-        conn.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
-        conn.execute("CREATE USER user1 WITH PASSWORD 'user1'")
-        conn.execute("GRANT ALL ON ks.t1 TO user1")
-
-        if self.cluster.version() >= LooseVersion('4.0'):
-            self.verify_output("LIST USERS", node1, """
- name      | super | datacenters
------------+-------+-------------
- cassandra |  True |         ALL
-     user1 | False |         ALL
-
-(2 rows)
-""")
-        elif self.cluster.version() >= LooseVersion('2.2'):
-            self.verify_output("LIST USERS", node1, """
- name      | super
------------+-------
- cassandra |  True
-     user1 | False
-
-(2 rows)
-""")
-        else:
-            self.verify_output("LIST USERS", node1, """
- name      | super
------------+-------
-     user1 | False
- cassandra |  True
-
-(2 rows)
-""")
-
-        if self.cluster.version() >= LooseVersion('2.2'):
-            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
- role  | username | resource      | permission
--------+----------+---------------+------------
- user1 |    user1 | <table ks.t1> |      ALTER
- user1 |    user1 | <table ks.t1> |       DROP
- user1 |    user1 | <table ks.t1> |     SELECT
- user1 |    user1 | <table ks.t1> |     MODIFY
- user1 |    user1 | <table ks.t1> |  AUTHORIZE
-
-(5 rows)
-""")
-        else:
-            self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
- username | resource      | permission
-----------+---------------+------------
-    user1 | <table ks.t1> |     CREATE
-    user1 | <table ks.t1> |      ALTER
-    user1 | <table ks.t1> |       DROP
-    user1 | <table ks.t1> |     SELECT
-    user1 | <table ks.t1> |     MODIFY
-    user1 | <table ks.t1> |  AUTHORIZE
-
-(6 rows)
-""")
-
     def test_describe(self):
         """
         @jira_ticket CASSANDRA-7814
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
 
         self.execute(
@@ -900,8 +1478,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
         self.execute(cql='DESCRIBE test.test_val_idx', expected_err="'test_val_idx' not found in keyspace 'test'")
 
     def test_describe_describes_non_default_compaction_parameters(self):
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -915,8 +1492,7 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
     def test_describe_functions(self, fixture_dtest_setup_overrides):
         """Test DESCRIBE statements for functions and aggregate functions"""
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
         create_function_statement = """
@@ -976,28 +1552,9 @@ CREATE OR REPLACE AGGREGATE test.average(int)
             # describe aggregate functions
             self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
 
-    def get_describe_aggregate_output(self):
-        if self.cluster.version() >= LooseVersion("4.0"):
-            return """
-                CREATE AGGREGATE test.average(int)
-                    SFUNC average_state
-                    STYPE tuple<int, bigint>
-                    FINALFUNC average_final
-                    INITCOND (0, 0);
-                """
-
-        return """
-        CREATE AGGREGATE test.average(int)
-            SFUNC average_state
-            STYPE frozen<tuple<int, bigint>>
-            FINALFUNC average_final
-            INITCOND (0, 0);
-        """
-
     @since('4.0')
     def test_default_keyspaces_exist(self):
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
 
         # Describe keyspaces
@@ -1017,8 +1574,7 @@ CREATE OR REPLACE AGGREGATE test.average(int)
 
     def test_describe_types(self):
         """Test DESCRIBE statements for user defined datatypes"""
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
         create_name_type_statement = """
@@ -1065,8 +1621,7 @@ CREATE TYPE test.address_type (
         @jira_ticket CASSANDRA-9232
         Test that we can describe tables whose name is a non-reserved CQL keyword
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node, = self.cluster.nodelist()
         session = self.patient_cql_connection(node)
         create_ks(session, 'ks', 1)
@@ -1076,405 +1631,9 @@ CREATE TYPE test.address_type (
         assert "" == err
         assert "CREATE TABLE ks.map (" in out
 
-    @since('3.0')
-    def test_describe_mv(self):
-        """
-        @jira_ticket CASSANDRA-9961
-        """
-        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
-        self.cluster.populate(1)
-        self.cluster.start()
-
-        self.execute(
-            cql="""
-                CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1};
-                CREATE TABLE test.users (username varchar, password varchar, gender varchar,
-                session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username));
-                CREATE MATERIALIZED VIEW test.users_by_state AS
-                SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)
-                """)
-
-        output = self.execute(cql="DESCRIBE KEYSPACE test")
-        assert "users_by_state" in output
-
-        self.execute(cql='DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
-        self.execute(cql='DESCRIBE test.users_by_state', expected_output=self.get_users_by_state_mv_output())
-        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW test.users_by_state', expected_output=self.get_users_by_state_mv_output())
-        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW users_by_state', expected_output=self.get_users_by_state_mv_output())
-        self.execute(cql='USE test; DESCRIBE users_by_state', expected_output=self.get_users_by_state_mv_output())
-
-        # test quotes
-        self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW "users_by_state"', expected_output=self.get_users_by_state_mv_output())
-        self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
-
-    def get_keyspace_output(self):
-        return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
-                self.get_test_table_output(),
-                self.get_users_table_output()]
-
-    def get_test_table_output(self, has_val=True, has_val_idx=True):
-        create_table = None
-        if has_val:
-            create_table = """
-                CREATE TABLE test.test (
-                    id int,
-                    col int,
-                    val text,
-                PRIMARY KEY (id, col)
-                """
-        else:
-            create_table = """
-                CREATE TABLE test.test (
-                    id int,
-                    col int,
-                PRIMARY KEY (id, col)
-                """
-
-        if self.cluster.version() >= LooseVersion('4.0'):
-            create_table += """
-        ) WITH CLUSTERING ORDER BY (col ASC)
-            AND additional_write_policy = '99p'
-            AND bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND cdc = false
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND default_time_to_live = 0
-            AND extensions = {}
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
-        """
-        elif self.cluster.version() >= LooseVersion('3.9'):
-            create_table += """
-        ) WITH CLUSTERING ORDER BY (col ASC)
-            AND bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99PERCENTILE';
-        """
-        elif self.cluster.version() >= LooseVersion('3.0'):
-            create_table += """
-        ) WITH CLUSTERING ORDER BY (col ASC)
-            AND bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99PERCENTILE';
-        """
-        else:
-            create_table += """
-        ) WITH CLUSTERING ORDER BY (col ASC)
-            AND bloom_filter_fp_chance = 0.01
-            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-            AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99.0PERCENTILE';
-        """
-
-        col_idx_def = self.get_index_output('test_col_idx', 'test', 'test', 'col')
-        expected_output = [create_table, col_idx_def]
-        if has_val_idx:
-            expected_output.append(self.get_index_output('test_val_idx', 'test', 'test', 'val'))
-        return expected_output
-
-    def get_users_table_output(self):
-        quoted_index_output = self.get_index_output('"QuotedNameIndex"', 'test', 'users', 'firstname')
-        myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
-        create_table = None
-
-        if self.cluster.version() >= LooseVersion('4.0'):
-            create_table = """
-        CREATE TABLE test.users (
-            userid text PRIMARY KEY,
-            age int,
-            firstname text,
-            lastname text
-        ) WITH additional_write_policy = '99p'
-            AND bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND cdc = false
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND default_time_to_live = 0
-            AND extensions = {}
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
-        """
-        elif self.cluster.version() >= LooseVersion('3.9'):
-            create_table =  """
-        CREATE TABLE test.users (
-            userid text PRIMARY KEY,
-            age int,
-            firstname text,
-            lastname text
-        ) WITH bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99PERCENTILE';
-        """
-        elif self.cluster.version() >= LooseVersion('3.0'):
-            create_table = """
-        CREATE TABLE test.users (
-            userid text PRIMARY KEY,
-            age int,
-            firstname text,
-            lastname text
-        ) WITH bloom_filter_fp_chance = 0.01
-            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-            AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND crc_check_chance = 1.0
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99PERCENTILE';
-        """
-        else:
-            create_table = """
-        CREATE TABLE test.users (
-            userid text PRIMARY KEY,
-            age int,
-            firstname text,
-            lastname text
-        ) WITH bloom_filter_fp_chance = 0.01
-            AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'
-            AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy'}
-            AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-            AND dclocal_read_repair_chance = 0.1
-            AND default_time_to_live = 0
-            AND gc_grace_seconds = 864000
-            AND max_index_interval = 2048
-            AND memtable_flush_period_in_ms = 0
-            AND min_index_interval = 128
-            AND read_repair_chance = 0.0
-            AND speculative_retry = '99.0PERCENTILE';
-        """
-        return [create_table, quoted_index_output, myindex_output]
-
-    def get_index_output(self, index, ks, table, col):
-        # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
-        # from 3.0.14 & 3.11
-        if index[0] == '"' and index[-1] == '"':
-            version = self.cluster.version()
-            if version >= LooseVersion('3.11'):
-                pass
-            elif LooseVersion('3.1') > version >= LooseVersion('3.0.14'):
-                pass
-            else:
-                index = index[1:-1]
-        return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
-
-    def get_users_by_state_mv_output(self):
-        if self.cluster.version() >= LooseVersion('4.0'):
-            return """
-                CREATE MATERIALIZED VIEW test.users_by_state AS
-                SELECT *
-                FROM test.users
-                WHERE state IS NOT NULL AND username IS NOT NULL
-                PRIMARY KEY (state, username)
-                WITH CLUSTERING ORDER BY (username ASC)
-                AND additional_write_policy = '99p'
-                AND bloom_filter_fp_chance = 0.01
-                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-                AND cdc = false
-                AND comment = ''
-                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-                AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-                AND crc_check_chance = 1.0
-                AND default_time_to_live = 0
-                AND extensions = {}
-                AND gc_grace_seconds = 864000
-                AND max_index_interval = 2048
-                AND memtable_flush_period_in_ms = 0
-                AND min_index_interval = 128
-                AND read_repair = 'BLOCKING'
-                AND speculative_retry = '99p';
-               """
-        elif self.cluster.version() >= LooseVersion('3.9'):
-            return """
-                CREATE MATERIALIZED VIEW test.users_by_state AS
-                SELECT *
-                FROM test.users
-                WHERE state IS NOT NULL AND username IS NOT NULL
-                PRIMARY KEY (state, username)
-                WITH CLUSTERING ORDER BY (username ASC)
-                AND bloom_filter_fp_chance = 0.01
-                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-                AND comment = ''
-                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-                AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-                AND crc_check_chance = 1.0
-                AND dclocal_read_repair_chance = 0.1
-                AND default_time_to_live = 0
-                AND gc_grace_seconds = 864000
-                AND max_index_interval = 2048
-                AND memtable_flush_period_in_ms = 0
-                AND min_index_interval = 128
-                AND read_repair_chance = 0.0
-                AND speculative_retry = '99PERCENTILE';
-               """
-        else:
-            return """
-                CREATE MATERIALIZED VIEW test.users_by_state AS
-                SELECT *
-                FROM test.users
-                WHERE state IS NOT NULL AND username IS NOT NULL
-                PRIMARY KEY (state, username)
-                WITH CLUSTERING ORDER BY (username ASC)
-                AND bloom_filter_fp_chance = 0.01
-                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-                AND comment = ''
-                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
-                AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-                AND crc_check_chance = 1.0
-                AND dclocal_read_repair_chance = 0.1
-                AND default_time_to_live = 0
-                AND gc_grace_seconds = 864000
-                AND max_index_interval = 2048
-                AND memtable_flush_period_in_ms = 0
-                AND min_index_interval = 128
-                AND read_repair_chance = 0.0
-                AND speculative_retry = '99PERCENTILE';
-               """
-
-    def execute(self, cql, expected_output=None, expected_err=None, env_vars=None, output_is_ordered=True, err_is_ordered=True):
-        logger.debug(cql)
-
-        node1, = self.cluster.nodelist()
-        output, err = self.run_cqlsh(node1, cql, env_vars=env_vars)
-
-        if err:
-            if expected_err:
-                err = err[10:]  # strip <stdin>:2:
-                if err_is_ordered:
-                    self.check_response(err, expected_err)
-                else:
-                    self.check_response_unordered(err, expected_err)
-                return
-            else:
-                assert False, err
-
-        if expected_output:
-            if output_is_ordered:
-                self.check_response(output, expected_output)
-            else:
-                self.check_response_unordered(output, expected_output)
-
-        return output
-
-    def check_response(self, response, expected_response):
-        lines = [s.strip() for s in response.split("\n") if s.strip()]
-        expected_lines = [s.strip() for s in expected_response.split("\n") if s.strip()]
-        assert expected_lines == lines
-
-    def strip_default_time_to_live(self, describe_statement):
-        """
-        Remove default_time_to_live options from output of DESCRIBE
-        statements. The resulting string may be reused as a CREATE
-        statement.
-        Useful after CASSANDRA-14071, which removed
-        default_time_to_live options from CREATE MATERIALIZED VIEW
-        statements.
-        """
-        describe_statement = re.sub(r"( AND)? default_time_to_live = [\d\.]+", "", describe_statement)
-        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
-        return describe_statement
-
-    def check_response_unordered(self, response, expected_response):
-        """
-        Assert that a response matches a concatenation of expected
-        strings in an arbitrary order. This is useful for features
-        such as DESCRIBE KEYSPACE, where output is arbitrarily
-        ordered.
-        expected_response should be a list of strings that form the
-        expected output.
-        """
-
-        def consume_expected(observed, expected):
-            unconsumed = observed
-            if isinstance(expected, list):
-                for unit in expected:
-                    unconsumed = consume_expected(unconsumed, unit)
-            else:
-                expected_stripped = "\n".join([s.strip() for s in expected.split("\n") if s.strip()])
-                assert unconsumed.find(expected_stripped) >= 0
-                unconsumed = unconsumed.replace(expected_stripped, "")
-            return unconsumed
-
-        stripped_response = "\n".join([s.strip() for s in response.split("\n") if s.strip()])
-        unconsumed = consume_expected(stripped_response, expected_response)
-        assert unconsumed.replace("\n", "") == ""
-
-    def strip_read_repair_chance(self, describe_statement):
-        """
-        Remove read_repair_chance and dclocal_read_repair_chance options
-        from output of DESCRIBE statements. The resulting string may be
-        reused as a CREATE statement.
-        Useful after CASSANDRA-13910, which removed read_repair_chance
-        options from CREATE statements but did not remove them completely
-        from the system.
-        """
-        describe_statement = re.sub(r"( AND)? (dclocal_)?read_repair_chance = [\d\.]+", "", describe_statement)
-        describe_statement = re.sub(r"WITH[\s]*;", "", describe_statement)
-        return describe_statement
-
     def test_copy_to(self):
-        self.cluster.populate(1).start()
+        self.try_reuse_node()
+
         node1, = self.cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
@@ -1513,8 +1672,7 @@ CREATE TYPE test.address_type (
 
     def test_float_formatting(self):
         """ Tests for CASSANDRA-9224, check format of float and double values"""
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1691,8 +1849,7 @@ CREATE TYPE test.address_type (
     @since('2.2')
     def test_int_values(self):
         """ Tests for CASSANDRA-9399, check tables with int, bigint, smallint and tinyint values"""
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1728,8 +1885,7 @@ CREATE TABLE int_checks.values (
     @since('2.2', max_version='4')
     def test_datetime_values(self):
         """ Tests for CASSANDRA-9399, check tables with date and time values"""
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1774,8 +1930,7 @@ CREATE TABLE datetime_checks.values (
     """
     @since('4.0')
     def test_datetime_values_40(self):
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1821,8 +1976,7 @@ CREATE TABLE datetime_checks.values (
         We care mostly that we do not crash, not so much on the tracing content, which may change and would
         therefore make this test too brittle.
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1848,69 +2002,11 @@ CREATE TABLE datetime_checks.values (
 
 Tracing session:""")
 
-    @since('2.2')
-    def test_client_warnings(self):
-        """
-        Tests for CASSANDRA-9399, check client warnings:
-        - an unlogged batch across multiple partitions should generate a WARNING if there are more than
-        unlogged_batch_across_partitions_warn_threshold partitions.
-
-        Execute two unlogged batches: one only with fewer partitions and the other one with more than
-        unlogged_batch_across_partitions_warn_threshold partitions.
-
-        Check that only the second one generates a client warning.
-
-        @jira_ticket CASSNADRA-9399
-        @jira_ticket CASSANDRA-9303
-        @jira_ticket CASSANDRA-11529
-        """
-        max_partitions_per_batch = 5
-        self.cluster.populate(3)
-        self.cluster.set_configuration_options({
-            'unlogged_batch_across_partitions_warn_threshold': str(max_partitions_per_batch)})
-
-        self.cluster.start()
-
-        node1 = self.cluster.nodelist()[0]
-
-        stdout, stderr = self.run_cqlsh(node1, cmds="""
-            CREATE KEYSPACE client_warnings WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-            USE client_warnings;
-            CREATE TABLE test (id int, val text, PRIMARY KEY (id))""")
-
-        assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
-
-        session = self.patient_cql_connection(node1)
-        prepared = session.prepare("INSERT INTO client_warnings.test (id, val) VALUES (?, 'abc')")
-
-        batch_without_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
-        batch_with_warning = BatchStatement(batch_type=BatchType.UNLOGGED)
-
-        for i in range(max_partitions_per_batch + 1):
-            batch_with_warning.add(prepared, (i,))
-            if i < max_partitions_per_batch:
-                batch_without_warning.add(prepared, (i,))
-
-        fut = session.execute_async(batch_without_warning)
-        fut.result()  # wait for batch to complete before checking warnings
-        assert fut.warnings is None
-
-        fut = session.execute_async(batch_with_warning)
-        fut.result()  # wait for batch to complete before checking warnings
-        logger.debug(fut.warnings)
-        assert fut.warnings is not None
-        assert 1 == len(fut.warnings)
-        expected_fut_warning = ("Unlogged batch covering {} partitions detected against table [client_warnings.test]. " +
-                                "You should use a logged batch for atomicity, or asynchronous writes for performance.") \
-                                .format(max_partitions_per_batch + 1)
-        assert expected_fut_warning == fut.warnings[0]
-
     def test_connect_timeout(self):
         """
         @jira_ticket CASSANDRA-9601
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
 
@@ -1922,8 +2018,7 @@ Tracing session:""")
         """
         @jira_ticket CASSANDRA-15193
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
 
         node1, = self.cluster.nodelist()
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
@@ -1937,55 +2032,6 @@ Tracing session:""")
 
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=3', '--tty'])
         assert "Native protocol v3" in stdout
-
-    @since('3.0.19')
-    def test_protocol_version_restriction(self):
-        """
-        @jira_ticket CASSANDRA-15193
-        """
-        self.fixture_dtest_setup.ignore_log_patterns = (
-                r'.*Unknown exception in client networking.*',
-                r'.*Invalid or unsupported protocol version \(4\).*',
-                )
-        self.cluster.populate(1)
-        self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
-        self.cluster.start()
-
-        node1, = self.cluster.nodelist()
-        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
-        # yaml property is deprecated from 4.0 and has no effect
-        if node1.get_cassandra_version() < '4.0':
-            assert "Native protocol v3" in stdout
-
-        node1, = self.cluster.nodelist()
-        stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--protocol-version=4', '--tty'])
-        # yaml property is deprecated from 4.0 and has no effect
-        if node1.get_cassandra_version() < '4.0':
-            assert "ProtocolError returned from server while using explicitly set client protocol_version 4" in stderr
-
-    def test_update_schema_with_down_node(self):
-        """
-        Test that issuing a DML statement after a DDL statement will work with a down node
-        @jira_ticket CASSANDRA-9689
-        """
-        self.cluster.populate(3)
-        self.cluster.start()
-
-        node1, node2, node3 = self.cluster.nodelist()
-        node2.stop(wait_other_notice=True)
-
-        # --request-timeout option needed on 2.1 due to CASSANDRA-10686
-        cqlsh_opts = [] if self.cluster.version() >= LooseVersion('2.2') else ['--request-timeout=6']
-
-        stdout, stderr = self.run_cqlsh(node1, cmds="""
-              CREATE KEYSPACE training WITH replication={'class':'SimpleStrategy','replication_factor':1};
-              DESCRIBE KEYSPACES""", cqlsh_options=cqlsh_opts)
-        assert "training" in stdout
-
-        stdout, stderr = self.run_cqlsh(node1, """USE training;
-                                                  CREATE TABLE mytable (id int, val text, PRIMARY KEY (id));
-                                                  describe tables""", cqlsh_options=cqlsh_opts)
-        assert "mytable" in stdout
 
     def test_describe_round_trip(self):
         """
@@ -2001,8 +2047,7 @@ Tracing session:""")
         The final two steps of the test should not fall down. If one does, that
         indicates the output of DESCRIBE is not a correct CREATE TABLE statement.
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2023,61 +2068,6 @@ Tracing session:""")
 
         # the table created before and after should be the same
         assert reloaded_describe_out == describe_out
-
-    @since('3.0')
-    def test_materialized_view(self):
-        """
-        Test operations on a materialized view: create, describe, select from, drop, create using describe output.
-        @jira_ticket CASSANDRA-9961 and CASSANDRA-10348
-        """
-        self.cluster.set_configuration_options({'enable_materialized_views': 'true'})
-        self.cluster.populate(1)
-        self.cluster.start()
-        node1, = self.cluster.nodelist()
-        session = self.patient_cql_connection(node1)
-
-        create_ks(session, 'test', 1)
-
-        session.execute("""CREATE TABLE test.users (username varchar, password varchar, gender varchar,
-                session_token varchar, state varchar, birth_year bigint, PRIMARY KEY (username))""")
-
-        session.execute("""CREATE MATERIALIZED VIEW test.users_by_state AS
-                SELECT * FROM users WHERE STATE IS NOT NULL AND username IS NOT NULL PRIMARY KEY (state, username)""")
-
-        insert_stmt = "INSERT INTO users (username, password, gender, state, birth_year) VALUES "
-        session.execute(insert_stmt + "('user1', 'ch@ngem3a', 'f', 'TX', 1968);")
-        session.execute(insert_stmt + "('user2', 'ch@ngem3b', 'm', 'CA', 1971);")
-        session.execute(insert_stmt + "('user3', 'ch@ngem3c', 'f', 'FL', 1978);")
-        session.execute(insert_stmt + "('user4', 'ch@ngem3d', 'm', 'TX', 1974);")
-
-        describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        assert 0 == len(err), err
-
-        select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
-        assert 0 == len(err), err
-        logger.debug(select_out)
-
-        drop_out, err = self.run_cqlsh(node1, "DROP MATERIALIZED VIEW test.users_by_state; DESCRIBE KEYSPACE test; DESCRIBE table test.users")
-        assert 0 == len(err), err
-        assert "CREATE MATERIALIZED VIEW users_by_state" not in drop_out
-
-        describe_after_drop_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        assert 0 == len(describe_after_drop_out.strip()), describe_after_drop_out
-        assert "Materialized view 'users_by_state' not found" in err
-
-        create_statement = 'USE test; ' + ' '.join(describe_out.splitlines()).strip()[:-1]
-        create_statement = self.strip_default_time_to_live(create_statement)
-        create_statement = self.strip_read_repair_chance(create_statement)
-        out, err = self.run_cqlsh(node1, create_statement)
-        assert 0 == len(err), err
-
-        reloaded_describe_out, err = self.run_cqlsh(node1, 'DESCRIBE MATERIALIZED VIEW test.users_by_state')
-        assert 0 == len(err), err
-        assert describe_out == reloaded_describe_out
-
-        reloaded_select_out, err = self.run_cqlsh(node1, "SELECT * FROM test.users_by_state")
-        assert 0 == len(err), err
-        assert select_out == reloaded_select_out
 
     @since('3.0')
     def test_clear(self):
@@ -2113,8 +2103,7 @@ Tracing session:""")
             screen sequences is contained in the output, via a regular
             expression.
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
 
         out, err = self.run_cqlsh(node1, cmd, env_vars={'TERM': 'xterm'})
@@ -2129,8 +2118,7 @@ Tracing session:""")
         Test the BATCH command
         @jira_ticket CASSANDRA-10272
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
 
         stdout, stderr = self.run_cqlsh(node1, cmds="""
@@ -2147,8 +2135,7 @@ Tracing session:""")
         Test: cqlsh -e "<STATEMENT>"
         @jira_ticket CASSANDRA-15660
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2167,8 +2154,7 @@ Tracing session:""")
         Test: cqlsh -e "<SELECT STATEMENT>" with more rows than 1 page
         @jira_ticket CASSANDRA-15905
         """
-        self.cluster.populate(1)
-        self.cluster.start()
+        self.try_reuse_node()
         node1, = self.cluster.nodelist()
         session = self.patient_cql_connection(node1)
 
@@ -2286,6 +2272,7 @@ Tracing session:""")
 
 
 
+@reuse_cluster
 class TestCqlshSmoke(Tester, CqlshMixin):
     """
     Tests simple use cases for clqsh.
@@ -2293,7 +2280,8 @@ class TestCqlshSmoke(Tester, CqlshMixin):
 
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
-        fixture_dtest_setup.cluster.populate(1).start()
+        if len(fixture_dtest_setup.cluster.nodelist()) == 0:
+            fixture_dtest_setup.cluster.populate(1).start()
         [self.node1] = fixture_dtest_setup.cluster.nodelist()
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 
@@ -2587,19 +2575,37 @@ class TestCqlshSmoke(Tester, CqlshMixin):
         assert stdout_lines_sorted.find(expected) >= 0
 
 
+@reuse_cluster
 class TestCqlLogin(Tester, CqlshMixin):
     """
     Tests login which requires password authenticator
     """
+    def clear_auth(self, session):
+        # Clear auth after test to support node reusage
+        rows = list(session.execute(query="list roles", timeout=120))
+        for row in rows:
+            role = str(row.role)
+            if role != 'cassandra':
+                logging.debug("drop role if exists '" + role + "'")
+                session.execute(query="drop role if exists '" + role + "'", timeout=120)
+            session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+
+    @pytest.fixture(autouse=True)
+    def fixture_clear_auth(self, fixture_cluster_setup):
+        # Run the test
+        yield
+        self.clear_auth(self.session)
 
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}
-        cluster.set_configuration_options(values=config)
-        cluster.populate(1).start()
+        if len(cluster.nodelist()) == 0:
+            config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator'}
+            cluster.set_configuration_options(values=config)
+            cluster.populate(1).start()
+            [self.node1] = cluster.nodelist()
+            self.node1.watch_log_for('Created default superuser')
         [self.node1] = cluster.nodelist()
-        self.node1.watch_log_for('Created default superuser')
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1, user='cassandra', password='cassandra')
 
     def assert_login_not_allowed(self, user, input):
@@ -2733,6 +2739,7 @@ class TestCqlLogin(Tester, CqlshMixin):
         assert '' == err
 
 
+@reuse_cluster
 class TestCqlshUnicode(Tester, CqlshMixin):
     """
     Tests to make sure some specific unicode use cases work.
@@ -2744,7 +2751,8 @@ class TestCqlshUnicode(Tester, CqlshMixin):
     @pytest.fixture(scope='function', autouse=True)
     def fixture_cluster_setup(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
-        cluster.populate(1).start()
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(1).start()
         [self.node1] = cluster.nodelist()
         self.session = fixture_dtest_setup.patient_cql_connection(self.node1)
 

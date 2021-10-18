@@ -131,6 +131,7 @@ class Reuse_cluster(Enum):
 
 @pytest.fixture(scope='function', autouse=True)
 def fixture_dtest_reuse_cluster(request):
+    marker = None
     for node_mark, marker in request.node.iter_markers_with_node("reuse_cluster"):
         if not isinstance(node_mark, request.node.Class):
             err = "'reuse_cluster' is only applicable at class level: " + str(node_mark) + " / " + str(marker)
