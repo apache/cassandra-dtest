@@ -127,19 +127,18 @@ def fixture_dtest_setup_overrides(dtest_config):
 
 class Reuse_cluster(Enum):
     REUSE_CLUSTER_NO = 1
-    REUSE_CLUSTER_CREATE = 2
-    REUSE_CLUSTER_YES = 3
+    REUSE_CLUSTER_YES = 2
 
 @pytest.fixture(scope='function', autouse=True)
 def fixture_dtest_reuse_cluster(request):
-    marker = request.node.get_closest_marker("reuse_cluster")
+    for node_mark, marker in request.node.iter_markers_with_node("reuse_cluster"):
+        if not isinstance(node_mark, request.node.Class):
+            err = "'reuse_cluster' is only applicable at class level: " + str(node_mark) + " / " + str(marker)
+            logger.error(err)
+            pytest.fail(err)
 
     if marker is None:
         return Reuse_cluster.REUSE_CLUSTER_NO
-
-    start_new_cluster = marker.kwargs.get('new_cluster', False)
-    if start_new_cluster:
-        return Reuse_cluster.REUSE_CLUSTER_CREATE
     else:
         return Reuse_cluster.REUSE_CLUSTER_YES
 
@@ -361,12 +360,12 @@ def fixture_dtest_setup(request,
                         fixture_dtest_cluster_name,
                         fixture_dtest_create_cluster_func,
                         fixture_dtest_reuse_cluster):
-    #TODO
+    #TODO Reuse nodes taking into account
     #Byteman cleanup
     #Auto detect configuration options
 
-    # Use reuse_option = Reuse_cluster.REUSE_CLUSTER_NO to fully disable node-reusage
     reuse_option = fixture_dtest_reuse_cluster
+    # Use reuse_option = Reuse_cluster.REUSE_CLUSTER_NO to fully disable node-reusage
     #reuse_option = Reuse_cluster.REUSE_CLUSTER_NO
 
     dtest_setup = None
@@ -385,7 +384,6 @@ def fixture_dtest_setup(request,
     cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
     missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES
     if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO\
-            or reuse_option == Reuse_cluster.REUSE_CLUSTER_CREATE\
             or cant_reuse\
             or missing_reuse_cluster:
 

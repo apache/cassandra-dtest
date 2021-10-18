@@ -353,7 +353,7 @@ class TestAuthNodeReuse(TestAuthBase):
         # Run the test
         yield
         clear_auth(self.get_session(user='cassandra', password='cassandra'))
-        
+
     def test_login(self):
         """
         * Launch a one node cluster
