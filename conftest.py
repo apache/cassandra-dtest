@@ -10,6 +10,7 @@ from cassandra import OperationTimedOut
 from datetime import datetime
 from distutils.version import LooseVersion
 # Python 3 imports
+from cassandra.connection import ConnectionShutdown
 from enum import Enum
 from itertools import zip_longest
 
@@ -420,7 +421,10 @@ def fixture_dtest_setup(request,
     dtest_setup.jvm_args = []
 
     for con in dtest_setup.connections:
-        con.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        try:
+            con.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        except ConnectionShutdown:
+            pass
         con.cluster.shutdown()
     dtest_setup.connections = []
 
