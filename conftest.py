@@ -11,6 +11,7 @@ from datetime import datetime
 from distutils.version import LooseVersion
 # Python 3 imports
 from cassandra.connection import ConnectionShutdown
+from cassandra import Unauthorized
 from enum import Enum
 from itertools import zip_longest
 
@@ -423,7 +424,7 @@ def fixture_dtest_setup(request,
     for con in dtest_setup.connections:
         try:
             con.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
-        except ConnectionShutdown:
+        except (ConnectionShutdown, Unauthorized) as e:
             pass
         con.cluster.shutdown()
     dtest_setup.connections = []
