@@ -82,13 +82,27 @@ the ``--count`` option. For example, to run a test class 10 times:
 
     pytest --count=10 --cassandra-dir=~/path/to/cassandra pending_range_test.py
 
+Use ``--log-cli-level=DEBUG`` to get log messages emitted from the test
+
+    pytest --log-cli-level=DEBUG --cassandra-dir=~/path/to/cassandra pending_range_test.py
+
 Existing tests are probably the best place to start to look at how to write
 tests.
 
+Node reusage 4.0+
+-----------------
 Each test spawns a new fresh cluster and tears it down after the test. If a
 test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
+
+Starting at 4.0, as dtests can be very heavy, in order to speed up things node reusage has been implemented. Basically a 
+test starts a cluster and the tests in the same annotated class will reuse that cluster. Big time 
+and costs (for paid CI services) can be achieved by doing so.
+
+You only have to annotate a class with ``@reuse_cluster``. Results are undefined if this annotation is used at method level.
+
+You can disable node reusage completely in conftest.py::fixture_dtest_setup if you needed to do so while debugging i.e.
 
 Writing Tests
 -------------

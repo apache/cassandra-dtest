@@ -14,6 +14,7 @@ from cassandra.protocol import SyntaxException
 
 from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester
+from paging_test import reuse_cluster
 from tools.assertions import (assert_all, assert_exception, assert_invalid,
                               assert_length_equal, assert_one,
                               assert_unauthorized)
@@ -21,11 +22,22 @@ from tools.jmxutils import (JolokiaAgent, make_mbean)
 from tools.metadata_wrapper import UpdatingKeyspaceMetadataWrapper
 from tools.misc import ImmutableMapping
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
+def clear_auth(session):
+    # Clear auth after test to support node reusage
+    rows = list(session.execute(query="list roles", timeout=120))
+    for row in rows:
+        role = str(row.role)
+        if role != 'cassandra':
+            logging.debug("drop role if exists '" + role + "'")
+            session.execute(query="drop role if exists '" + role + "'", timeout=120)
+        session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
 
-class TestAuth(Tester):
+
+class TestAuthBase(Tester):
 
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
@@ -36,6 +48,53 @@ class TestAuth(Tester):
             r'Can\'t send migration request: node.*is down',
         )
 
+    def prepare(self, nodes=1, permissions_validity=0):
+        """
+        Sets up and launches C* cluster.
+        @param nodes Number of nodes in the cluster. Default is 1
+        @param permissions_validity The timeout for the permissions cache in ms. Default is 0.
+        """
+
+        if len(self.cluster.nodelist()) == 0:
+            config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                      'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                      'permissions_validity_in_ms': permissions_validity}
+            if self.dtest_config.cassandra_version_from_build >= '3.0':
+                config['enable_materialized_views'] = 'true'
+            if self.dtest_config.cassandra_version_from_build >= '4.0':
+                config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
+            self.cluster.set_configuration_options(values=config)
+            self.cluster.populate(nodes).start()
+
+            n = self.cluster.wait_for_any_log('Created default superuser', 25)
+            logger.debug("Default role created by " + n.name)
+
+    def get_session(self, node_idx=0, user=None, password=None):
+        """
+        Connect with a set of credentials to a given node. Connection is not exclusive to that node.
+        @param node_idx Initial node to connect to
+        @param user User to connect as
+        @param password Password to use
+        @return Session as user, to specified node
+        """
+        node = self.cluster.nodelist()[node_idx]
+        session = self.patient_cql_connection(node, user=user, password=password)
+        return session
+
+    def assertPermissionsListed(self, expected, session, query):
+        """
+        Issues the given query with the session. Asserts the value of expected permissions matches
+        the returned permissions from the query.
+        @param expected Expected permissions. Should be a list of permissions in the form [username, resource, permission]
+        @param session Session to use
+        @param query Query to run
+        """
+        rows = session.execute(query)
+        perms = [(str(r.username), str(r.resource), str(r.permission)) for r in rows]
+        assert sorted(expected) == sorted(perms)
+
+
+class TestAuth(TestAuthBase):
     def test_system_auth_ks_is_alterable(self):
         """
         * Launch a three node cluster
@@ -87,6 +146,213 @@ class TestAuth(Tester):
                 ks_name='system_auth'
             )
             assert 3 == exclusive_auth_metadata.replication_strategy.replication_factor
+
+    def test_permissions_caching(self):
+                """
+                * Launch a one node cluster, with a 2s permission cache
+                * Connect as the default superuser
+                * Create a new user, 'cathy'
+                * Create a table, ks.cf
+                * Connect as cathy in two separate sessions
+                * Grant SELECT to cathy
+                * Verify that reading from ks.cf throws Unauthorized until the cache expires
+                * Verify that after the cache expires, we can eventually read with both sessions
+
+                @jira_ticket CASSANDRA-8194
+                """
+                self.prepare(permissions_validity=2000)
+
+                cassandra = self.get_session(user='cassandra', password='cassandra')
+                cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+                cassandra.execute(
+                    "CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+                cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
+
+                cathy = self.get_session(user='cathy', password='12345')
+                # another user to make sure the cache is at user level
+                cathy2 = self.get_session(user='cathy', password='12345')
+                cathys = [cathy, cathy2]
+
+                assert_unauthorized(cathy, "SELECT * FROM ks.cf",
+                                    "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
+
+                def check_caching(attempt=0):
+                    attempt += 1
+                    if attempt > 3:
+                        pytest.fail("Unable to verify cache expiry in 3 attempts, failing")
+
+                    logger.debug("Attempting to verify cache expiry, attempt #{i}".format(i=attempt))
+                    # grant SELECT to cathy
+                    cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
+                    grant_time = datetime.now()
+                    # selects should still fail after 1 second, but if execution was
+                    # delayed for some reason such that the cache expired, retry
+                    time.sleep(1.0)
+                    for c in cathys:
+                        try:
+                            c.execute("SELECT * FROM ks.cf")
+                            # this should still fail, but if the cache has expired while we paused, try again
+                            delta = datetime.now() - grant_time
+                            if delta > timedelta(seconds=2):
+                                # try again
+                                cassandra.execute("REVOKE SELECT ON ks.cf FROM cathy")
+                                time.sleep(2.5)
+                                check_caching(attempt)
+                            else:
+                                # legit failure
+                                pytest.fail("Expecting query to raise an exception, but nothing was raised.")
+                        except Unauthorized as e:
+                            assert re.search(
+                                "User cathy has no SELECT permission on <table ks.cf> or any of its parents", str(e))
+
+                check_caching()
+
+                # wait until the cache definitely expires and retry - should succeed now
+                time.sleep(1.5)
+                # refresh of user permissions is done asynchronously, the first request
+                # will trigger the refresh, but we'll continue to use the cached set until
+                # that completes (CASSANDRA-8194).
+                # make a request to trigger the refresh
+                try:
+                    cathy.execute("SELECT * FROM ks.cf")
+                except Unauthorized:
+                    pass
+
+                # once the async refresh completes, both clients should have the granted permissions
+                success = False
+                cnt = 0
+                while not success and cnt < 10:
+                    try:
+                        for c in cathys:
+                            rows = list(c.execute("SELECT * FROM ks.cf"))
+                            assert 0 == len(rows)
+                        success = True
+                    except Unauthorized:
+                        pass
+                    cnt += 1
+                    time.sleep(0.1)
+
+                assert success
+
+    @since('3.10')
+    def test_auth_metrics(self):
+        """
+        Success and failure metrics were added to the authentication procedure
+        so as to estimate the percentage of authentication attempts that failed.
+        @jira_ticket CASSANDRA-10635
+        """
+        cluster = self.cluster
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'permissions_validity_in_ms': 0}
+        self.cluster.set_configuration_options(values=config)
+        cluster.set_datadir_count(1)
+        cluster.populate(1)
+        [node] = cluster.nodelist()
+        cluster.start()
+
+        with JolokiaAgent(node) as jmx:
+            success = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
+            failure = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
+
+            assert 0 == success
+            assert 0 == failure
+
+            try:
+                self.get_session(user='cassandra', password='wrong_password')
+            except NoHostAvailable as e:
+                assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
+
+            self.get_session(user='cassandra', password='cassandra')
+
+            success = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
+            failure = jmx.read_attribute(
+                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
+
+            assert success > 0
+            assert failure > 0
+
+    def test_restart_node_doesnt_lose_auth_data(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create some new users, grant them permissions
+        * Stop the cluster, switch to AllowAll auth, restart the cluster
+        * Stop the cluster, switch back to auth, restart the cluster
+        * Check all user auth data was preserved
+        """
+        self.prepare()
+        cassandra = self.get_session(user='cassandra', password='cassandra')
+        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
+        cassandra.execute("CREATE USER philip WITH PASSWORD 'strongpass'")
+        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
+        cassandra.execute("CREATE TABLE ks.cf (id int PRIMARY KEY)")
+        cassandra.execute("GRANT ALL ON ks.cf to philip")
+
+        self.cluster.stop()
+        config = {'authenticator': 'org.apache.cassandra.auth.AllowAllAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.AllowAllAuthorizer'}
+        if self.dtest_config.cassandra_version_from_build >= '4.0':
+            config['network_authorizer'] = 'org.apache.cassandra.auth.AllowAllNetworkAuthorizer'
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.start()
+
+        self.cluster.stop()
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer'}
+        if self.dtest_config.cassandra_version_from_build >= '4.0':
+            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.start()
+
+        philip = self.get_session(user='philip', password='strongpass')
+        cathy = self.get_session(user='cathy', password='12345')
+        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
+        philip.execute("SELECT * FROM ks.cf")
+
+    @since('2.2')
+    def test_handle_corrupt_role_data(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a new role
+        * Confirm that there exists 2 users
+        * Manually corrupt / delete the is_superuser cell of that role
+        * Confirm that listing users shows an invalid request
+        * Confirm that corrupted user can no longer login
+        @jira_ticket CASSANDRA-12700
+        """
+        self.prepare()
+
+        session = self.get_session(user='cassandra', password='cassandra')
+        session.execute("CREATE USER bob WITH PASSWORD '12345' SUPERUSER")
+
+        bob = self.get_session(user='bob', password='12345')
+        rows = list(bob.execute("LIST USERS"))
+        assert_length_equal(rows, 2)
+
+        session.execute("UPDATE system_auth.roles SET is_superuser=null WHERE role='bob'")
+
+        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+            r'Invalid metadata has been detected for role bob']
+        assert_exception(session, "LIST USERS", "Invalid metadata has been detected for role",
+                         expected=(NoHostAvailable))
+        try:
+            self.get_session(user='bob', password='12345')
+        except NoHostAvailable as e:
+            assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
+
+
+@reuse_cluster
+class TestAuthNodeReuse(TestAuthBase):
+    @pytest.fixture(autouse=True)
+    def fixture_clear_auth(self):
+        # Run the test
+        yield
+        clear_auth(self.get_session(user='cassandra', password='cassandra'))
 
     def test_login(self):
         """
@@ -152,6 +418,8 @@ class TestAuth(Tester):
         session.execute("CREATE USER 'james@example.com' WITH PASSWORD '12345' NOSUPERUSER")
         assert_invalid(session, "CREATE USER 'james@example.com' WITH PASSWORD '12345' NOSUPERUSER", 'james@example.com already exists')
 
+        rows = list(session.execute(query="list roles", timeout=120))
+
     def test_list_users(self):
         """
         * Launch a one node cluster
@@ -191,37 +459,6 @@ class TestAuth(Tester):
         assert users['bob']
         assert not users['cathy']
         assert users['dave']
-
-    @since('2.2')
-    def test_handle_corrupt_role_data(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create a new role
-        * Confirm that there exists 2 users
-        * Manually corrupt / delete the is_superuser cell of that role
-        * Confirm that listing users shows an invalid request
-        * Confirm that corrupted user can no longer login
-        @jira_ticket CASSANDRA-12700
-        """
-        self.prepare()
-
-        session = self.get_session(user='cassandra', password='cassandra')
-        session.execute("CREATE USER bob WITH PASSWORD '12345' SUPERUSER")
-
-        bob = self.get_session(user='bob', password='12345')
-        rows = list(bob.execute("LIST USERS"))
-        assert_length_equal(rows, 2)
-
-        session.execute("UPDATE system_auth.roles SET is_superuser=null WHERE role='bob'")
-
-        self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
-            r'Invalid metadata has been detected for role bob']
-        assert_exception(session, "LIST USERS", "Invalid metadata has been detected for role", expected=(NoHostAvailable))
-        try:
-            self.get_session(user='bob', password='12345')
-        except NoHostAvailable as e:
-            assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
 
     def test_user_cant_drop_themselves(self):
         """
@@ -816,90 +1053,6 @@ class TestAuth(Tester):
 
         assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
 
-    def test_permissions_caching(self):
-        """
-        * Launch a one node cluster, with a 2s permission cache
-        * Connect as the default superuser
-        * Create a new user, 'cathy'
-        * Create a table, ks.cf
-        * Connect as cathy in two separate sessions
-        * Grant SELECT to cathy
-        * Verify that reading from ks.cf throws Unauthorized until the cache expires
-        * Verify that after the cache expires, we can eventually read with both sessions
-
-        @jira_ticket CASSANDRA-8194
-        """
-        self.prepare(permissions_validity=2000)
-
-        cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
-        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
-        cassandra.execute("CREATE TABLE ks.cf (id int primary key, val int)")
-
-        cathy = self.get_session(user='cathy', password='12345')
-        # another user to make sure the cache is at user level
-        cathy2 = self.get_session(user='cathy', password='12345')
-        cathys = [cathy, cathy2]
-
-        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
-
-        def check_caching(attempt=0):
-            attempt += 1
-            if attempt > 3:
-                pytest.fail("Unable to verify cache expiry in 3 attempts, failing")
-
-            logger.debug("Attempting to verify cache expiry, attempt #{i}".format(i=attempt))
-            # grant SELECT to cathy
-            cassandra.execute("GRANT SELECT ON ks.cf TO cathy")
-            grant_time = datetime.now()
-            # selects should still fail after 1 second, but if execution was
-            # delayed for some reason such that the cache expired, retry
-            time.sleep(1.0)
-            for c in cathys:
-                try:
-                    c.execute("SELECT * FROM ks.cf")
-                    # this should still fail, but if the cache has expired while we paused, try again
-                    delta = datetime.now() - grant_time
-                    if delta > timedelta(seconds=2):
-                        # try again
-                        cassandra.execute("REVOKE SELECT ON ks.cf FROM cathy")
-                        time.sleep(2.5)
-                        check_caching(attempt)
-                    else:
-                        # legit failure
-                        pytest.fail("Expecting query to raise an exception, but nothing was raised.")
-                except Unauthorized as e:
-                    assert re.search("User cathy has no SELECT permission on <table ks.cf> or any of its parents", str(e))
-
-        check_caching()
-
-        # wait until the cache definitely expires and retry - should succeed now
-        time.sleep(1.5)
-        # refresh of user permissions is done asynchronously, the first request
-        # will trigger the refresh, but we'll continue to use the cached set until
-        # that completes (CASSANDRA-8194).
-        # make a request to trigger the refresh
-        try:
-            cathy.execute("SELECT * FROM ks.cf")
-        except Unauthorized:
-            pass
-
-        # once the async refresh completes, both clients should have the granted permissions
-        success = False
-        cnt = 0
-        while not success and cnt < 10:
-            try:
-                for c in cathys:
-                    rows = list(c.execute("SELECT * FROM ks.cf"))
-                    assert 0 == len(rows)
-                success = True
-            except Unauthorized:
-                pass
-            cnt += 1
-            time.sleep(0.1)
-
-        assert success
-
     def test_list_permissions(self):
         """
         * Launch a one node cluster
@@ -1003,129 +1156,6 @@ class TestAuth(Tester):
         cassandra.execute("GRANT DROP ON KEYSPACE ks TO cathy")
         cathy.execute("DROP TYPE ks.address")
 
-    def test_restart_node_doesnt_lose_auth_data(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create some new users, grant them permissions
-        * Stop the cluster, switch to AllowAll auth, restart the cluster
-        * Stop the cluster, switch back to auth, restart the cluster
-        * Check all user auth data was preserved
-        """
-        self.prepare()
-        cassandra = self.get_session(user='cassandra', password='cassandra')
-        cassandra.execute("CREATE USER cathy WITH PASSWORD '12345'")
-        cassandra.execute("CREATE USER philip WITH PASSWORD 'strongpass'")
-        cassandra.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
-        cassandra.execute("CREATE TABLE ks.cf (id int PRIMARY KEY)")
-        cassandra.execute("GRANT ALL ON ks.cf to philip")
-
-        self.cluster.stop()
-        config = {'authenticator': 'org.apache.cassandra.auth.AllowAllAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.AllowAllAuthorizer'}
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            config['network_authorizer'] = 'org.apache.cassandra.auth.AllowAllNetworkAuthorizer'
-        self.cluster.set_configuration_options(values=config)
-        self.cluster.start()
-
-        self.cluster.stop()
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer'}
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
-        self.cluster.set_configuration_options(values=config)
-        self.cluster.start()
-
-        philip = self.get_session(user='philip', password='strongpass')
-        cathy = self.get_session(user='cathy', password='12345')
-        assert_unauthorized(cathy, "SELECT * FROM ks.cf", "User cathy has no SELECT permission on <table ks.cf> or any of its parents")
-        philip.execute("SELECT * FROM ks.cf")
-
-    @since('3.10')
-    def test_auth_metrics(self):
-        """
-        Success and failure metrics were added to the authentication procedure
-        so as to estimate the percentage of authentication attempts that failed.
-        @jira_ticket CASSANDRA-10635
-        """
-        cluster = self.cluster
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms': 0}
-        self.cluster.set_configuration_options(values=config)
-        cluster.set_datadir_count(1)
-        cluster.populate(1)
-        [node] = cluster.nodelist()
-        cluster.start()
-
-        with JolokiaAgent(node) as jmx:
-            success = jmx.read_attribute(
-                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
-            failure = jmx.read_attribute(
-                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
-
-            assert 0 == success
-            assert 0 == failure
-
-            try:
-                self.get_session(user='cassandra', password='wrong_password')
-            except NoHostAvailable as e:
-                assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
-
-            self.get_session(user='cassandra', password='cassandra')
-
-            success = jmx.read_attribute(
-                make_mbean('metrics', type='Client', name='AuthSuccess'), 'Count')
-            failure = jmx.read_attribute(
-                make_mbean('metrics', type='Client', name='AuthFailure'), 'Count')
-
-            assert success > 0
-            assert failure > 0
-
-    def prepare(self, nodes=1, permissions_validity=0):
-        """
-        Sets up and launches C* cluster.
-        @param nodes Number of nodes in the cluster. Default is 1
-        @param permissions_validity The timeout for the permissions cache in ms. Default is 0.
-        """
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'permissions_validity_in_ms': permissions_validity}
-        if self.dtest_config.cassandra_version_from_build >= '3.0':
-            config['enable_materialized_views'] = 'true'
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
-        self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start()
-
-        n = self.cluster.wait_for_any_log('Created default superuser', 25)
-        logger.debug("Default role created by " + n.name)
-
-    def get_session(self, node_idx=0, user=None, password=None):
-        """
-        Connect with a set of credentials to a given node. Connection is not exclusive to that node.
-        @param node_idx Initial node to connect to
-        @param user User to connect as
-        @param password Password to use
-        @return Session as user, to specified node
-        """
-        node = self.cluster.nodelist()[node_idx]
-        session = self.patient_cql_connection(node, user=user, password=password)
-        return session
-
-    def assertPermissionsListed(self, expected, session, query):
-        """
-        Issues the given query with the session. Asserts the value of expected permissions matches
-        the returned permissions from the query.
-        @param expected Expected permissions. Should be a list of permissions in the form [username, resource, permission]
-        @param session Session to use
-        @param query Query to run
-        """
-        rows = session.execute(query)
-        perms = [(str(r.username), str(r.resource), str(r.permission)) for r in rows]
-        assert sorted(expected) == sorted(perms)
-
-
 def data_resource_creator_permissions(creator, resource):
     """
     Assemble a list of all permissions needed to create data on a given resource
@@ -1146,33 +1176,34 @@ def data_resource_creator_permissions(creator, resource):
 
 
 @since('2.2')
-class TestAuthRoles(Tester):
+class TestAuthRolesBase(Tester):
 
     Role = None
     cassandra_role = None
 
     @pytest.fixture(autouse=True)
     def fixture_setup_auth(self, fixture_dtest_setup):
-        if fixture_dtest_setup.dtest_config.cassandra_version_from_build >= '4.0':
-            fixture_dtest_setup.cluster.set_configuration_options(values={
-                'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                'network_authorizer': 'org.apache.cassandra.auth.CassandraNetworkAuthorizer',
-                'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
-                'permissions_validity_in_ms': 0,
-                'roles_validity_in_ms': 0,
-                'num_tokens': 1
-            })
-        else:
-            fixture_dtest_setup.cluster.set_configuration_options(values={
-                'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
-                'permissions_validity_in_ms': 0,
-                'roles_validity_in_ms': 0,
-                'num_tokens': 1
-            })
-        fixture_dtest_setup.cluster.populate(1, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
+        if len(fixture_dtest_setup.cluster.nodelist()) == 0:
+            if fixture_dtest_setup.dtest_config.cassandra_version_from_build >= '4.0':
+                fixture_dtest_setup.cluster.set_configuration_options(values={
+                    'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                    'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                    'network_authorizer': 'org.apache.cassandra.auth.CassandraNetworkAuthorizer',
+                    'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
+                    'permissions_validity_in_ms': 0,
+                    'roles_validity_in_ms': 0,
+                    'num_tokens': 1
+                })
+            else:
+                fixture_dtest_setup.cluster.set_configuration_options(values={
+                    'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                    'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                    'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
+                    'permissions_validity_in_ms': 0,
+                    'roles_validity_in_ms': 0,
+                    'num_tokens': 1
+                })
+            fixture_dtest_setup.cluster.populate(1, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
         nodes = fixture_dtest_setup.cluster.nodelist()
         fixture_dtest_setup.superuser = fixture_dtest_setup.patient_exclusive_cql_connection(nodes[0], user='cassandra', password='cassandra')
 
@@ -1204,6 +1235,189 @@ class TestAuthRoles(Tester):
             return self.Role(name, superuser, login, options, dcs)
         else:
             return self.Role(name, superuser, login, options)
+
+    def get_session(self, node_idx=0, user=None, password=None):
+        """
+        Connect with a set of credentials to a given node. Connection is not exclusive to that node.
+        @param node_idx Initial node to connect to
+        @param user User to connect as
+        @param password Password to use
+        @return Session as user, to specified node
+        """
+        node = self.cluster.nodelist()[node_idx]
+        session = self.patient_cql_connection(node, user=user, password=password)
+        return session
+
+    def setup_table(self):
+        self.superuser.execute(
+            "CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
+        self.superuser.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
+
+    def assert_unauthenticated(self, user, password):
+        with pytest.raises(NoHostAvailable) as response:
+            node = self.cluster.nodelist()[0]
+            self.cql_connection(node, user=user, password=password)
+        host, error = response._excinfo[1].errors.popitem()
+
+        message = "Provided username {user} and/or password are incorrect".format(user=user) \
+            if node.cluster.version() >= LooseVersion('3.10') \
+            else "Username and/or password are incorrect"
+        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
+                  '[Bad credentials] message="{message}"'.format(host=host, message=message)
+
+        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
+        assert pattern in repr(error)
+
+    def assert_login_not_allowed(self, user, password):
+        with pytest.raises(NoHostAvailable) as response:
+            node = self.cluster.nodelist()[0]
+            self.cql_connection(node, user=user, password=password)
+        host, error = response._excinfo[1].errors.popitem()
+
+        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
+                  '[Bad credentials] message="{user} is not permitted to log in"'.format(host=host, user=user)
+
+        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
+        assert pattern in repr(error)
+
+    def prepare(self, nodes=1, roles_expiry=0):
+        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                  'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
+                  'permissions_validity_in_ms': 0,
+                  'roles_validity_in_ms': roles_expiry}
+
+        if self.dtest_config.cassandra_version_from_build >= '4.0':
+            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
+
+        self.cluster.set_configuration_options(values=config)
+        self.cluster.populate(nodes).start()
+
+        self.cluster.wait_for_any_log('Created default superuser', 25)
+
+    def assert_permissions_listed(self, expected, session, query):
+        rows = session.execute(query)
+        perms = [(str(r.role), str(r.resource), str(r.permission)) for r in rows]
+        assert sorted(expected) == sorted(perms)
+
+    def assert_no_permissions(self, session, query):
+        assert list(session.execute(query)) == []
+
+
+class TestAuthRoles(TestAuthRolesBase):
+
+    def test_role_requires_login_privilege_to_authenticate(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a new user,'mike', with the login privilege
+        * Connect as mike
+        * Remove mike's login privilege. Verify mike cannot login
+        * Restore mike's login privilege. Verify mike can connect again.
+        """
+        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike')))
+        self.get_session(user='mike', password='12345')
+
+        self.superuser.execute("ALTER ROLE mike WITH LOGIN = false")
+        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike', login=False)))
+        self.assert_login_not_allowed('mike', '12345')
+
+        self.superuser.execute("ALTER ROLE mike WITH LOGIN = true")
+        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike', login=True)))
+        self.get_session(user='mike', password='12345')
+
+    def test_roles_do_not_inherit_login_privilege(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a user who can login, and 'mike', who cannot
+        * Grant the other user to mike.
+        * Verify mike still cannot log in.
+        """
+        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = false")
+        self.superuser.execute("CREATE ROLE with_login WITH PASSWORD = '54321' AND SUPERUSER = false AND LOGIN = true")
+        self.superuser.execute("GRANT with_login to mike")
+        mike = self.role('mike', login=False)
+        with_login = self.role('with_login')
+
+        assert_all(self.superuser, "LIST ROLES OF mike", [list(mike), list(with_login)])
+        assert_one(self.superuser, "LIST ROLES OF with_login", list(with_login))
+
+        self.assert_login_not_allowed("mike", "12345")
+
+    def test_superuser_status_is_inherited(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a superuser role, and 'mike'.
+        * Connect as mike
+        * Verify that mike does not have permissions.
+        * Grant the superuser role to mike.
+        * Verify that mike now has all permissions
+        """
+        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        self.superuser.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
+
+        as_mike = self.get_session(user='mike', password='12345')
+        assert_unauthorized(as_mike,
+                            "CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false",
+                            "User mike does not have sufficient privileges to perform the requested operation")
+
+        self.superuser.execute("GRANT db_admin TO mike")
+        as_mike.execute("CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false")
+        assert_all(as_mike, "LIST ROLES", [list(self.role('another_role', superuser=False, login=False)),
+                                           list(self.cassandra_role),
+                                           list(self.role('db_admin', superuser=True, login=False)),
+                                           list(self.role('mike'))])
+
+    def test_list_users_considers_inherited_superuser_status(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Create a superuser role, and 'mike'
+        * Grant the superuser role to mike
+        * Verify that LIST USERS shows mike as a superuser, even though that privilege is granted indirectly
+        """
+        self.superuser.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
+        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
+        self.superuser.execute("GRANT db_admin TO mike")
+        if self.dtest_config.cassandra_version_from_build >= '4.0':
+            assert_all(self.superuser, "LIST USERS", [['cassandra', True, 'ALL'], ['mike', True, 'ALL']])
+        else:
+            assert_all(self.superuser, "LIST USERS", [['cassandra', True], ['mike', True]])
+
+    def test_inheritence_of_udf_permissions(self):
+        """
+        * Launch a one node cluster
+        * Connect as the default superuser
+        * Verify that if EXECUTE permissions are granted to a parent role, that roles the parent is granted to inherit EXECUTE
+        """
+        self.setup_table()
+        self.superuser.execute("CREATE ROLE function_user")
+        self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO function_user")
+        self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
+        self.superuser.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
+        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
+        self.superuser.execute("GRANT SELECT ON ks.t1 TO mike")
+        as_mike = self.get_session(user='mike', password='12345')
+        select = "SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1"
+        assert_unauthorized(as_mike,
+                            select,
+                            r"User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
+
+        self.superuser.execute("GRANT function_user TO mike")
+        assert_one(as_mike, select, [1, 1, 2])
+
+
+@reuse_cluster
+class TestAuthRolesReuseNode(TestAuthRolesBase):
+
+    @pytest.fixture(autouse=True)
+    def fixture_clear_auth(self, fixture_dtest_setup):
+        # Run the test
+        yield
+        clear_auth(fixture_dtest_setup.superuser)
 
     def test_create_drop_role(self):
         """
@@ -2013,46 +2227,6 @@ class TestAuthRoles(Tester):
         self.get_session(user='USER2', password='12345')
         self.assert_unauthenticated('User2', '12345')
 
-    def test_role_requires_login_privilege_to_authenticate(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create a new user,'mike', with the login privilege
-        * Connect as mike
-        * Remove mike's login privilege. Verify mike cannot login
-        * Restore mike's login privilege. Verify mike can connect again.
-        """
-        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
-        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike')))
-        self.get_session(user='mike', password='12345')
-
-        self.superuser.execute("ALTER ROLE mike WITH LOGIN = false")
-        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike', login=False)))
-        self.assert_login_not_allowed('mike', '12345')
-
-        self.superuser.execute("ALTER ROLE mike WITH LOGIN = true")
-        assert_one(self.superuser, "LIST ROLES OF mike", list(self.role('mike', login=True)))
-        self.get_session(user='mike', password='12345')
-
-    def test_roles_do_not_inherit_login_privilege(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create a user who can login, and 'mike', who cannot
-        * Grant the other user to mike.
-        * Verify mike still cannot log in.
-        """
-        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = false")
-        self.superuser.execute("CREATE ROLE with_login WITH PASSWORD = '54321' AND SUPERUSER = false AND LOGIN = true")
-        self.superuser.execute("GRANT with_login to mike")
-        mike = self.role('mike', login=False)
-        with_login = self.role('with_login')
-
-        assert_all(self.superuser, "LIST ROLES OF mike", [list(mike), list(with_login)])
-        assert_one(self.superuser, "LIST ROLES OF with_login", list(with_login))
-
-        self.assert_login_not_allowed("mike", "12345")
-
     def test_role_requires_password_to_login(self):
         """
         * Launch a one node cluster
@@ -2066,47 +2240,6 @@ class TestAuthRoles(Tester):
         self.assert_unauthenticated('mike', None)
         self.superuser.execute("ALTER ROLE mike WITH PASSWORD = '12345'")
         self.get_session(user='mike', password='12345')
-
-    def test_superuser_status_is_inherited(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create a superuser role, and 'mike'.
-        * Connect as mike
-        * Verify that mike does not have permissions.
-        * Grant the superuser role to mike.
-        * Verify that mike now has all permissions
-        """
-        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
-        self.superuser.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
-
-        as_mike = self.get_session(user='mike', password='12345')
-        assert_unauthorized(as_mike,
-                            "CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false",
-                            "User mike does not have sufficient privileges to perform the requested operation")
-
-        self.superuser.execute("GRANT db_admin TO mike")
-        as_mike.execute("CREATE ROLE another_role WITH SUPERUSER = false AND LOGIN = false")
-        assert_all(as_mike, "LIST ROLES", [list(self.role('another_role', superuser=False, login=False)),
-                                           list(self.cassandra_role),
-                                           list(self.role('db_admin', superuser=True, login=False)),
-                                           list(self.role('mike'))])
-
-    def test_list_users_considers_inherited_superuser_status(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Create a superuser role, and 'mike'
-        * Grant the superuser role to mike
-        * Verify that LIST USERS shows mike as a superuser, even though that privilege is granted indirectly
-        """
-        self.superuser.execute("CREATE ROLE db_admin WITH SUPERUSER = true")
-        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
-        self.superuser.execute("GRANT db_admin TO mike")
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            assert_all(self.superuser, "LIST USERS", [['cassandra', True, 'ALL'], ['mike', True, 'ALL']])
-        else:
-            assert_all(self.superuser, "LIST USERS", [['cassandra', True], ['mike', True]])
 
     # UDF permissions tests # TODO move to separate fixture & refactor this + auth_test.py
     def test_grant_revoke_udf_permissions(self):
@@ -2473,28 +2606,6 @@ class TestAuthRoles(Tester):
         self.superuser.execute("GRANT EXECUTE ON FUNCTION ks.plus_one(int) TO mike")
         return as_mike.execute(cql)
 
-    def test_inheritence_of_udf_permissions(self):
-        """
-        * Launch a one node cluster
-        * Connect as the default superuser
-        * Verify that if EXECUTE permissions are granted to a parent role, that roles the parent is granted to inherit EXECUTE
-        """
-        self.setup_table()
-        self.superuser.execute("CREATE ROLE function_user")
-        self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO function_user")
-        self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
-        self.superuser.execute("INSERT INTO ks.t1 (k,v) VALUES (1,1)")
-        self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        self.superuser.execute("GRANT SELECT ON ks.t1 TO mike")
-        as_mike = self.get_session(user='mike', password='12345')
-        select = "SELECT k, v, ks.plus_one(v) FROM ks.t1 WHERE k = 1"
-        assert_unauthorized(as_mike,
-                            select,
-                            r"User mike has no EXECUTE permission on <function ks.plus_one\(int\)> or any of its parents")
-
-        self.superuser.execute("GRANT function_user TO mike")
-        assert_one(as_mike, select, [1, 1, 2])
-
     def test_builtin_functions_require_no_special_permissions(self):
         """
         * Launch a one node cluster
@@ -2639,72 +2750,6 @@ class TestAuthRoles(Tester):
         # hack an invalid entry into the roles table for roleA
         self.superuser.execute("UPDATE system_auth.roles SET member_of = {'role1'} where role = 'mike'")
         assert_all(self.superuser, "LIST ROLES OF mike", [list(self.role('mike'))])
-
-    def setup_table(self):
-        self.superuser.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':1}")
-        self.superuser.execute("CREATE TABLE ks.t1 (k int PRIMARY KEY, v int)")
-
-    def assert_unauthenticated(self, user, password):
-        with pytest.raises(NoHostAvailable) as response:
-            node = self.cluster.nodelist()[0]
-            self.cql_connection(node, user=user, password=password)
-        host, error = response._excinfo[1].errors.popitem()
-
-        message = "Provided username {user} and/or password are incorrect".format(user=user)\
-            if node.cluster.version() >= LooseVersion('3.10') \
-            else "Username and/or password are incorrect"
-        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
-                  '[Bad credentials] message="{message}"'.format(host=host, message=message)
-
-        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
-        assert pattern in repr(error)
-
-    def assert_login_not_allowed(self, user, password):
-        with pytest.raises(NoHostAvailable) as response:
-            node = self.cluster.nodelist()[0]
-            self.cql_connection(node, user=user, password=password)
-        host, error = response._excinfo[1].errors.popitem()
-
-        pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
-                  '[Bad credentials] message="{user} is not permitted to log in"'.format(host=host, user=user)
-
-        assert isinstance(error, AuthenticationFailed), "Expected AuthenticationFailed, got {error}".format(error=error)
-        assert pattern in repr(error)
-
-    def get_session(self, node_idx=0, user=None, password=None):
-        """
-        Connect with a set of credentials to a given node. Connection is not exclusive to that node.
-        @param node_idx Initial node to connect to
-        @param user User to connect as
-        @param password Password to use
-        @return Session as user, to specified node
-        """
-        node = self.cluster.nodelist()[node_idx]
-        session = self.patient_cql_connection(node, user=user, password=password)
-        return session
-
-    def prepare(self, nodes=1, roles_expiry=0):
-        config = {'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-                  'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-                  'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
-                  'permissions_validity_in_ms': 0,
-                  'roles_validity_in_ms': roles_expiry}
-
-        if self.dtest_config.cassandra_version_from_build >= '4.0':
-            config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
-
-        self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start()
-
-        self.cluster.wait_for_any_log('Created default superuser', 25)
-
-    def assert_permissions_listed(self, expected, session, query):
-        rows = session.execute(query)
-        perms = [(str(r.role), str(r.resource), str(r.permission)) for r in rows]
-        assert sorted(expected) == sorted(perms)
-
-    def assert_no_permissions(self, session, query):
-        assert list(session.execute(query)) == []
 
 
 @since('2.2')
@@ -3031,21 +3076,23 @@ class TestAuthUnavailable(Tester):
 
 
 @since('4.0')
+@reuse_cluster
 class TestNetworkAuth(Tester):
 
     @pytest.fixture(autouse=True)
     def fixture_setup_auth(self, fixture_dtest_setup):
-        fixture_dtest_setup.cluster.set_configuration_options(values={
-            'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
-            'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
-            'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
-            'network_authorizer': 'org.apache.cassandra.auth.CassandraNetworkAuthorizer',
-            'num_tokens': 1
-        })
-        fixture_dtest_setup.cluster.populate([1, 1], debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
+        if len(fixture_dtest_setup.cluster.nodelist()) == 0:
+            fixture_dtest_setup.cluster.set_configuration_options(values={
+                'authenticator': 'org.apache.cassandra.auth.PasswordAuthenticator',
+                'authorizer': 'org.apache.cassandra.auth.CassandraAuthorizer',
+                'role_manager': 'org.apache.cassandra.auth.CassandraRoleManager',
+                'network_authorizer': 'org.apache.cassandra.auth.CassandraNetworkAuthorizer',
+                'num_tokens': 1
+            })
+            fixture_dtest_setup.cluster.populate([1, 1], debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
+
         fixture_dtest_setup.dc1_node, fixture_dtest_setup.dc2_node = fixture_dtest_setup.cluster.nodelist()
         fixture_dtest_setup.superuser = fixture_dtest_setup.patient_exclusive_cql_connection(fixture_dtest_setup.dc1_node, user='cassandra', password='cassandra')
-
         fixture_dtest_setup.superuser.execute("ALTER KEYSPACE system_auth WITH REPLICATION={'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1}")
         fixture_dtest_setup.superuser.execute("CREATE KEYSPACE ks WITH REPLICATION={'class': 'NetworkTopologyStrategy', 'dc1': 1, 'dc2': 1}")
         fixture_dtest_setup.superuser.execute("CREATE TABLE ks.tbl (k int primary key, v int)")

@@ -20,6 +20,7 @@ from tools.data import rows_to_list
 from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from tools.paging import PageAssertionMixin, PageFetcher
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ class BasePagingTester(Tester):
         supports_v5 = self.supports_v5_protocol(self.cluster.version())
         protocol_version = 5 if supports_v5 else None
         cluster = self.cluster
-        cluster.populate(3).start()
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(3).start()
         node1 = cluster.nodelist()[0]
         session = self.patient_cql_connection(node1,
                                               protocol_version=protocol_version,
@@ -40,12 +42,12 @@ class BasePagingTester(Tester):
 
 
 @since('2.0')
+@reuse_cluster
 class TestPagingSize(BasePagingTester, PageAssertionMixin):
     """
     Basic tests relating to page size (relative to results set)
     and validation of page size setting.
     """
-
     def test_with_no_results(self):
         """
         No errors when a page is requested and query has no results.
@@ -180,6 +182,7 @@ class TestPagingSize(BasePagingTester, PageAssertionMixin):
 
 
 @since('2.0')
+@reuse_cluster
 class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
@@ -423,6 +426,7 @@ class TestPagingWithModifiers(BasePagingTester, PageAssertionMixin):
 
 
 @since('2.0')
+@reuse_cluster
 class TestPagingData(BasePagingTester, PageAssertionMixin):
 
     def test_paging_a_single_wide_row(self):
@@ -2828,6 +2832,7 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
 
 
 @since('2.0')
+@reuse_cluster
 class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
@@ -3011,6 +3016,8 @@ class TestPagingDatasetChanges(BasePagingTester, PageAssertionMixin):
         page3 = pf.page_data(3)
         assert_lists_equal_ignoring_order(page3, page3expected, sort_key="mytext")
 
+
+class TestPagingDatasetChanges3Nodes(BasePagingTester, PageAssertionMixin):
     def test_node_unavailabe_during_paging(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -3134,11 +3141,7 @@ class TestPagingQueryIsolation(BasePagingTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(flatten_into_set(page_fetchers[10].all_data()), flatten_into_set(expected_data[:50000]))
 
 
-@since('2.0')
-class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
-    """
-    Tests concerned with paging when deletions occur.
-    """
+class TestPagingWithDeletionsBase(BasePagingTester, PageAssertionMixin):
 
     def setup_data(self):
 
@@ -3196,6 +3199,14 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         for i in range(pf.pagecount()):
             page_data = pf.page_data(i + 1)
             assert page_data == expected_pages_data[i]
+
+
+@since('2.0')
+@reuse_cluster
+class TestPagingWithDeletions(TestPagingWithDeletionsBase):
+    """
+    Tests concerned with paging when deletions occur.
+    """
 
     def test_single_partition_deletions(self):
         """Test single partition deletions """
@@ -3418,6 +3429,43 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         time.sleep(ttl_seconds)
         self.check_all_paging_results([], 0, [])
 
+    @since('2.2.6')
+    def test_deletion_with_distinct_paging(self):
+        """
+        Test that deletion does not affect paging for distinct queries.
+
+        @jira_ticket CASSANDRA-10010
+        """
+        self.session = self.prepare()
+        create_ks(self.session, 'test_paging_size', 2)
+        self.session.execute("CREATE TABLE paging_test ( "
+                             "k int, s int static, c int, v int, "
+                             "PRIMARY KEY (k, c) )")
+
+        for whereClause in ('', 'WHERE k IN (0, 1, 2, 3)'):
+            for i in range(4):
+                for j in range(2):
+                    self.session.execute("INSERT INTO paging_test (k, s, c, v) VALUES (%s, %s, %s, %s)", (i, i, j, j))
+
+            self.session.default_fetch_size = 2
+            result = self.session.execute("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
+            result = list(result)
+            assert 4 == len(result)
+
+            future = self.session.execute_async("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
+
+            # this will fetch the first page
+            fetcher = PageFetcher(future)
+
+            # delete the first row in the last partition that was returned in the first page
+            self.session.execute("DELETE FROM paging_test WHERE k = %s AND c = %s", (result[1]['k'], 0))
+
+            # finish paging
+            fetcher.request_all()
+            assert [2, 2] == fetcher.num_results_all()
+
+
+class TestPagingWithDeletionsNoNodeReuse(TestPagingWithDeletionsBase):
     def test_failure_threshold_deletions(self):
         """Test that paging throws a failure in case of tombstone threshold """
         supports_v5_protocol = self.supports_v5_protocol(self.cluster.version())
@@ -3459,38 +3507,3 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
             failure_msg = ("Scanned over.* tombstones during query.* query aborted")
 
         self.cluster.wait_for_any_log(failure_msg, 25)
-
-    @since('2.2.6')
-    def test_deletion_with_distinct_paging(self):
-        """
-        Test that deletion does not affect paging for distinct queries.
-
-        @jira_ticket CASSANDRA-10010
-        """
-        self.session = self.prepare()
-        create_ks(self.session, 'test_paging_size', 2)
-        self.session.execute("CREATE TABLE paging_test ( "
-                             "k int, s int static, c int, v int, "
-                             "PRIMARY KEY (k, c) )")
-
-        for whereClause in ('', 'WHERE k IN (0, 1, 2, 3)'):
-            for i in range(4):
-                for j in range(2):
-                    self.session.execute("INSERT INTO paging_test (k, s, c, v) VALUES (%s, %s, %s, %s)", (i, i, j, j))
-
-            self.session.default_fetch_size = 2
-            result = self.session.execute("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
-            result = list(result)
-            assert 4 == len(result)
-
-            future = self.session.execute_async("SELECT DISTINCT k, s FROM paging_test {}".format(whereClause))
-
-            # this will fetch the first page
-            fetcher = PageFetcher(future)
-
-            # delete the first row in the last partition that was returned in the first page
-            self.session.execute("DELETE FROM paging_test WHERE k = %s AND c = %s", (result[1]['k'], 0))
-
-            # finish paging
-            fetcher.request_all()
-            assert [2, 2] == fetcher.num_results_all()

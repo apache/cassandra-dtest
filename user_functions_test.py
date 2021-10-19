@@ -13,13 +13,11 @@ from dtest import Tester, create_ks
 from tools.assertions import assert_invalid, assert_none, assert_one
 from tools.misc import ImmutableMapping
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
-
-@since('2.2')
-class TestUserFunctions(Tester):
-
+class TestBase(Tester):
     @pytest.fixture(scope='function', autouse=True)
     def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
@@ -33,15 +31,23 @@ class TestUserFunctions(Tester):
 
     def prepare(self, create_keyspace=True, nodes=1, rf=1):
         cluster = self.cluster
+        node1 = None
 
-        cluster.populate(nodes).start()
-        node1 = cluster.nodelist()[0]
-        time.sleep(0.2)
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(nodes).start()
+            node1 = cluster.nodelist()[0]
+            time.sleep(0.2)
+        else:
+            node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
         if create_keyspace:
             create_ks(session, 'ks', rf)
         return session
+
+@since('2.2')
+@reuse_cluster
+class TestUserFunctions3Nodes(TestBase):
 
     def test_migration(self):
         """ Test migration of user functions """
@@ -166,6 +172,9 @@ class TestUserFunctions(Tester):
         assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded((ascii)'foo')")
         # should now work - unambiguous
         session.execute("DROP FUNCTION overloaded")
+
+@reuse_cluster
+class TestUserFunctions1Node(TestBase):
 
     def test_udf_scripting(self):
         session = self.prepare()
