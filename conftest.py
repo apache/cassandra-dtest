@@ -153,12 +153,7 @@ def fixture_dtest_clean_reused_cluster(request):
     yield
 
     global reusable_dtest_setup
-    if reusable_dtest_setup is not None:
-        try:
-            reusable_dtest_setup.cleanup_cluster(request)
-        except FileNotFoundError:
-            pass
-
+    safe_cluster_cleanup(request, reusable_dtest_setup)
 
 @pytest.fixture(scope='function')
 def fixture_dtest_cluster_name():
@@ -425,6 +420,7 @@ def fixture_dtest_setup(request,
     dtest_setup.jvm_args = []
 
     for con in dtest_setup.connections:
+        con.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
         con.cluster.shutdown()
     dtest_setup.connections = []
 
