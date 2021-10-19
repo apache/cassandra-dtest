@@ -25,9 +25,10 @@ awk 1 reuseTestClasses.txt > combinedTests.txt
 awk 1 $renewableTestsFile >> combinedTests.txt
 
 if [ "$CIRCLECI" = true ]; then
+  #Split tests by runtime at class level
   circleci tests split --split-by=timings --timings-type=classname combinedTests.txt > $outFile
 else
   #Split tests with round robin to spread weight of heavy test classes
-  split -n r/$chunk combinedTests.txt > $outFile
+  split -n r/$chunk/$splits combinedTests.txt > $outFile
 fi
 
