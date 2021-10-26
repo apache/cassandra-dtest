@@ -3,10 +3,12 @@ import pytest
 import logging
 
 from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
+from cassandra.query import SimpleStatement
 
 from dtest import Tester
 from thrift_bindings.thrift010 import ttypes as thrift_types
 from thrift_test import get_thrift_client
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -228,3 +230,48 @@ class TestWriteFailures(Tester):
                           thrift_types.ConsistencyLevel.ALL)
 
         client.transport.close()
+
+
+def assert_write_failure(session, query, consistency_level):
+    statement = SimpleStatement(query, consistency_level=consistency_level)
+    with pytest.raises(WriteFailure):
+        session.execute(statement)
+
+
+@since('3.0')
+class TestMultiDCWriteFailures(Tester):
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            "is too large for the maximum size of",  # 3.0+
+            "Encountered an oversized mutation",     # 4.0+
+            "ERROR WRITE_FAILURE",     # Logged in DEBUG mode for write failures
+            "MigrationStage"           # This occurs sometimes due to node down (because of restart)
+        )
+
+    def test_oversized_mutation(self):
+        """
+        Test that multi-DC write failures return operation failed rather than a timeout.
+        @jira_ticket CASSANDRA-16334.
+        """
+
+        cluster = self.cluster
+        cluster.populate([2, 2])
+        cluster.set_configuration_options(values={'max_mutation_size_in_kb': 128})
+        cluster.start()
+
+        node1 = cluster.nodelist()[0]
+        session = self.patient_exclusive_cql_connection(node1)
+
+        session.execute("CREATE KEYSPACE k WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 2}")
+        session.execute("CREATE TABLE k.t (key int PRIMARY KEY, val blob)")
+
+        payload = '1' * 1024 * 256
+        query = "INSERT INTO k.t (key, val) VALUES (1, textAsBlob('{}'))".format(payload)
+
+        assert_write_failure(session, query, ConsistencyLevel.LOCAL_ONE)
+        assert_write_failure(session, query, ConsistencyLevel.ONE)
+
+        # verify that no hints are created
+        with JolokiaAgent(node1) as jmx:
+            assert 0 == jmx.read_attribute(make_mbean('metrics', type='Storage', name='TotalHints'), 'Count')
