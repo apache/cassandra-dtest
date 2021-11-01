@@ -480,11 +480,13 @@ class BootstrapTester(Tester):
         except NodeError:
             pass  # node doesn't start as expected
         t.join()
+        # kill node3 before starting node1 so ccm does not attempt to watch for aliveness on node3
+        node3.stop(signal_event=signal.SIGKILL)
+        mark = node3.mark_log()
+
         node1.start()
 
         # restart node3 bootstrap with resetting bootstrap progress
-        node3.stop(signal_event=signal.SIGKILL)
-        mark = node3.mark_log()
         node3.start(jvm_args=["-Dcassandra.reset_bootstrap_progress=true"])
         # check if we reset bootstrap state
         node3.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
