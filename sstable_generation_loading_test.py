@@ -432,6 +432,7 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
         assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
         assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])
 
+    @since("3.0")
     def test_sstableloader_empty_stream(self):
         """
         @jira_ticket CASSANDRA-16349
