@@ -606,7 +606,11 @@ class TestSpeculativeReadRepair(Tester):
         node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
 
         node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
-        node1.byteman_submit(['./byteman/request_verb_timing.btm'])
+        version = self.cluster.cassandra_version()
+        if version < '4.1':
+            node1.byteman_submit(['./byteman/request_verb_timing.btm'])
+        else:
+            node1.byteman_submit(['./byteman/post4.0/request_verb_timing.btm'])
 
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.blocking_read_repair == 0
