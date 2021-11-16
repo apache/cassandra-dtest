@@ -599,9 +599,9 @@ def validate_stat_values(prefix, values, cassandra_version):
 def validate_sane_histogram_values(prefix, values, cassandra_version):
     validators = defaultdict(lambda: is_positive)
     if 'DurationUnit' in values and cassandra_version >= '4.1':
-        # Timer values (since 4.1) are in micros resolution. The default number of buckets should be 91.
-        # See CASSANDRA-16760
-        validators['RecentValues'] = partial(is_histo_list, expected_len=91)
+        # Timer values (since 4.1) are in micros resolution. The default number of buckets should be 128.
+        # See CASSANDRA-16760, CASSANDRA-17155
+        validators['RecentValues'] = partial(is_histo_list, expected_len=128)
     else:
         validators['RecentValues'] = partial(is_histo_list, expected_len=165)
     validators['StdDev'] = is_non_negative
