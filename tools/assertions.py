@@ -298,7 +298,10 @@ def assert_stderr_clean(err, acceptable_errors=None):
                              "objc.*Class JavaLaunchHelper.*?Which one is undefined.",
                              # Stress tool JMX connection failure, see CASSANDRA-12437
                              "Failed to connect over JMX; not collecting these stats",
-                             "Picked up JAVA_TOOL_OPTIONS:.*"]
+                             "Picked up JAVA_TOOL_OPTIONS:.*",
+                             # Warnings for backward compatibility should be logged CASSANDRA-15234
+                             ".*parameters have been deprecated. They have new names and/or value format; "
+                             + "For more information, please refer to NEWS.txt*"]
 
     regex_str = r"^({}|\s*|\n)*$".format("|".join(acceptable_errors))
     err_str = err.strip()

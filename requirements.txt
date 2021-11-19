@@ -9,7 +9,8 @@
 #
 # In case you want to test a patch with your own CCM branch, further to changing below CCM repo and branch name, you need to add -e flag at the beginning
 # Example: -e git+https://github.com/userb/ccm.git@cassandra-17182#egg=ccm
-git+https://github.com/riptano/ccm.git@cassandra-test#egg=ccm
+# git+https://github.com/riptano/ccm.git@cassandra-test#egg=ccm
+-e git+https://github.com/ekaterinadimitrova2/ccm.git@CASSANDRA-15234-3#egg=ccm
 decorator
 docopt
 enum34
