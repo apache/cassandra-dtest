@@ -14,6 +14,7 @@ VERSION_30 = 'github:apache/cassandra-3.0'
 VERSION_311 = 'github:apache/cassandra-3.11'
 VERSION_TRUNK = 'github:apache/trunk'
 
+
 @pytest.mark.upgrade_test
 class TestDropCompactStorage(Tester):
     def prepare(self):
@@ -37,12 +38,13 @@ class TestDropCompactStorage(Tester):
                                                                                                          i + 2))
         return cluster
 
-    def drop_compact_storage(self, session, assert_msg):
+    def drop_compact_storage(self, session, *args):
         try:
             session.execute("ALTER TABLE drop_compact_storage_test.test DROP COMPACT STORAGE")
             pytest.fail("No exception has been thrown")
         except InvalidRequest as e:
-            assert assert_msg in str(e)
+            for _ in args:
+                assert _ in str(e)
 
     def upgrade_node(self, node, to_version):
         node.drain()
@@ -77,6 +79,7 @@ class TestDropCompactStorage(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         assert_msg = "Cannot DROP COMPACT STORAGE as some nodes in the cluster ([/127.0.0.3]) are not on 3.0+ yet. " \
                      "Please upgrade those nodes and run `upgradesstables` before retrying."
+
         self.drop_compact_storage(session, assert_msg)
 
         self.upgrade_node(node3, VERSION_30)
@@ -108,23 +111,22 @@ class TestDropCompactStorage(Tester):
             self.upgrade_node(node, VERSION_30)
 
         session = self.patient_exclusive_cql_connection(node3)
-        assert_msg = "Cannot DROP COMPACT STORAGE as some nodes in the cluster ([/127.0.0.1, /127.0.0.2, /127.0.0.3]) has some " \
-                     "non-upgraded 2.x sstables. Please run `upgradesstables` on those nodes before retrying"
-        self.drop_compact_storage(session, assert_msg)
+        assert_msg_part1 = "Cannot DROP COMPACT STORAGE as some nodes in the cluster"
+        assert_msg_part2 = "non-upgraded 2.x sstables. Please run `upgradesstables` on those nodes before retrying"
+
+        self.drop_compact_storage(session, assert_msg_part1, node1.ip_addr, node2.ip_addr, node3.ip_addr, assert_msg_part2)
 
         node3.nodetool("upgradesstables")
         time.sleep(1)
 
-        assert_msg = "Cannot DROP COMPACT STORAGE as some nodes in the cluster ([/127.0.0.1, /127.0.0.2]) has some " \
-                     "non-upgraded 2.x sstables. Please run `upgradesstables` on those nodes before retrying"
-        self.drop_compact_storage(session, assert_msg)
+        self.drop_compact_storage(session, assert_msg_part1, node1.ip_addr, node2.ip_addr, assert_msg_part2)
 
         self.upgrade_node(node3, VERSION_311)
 
         time.sleep(5)
 
         session = self.patient_exclusive_cql_connection(node3)
-        self.drop_compact_storage(session, assert_msg)
+        self.drop_compact_storage(session, assert_msg_part1, node1.ip_addr, node2.ip_addr, assert_msg_part2)
 
         node2.nodetool("upgradesstables")
 
@@ -144,9 +146,10 @@ class TestDropCompactStorage(Tester):
 
         session = self.patient_exclusive_cql_connection(node3)
         session.execute("SELECT * FROM drop_compact_storage_test.test")
-        assert_msg = "Cannot DROP COMPACT STORAGE as some nodes in the cluster ([/127.0.0.2:7000, /127.0.0.1:7000]) are not on 4.0+ yet. " \
-                     "Please upgrade those nodes and run `upgradesstables` before retrying."
-        self.drop_compact_storage(session, assert_msg)
+        assert_msg_part1 = "Cannot DROP COMPACT STORAGE as some nodes in the cluster"
+        assert_msg_part2 = "are not on 4.0+ yet. " \
+                           "Please upgrade those nodes and run `upgradesstables` before retrying."
+        self.drop_compact_storage(session, assert_msg_part1, node1.ip_addr, node2.ip_addr, assert_msg_part2)
 
         for node in [node1, node2]:
             self.upgrade_node(node, VERSION_TRUNK)
