@@ -345,8 +345,8 @@ class TestSecondaryIndexes(Tester):
 
         # Verify that the index is marked as built and it can answer queries and accept writes
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_length_equal(node.grep_log('became queryable after successful build'), 1)
-        assert_length_equal(node.grep_log('registered and writable'), 1)
+        assert_length_equal(node.grep_log('idx.*became queryable after successful build'), 1)
+        assert_length_equal(node.grep_log('idx.*registered and writable'), 1)
         session.execute("INSERT INTO k.t(k, v) VALUES (1, 1)")
         assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1]], ignore_order=True)
 
@@ -361,8 +361,8 @@ class TestSecondaryIndexes(Tester):
         # Verify that the index is not built, not marked as built, and it still can answer queries and accept writes
         assert before_files == after_files
         assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
-        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
-        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became writable', from_mark=mark), 0)
         session.execute("INSERT INTO k.t(k, v) VALUES (2, 1)")
         assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2]], ignore_order=True)
 
@@ -379,8 +379,8 @@ class TestSecondaryIndexes(Tester):
         # Verify that the index is rebuilt, marked as built, and it still can answer queries and accept writes
         assert before_files != after_files
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_length_equal(node.grep_log('became queryable after successful build', from_mark=mark), 1)
-        assert_length_equal(node.grep_log('registered and writable', from_mark=mark), 1)
+        assert_length_equal(node.grep_log('idx.*became queryable after successful build', from_mark=mark), 1)
+        assert_length_equal(node.grep_log('idx.*registered and writable', from_mark=mark), 1)
         session.execute("INSERT INTO k.t(k, v) VALUES (3, 1)")
         assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3]], ignore_order=True)
 
@@ -395,8 +395,8 @@ class TestSecondaryIndexes(Tester):
         # Verify that the index is not built, not marked as built, and it still can answer queries and accept writes
         assert before_files == after_files
         assert_none(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""")
-        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
-        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became writable', from_mark=mark), 0)
         session.execute("INSERT INTO k.t(k, v) VALUES (4, 1)")
         assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3], [4]], ignore_order=True)
 
@@ -409,8 +409,8 @@ class TestSecondaryIndexes(Tester):
         # Verify that the index is rebuilt, marked as built, and it still can answer queries and accept writes
         assert before_files != after_files
         assert_one(session, """SELECT table_name, index_name FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx'])
-        assert_length_equal(node.grep_log('became queryable', from_mark=mark), 0)
-        assert_length_equal(node.grep_log('became writable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became queryable', from_mark=mark), 0)
+        assert_length_equal(node.grep_log('idx.*became writable', from_mark=mark), 0)
         session.execute("INSERT INTO k.t(k, v) VALUES (5, 1)")
         assert_all(session, "SELECT k FROM k.t WHERE v = 1", [[0], [1], [2], [3], [4], [5]], ignore_order=True)
 

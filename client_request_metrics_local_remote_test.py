@@ -59,7 +59,7 @@ class TestClientRequestMetricsLocalRemote(Tester):
         # Run batch test:
         query = 'BEGIN BATCH '
         for i in murmur3_hashes.keys():
-            for y in range(0, 100):
+            for y in range(0, 50):
                 query += "INSERT INTO ks.test (id, ord, val) VALUES ({}, {}, 'aaa')".format(i, y)
         query += 'APPLY BATCH;'
         session.execute(query)
