@@ -160,6 +160,27 @@ class TestFQLTool(Tester):
             rs = session.execute("SELECT * FROM fql_ks.fql_table;")
             assert(len(list(rs)) == 1)
 
+    def test_unclean_enable(self):
+        """
+        test that fql can be enabled on a dirty directory
+        @jira_ticket CASSANDRA-17136
+        """
+        self.cluster.populate(1).start()
+        node1 = self.cluster.nodelist()[0]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fqldir = tempfile.mkdtemp(dir=temp_dir)
+            baddir = os.path.join(fqldir, 'baddir')
+            os.mkdir(baddir)
+            badfile = os.path.join(baddir, 'badfile')
+            with open(os.path.join(badfile), 'w')  as f:
+                    f.write('bad')
+            os.chmod(badfile, 0o000)
+            os.chmod(baddir, 0o000)
+            node1.nodetool("enablefullquerylog --path={}".format(fqldir))
+            # so teardown doesn't fail
+            os.chmod(baddir, 0o777)
+
     def _run_fqltool_replay(self, node, logdirs, target, queries, results, replay_ddl_statements=False):
         fqltool = self.fqltool(node)
         args = [fqltool, "replay", "--target {}".format(target)]
