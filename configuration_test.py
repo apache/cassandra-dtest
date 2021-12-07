@@ -2,6 +2,7 @@ import os
 import logging
 import parse
 import pytest
+import tempfile
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -103,6 +104,19 @@ class TestConfiguration(Tester):
         session.execute('ALTER KEYSPACE ks WITH DURABLE_WRITES=true')
         write_to_trigger_fsync(session, 'ks', 'tab')
         assert commitlog_size(node) > init_size, "ALTER KEYSPACE was not respected"
+
+    def test_relative_paths(self):
+        """
+        @jira_ticket CASSANDRA-17084
+        """
+        self.cluster.populate(1)
+        node1 = self.cluster.nodelist()[0]
+        cassdir = tempfile.mkdtemp()
+        os.mkdir(os.path.join(cassdir, 'bin'))
+        os.chdir(cassdir)
+        node1.set_configuration_options({'commitlog_directory': 'bin/../data/commitlog', 'data_file_directories': ['bin/../data/data']})
+        self.cluster.start()
+        self.cluster.stop()
 
     def overlapping_data_folders(self):
         """
