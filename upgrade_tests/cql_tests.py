@@ -2654,7 +2654,7 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
 
             cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
-            cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid(1234567) AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
+            cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid('2012-11-07 18:18:22-0800') AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
             # not sure what to check exactly so just checking the query returns
 
     def test_float_with_exponent(self):
