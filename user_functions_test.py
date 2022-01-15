@@ -147,7 +147,10 @@ class TestUserFunctions(Tester):
         session.execute("CREATE OR REPLACE FUNCTION overloaded(v ascii) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'")
 
         # ensure that works with correct specificity
-        assert_none(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
+        if self.cluster.version() < LooseVersion('4.1'):
+            assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
+        else:
+            assert_none(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
         assert_none(session, "SELECT v FROM tab WHERE k = overloaded((text) 'foo')")
         assert_none(session, "SELECT v FROM tab WHERE k = overloaded((ascii) 'foo')")
         assert_none(session, "SELECT v FROM tab WHERE k = overloaded((varchar) 'foo')")
