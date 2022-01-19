@@ -13,7 +13,7 @@ enum34
 flaky
 mock
 pytest==3.6.4
-pytest-timeout
+pytest-timeout==1.4.2
 pytest-repeat
 parse
 pycodestyle
