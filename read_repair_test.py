@@ -764,7 +764,10 @@ class TestSpeculativeReadRepair(Tester):
 def _byteman_cycle(nodes, scripts):
     script_path = lambda name: './byteman/read_repair/' + name + '.btm'
 
+    logger.debug("Current path is:" + os.getcwd())
+
     for script in scripts:
+        logger.debug("Script path is: " + script_path(script))
         byteman_validate(nodes[0], script_path(script))
 
     for node in nodes:
