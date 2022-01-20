@@ -2,6 +2,8 @@ from contextlib import contextmanager
 import glob
 import os
 import time
+from pathlib import Path
+
 import pytest
 import logging
 import subprocess
@@ -762,6 +764,9 @@ class TestSpeculativeReadRepair(Tester):
 
 @contextmanager
 def _byteman_cycle(nodes, scripts):
+    # On circle sometimes the working dir gets moved around randomly see CASSANDRA-17265
+    os.chdir(Path(__file__).absolute().parent)
+
     script_path = lambda name: './byteman/read_repair/' + name + '.btm'
 
     logger.debug("Current path is:" + os.getcwd())
