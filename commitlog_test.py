@@ -346,6 +346,7 @@ class TestCommitLog(Tester):
         else:
             node.update_startup_byteman_script('./byteman/4.0/delay_schema_reload.btm')
         node.start(jvm_args=["-Dcassandra.test.flush_local_schema_changes=false"])
+        node.watch_log_for("Byteman-injected delay before schema reload", from_mark=mark)
         self.verify_commit_log_replay(mark)
 
         logger.debug("Verify that the replayed data is present")
