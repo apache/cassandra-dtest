@@ -765,6 +765,8 @@ def _byteman_cycle(nodes, scripts):
     script_path = lambda name: './byteman/read_repair/' + name + '.btm'
 
     logger.debug("Current path is:" + os.getcwd())
+    logger.debug("Current path byteman func is:" + os.getcwd())
+    logger.debug(os.listdir(os.getcwd()))
 
     for script in scripts:
         logger.debug("Script path is: " + script_path(script))
@@ -870,6 +872,8 @@ class TestReadRepairGuarantees(Tester):
         tests how read repair provides, or breaks, write atomicity
         'none' read repair should maintain atomic writes, blocking and async should not
          """
+        logger.debug("Current path 1 is:" + os.getcwd())
+        logger.debug(os.listdir(os.getcwd()))
         assert repair_type in ('blocking', 'async', 'none')
         node1, node2, node3 = self.cluster.nodelist()
 
@@ -878,8 +882,10 @@ class TestReadRepairGuarantees(Tester):
         print (ddl)
         session.execute(ddl)
 
+        logger.debug("Current path 2 is:" + os.getcwd())
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
 
+        logger.debug("Current path 3 is:" + os.getcwd())
         with stop_writes(node2, node3):
             session.execute("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 2, 2)")
 
