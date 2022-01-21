@@ -90,6 +90,8 @@ test fails, the logs for the node are saved in a `logs/<timestamp>` directory
 for analysis (it's not perfect but has been good enough so far, I'm open to
 better suggestions).
 
+In case you want to run tests using your own CCM branch, please, refer to the comments in requirements.txt for details how to do that.
+
 Writing Tests
 -------------
 

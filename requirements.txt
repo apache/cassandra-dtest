@@ -6,6 +6,9 @@
 # git tag -a -f cassandra-test
 # git push origin :refs/tags/cassandra-test
 # git push -f origin refs/tags/cassandra-test
+#
+# In case you want to test a patch with your own CCM branch, further to changing below CCM repo and branch name, you need to add -e flag at the beginning
+# Example: -e git+https://github.com/userb/ccm.git@cassandra-17182#egg=ccm
 git+https://github.com/riptano/ccm.git@cassandra-test#egg=ccm
 decorator
 docopt
