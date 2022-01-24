@@ -303,6 +303,8 @@ class TestCommitLog(Tester):
     def test_commitlog_replay_schema_mutation_ordering(self):
         """
         Test commit log replay schema mutation ordering
+
+        @jira_ticket CASSANDRA-16878
         """
         node = self.node1
         node.set_batch_commitlog(enabled=True)
@@ -349,15 +351,11 @@ class TestCommitLog(Tester):
         node.watch_log_for("Byteman-injected delay before schema reload", from_mark=mark)
         self.verify_commit_log_replay(mark)
 
-        logger.debug("Verify that the replayed data is present")
+        logger.debug("Verify that the replayed data and schema are present")
         session = self.patient_cql_connection(node)
-        assert_all(session,
-                   "SELECT * FROM ks.t",
-                   ignore_order=False,
-                   expected=[[1, 10, None],
-                             [2, 20, None],
-                             [4, 40, 4000],
-                             [3, 30, 3000]])
+        expected_rows = [[1, 10, None], [2, 20, None], [4, 40, 4000], [3, 30, 3000]]
+        assert_all(session, "SELECT * FROM ks.t", ignore_order=False, expected=expected_rows)
+        assert_all(session, "SELECT k, a, c FROM ks.t", ignore_order=False, expected=expected_rows)
 
     def test_default_segment_size(self):
         """
