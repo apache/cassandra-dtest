@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import glob
 import os
 import time
+
 import pytest
 import logging
 import subprocess
@@ -762,7 +763,7 @@ class TestSpeculativeReadRepair(Tester):
 
 @contextmanager
 def _byteman_cycle(nodes, scripts):
-    script_path = lambda name: './byteman/read_repair/' + name + '.btm'
+    script_path = lambda name: os.path.dirname(__file__) + '/byteman/read_repair/' + name + '.btm'
 
     for script in scripts:
         byteman_validate(nodes[0], script_path(script))
