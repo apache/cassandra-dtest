@@ -2,7 +2,6 @@ from contextlib import contextmanager
 import glob
 import os
 import time
-from pathlib import Path
 
 import pytest
 import logging
@@ -764,17 +763,9 @@ class TestSpeculativeReadRepair(Tester):
 
 @contextmanager
 def _byteman_cycle(nodes, scripts):
-    # On circle sometimes the working dir gets moved around randomly see CASSANDRA-17265
-    os.chdir(Path(__file__).absolute().parent)
-
-    script_path = lambda name: './byteman/read_repair/' + name + '.btm'
-
-    logger.debug("Current path is:" + os.getcwd())
-    logger.debug("Current path byteman func is:" + os.getcwd())
-    logger.debug(os.listdir(os.getcwd()))
+    script_path = lambda name: os.path.dirname(__file__) + '/byteman/read_repair/' + name + '.btm'
 
     for script in scripts:
-        logger.debug("Script path is: " + script_path(script))
         byteman_validate(nodes[0], script_path(script))
 
     for node in nodes:
@@ -877,8 +868,6 @@ class TestReadRepairGuarantees(Tester):
         tests how read repair provides, or breaks, write atomicity
         'none' read repair should maintain atomic writes, blocking and async should not
          """
-        logger.debug("Current path 1 is:" + os.getcwd())
-        logger.debug(os.listdir(os.getcwd()))
         assert repair_type in ('blocking', 'async', 'none')
         node1, node2, node3 = self.cluster.nodelist()
 
@@ -887,10 +876,8 @@ class TestReadRepairGuarantees(Tester):
         print (ddl)
         session.execute(ddl)
 
-        logger.debug("Current path 2 is:" + os.getcwd())
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 1, 1)"))
 
-        logger.debug("Current path 3 is:" + os.getcwd())
         with stop_writes(node2, node3):
             session.execute("INSERT INTO ks.tbl (k, c, v1, v2) VALUES (1, 0, 2, 2)")
 

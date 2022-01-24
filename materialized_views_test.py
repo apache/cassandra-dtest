@@ -1,4 +1,5 @@
 import collections
+import os
 import re
 import sys
 import time
@@ -978,7 +979,7 @@ class TestMaterializedViews(Tester):
         # Rename a column with an injected byteman rule to kill the node after the first schema update
         self.fixture_dtest_setup.allow_log_errors = True
         script_version = '4x' if self.cluster.version() >= '4' else '3x'
-        node.byteman_submit(['./byteman/merge_schema_failure_{}.btm'.format(script_version)])
+        node.byteman_submit([os.path.dirname(__file__) + '/byteman/merge_schema_failure_{}.btm'.format(script_version)])
         with pytest.raises(NoHostAvailable):
             session.execute("ALTER TABLE users RENAME username TO user")
 
@@ -1088,11 +1089,11 @@ class TestMaterializedViews(Tester):
         logger.debug("Avoid premature MV build finalization with byteman")
         for node in self.cluster.nodelist():
             if self.cluster.version() >= '4':
-                node.byteman_submit(['./byteman/4.0/skip_view_build_finalization.btm'])
-                node.byteman_submit(['./byteman/4.0/skip_view_build_task_finalization.btm'])
+                node.byteman_submit([os.path.dirname(__file__) + '/byteman/4.0/skip_view_build_finalization.btm'])
+                node.byteman_submit([os.path.dirname(__file__) + '/byteman/4.0/skip_view_build_task_finalization.btm'])
             else:
-                node.byteman_submit(['./byteman/pre4.0/skip_finish_view_build_status.btm'])
-                node.byteman_submit(['./byteman/pre4.0/skip_view_build_update_distributed.btm'])
+                node.byteman_submit([os.path.dirname(__file__) + '/byteman/pre4.0/skip_finish_view_build_status.btm'])
+                node.byteman_submit([os.path.dirname(__file__) + '/byteman/pre4.0/skip_view_build_update_distributed.btm'])
 
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
 
@@ -1157,7 +1158,7 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Slowing down MV build with byteman")
         for node in self.cluster.nodelist():
-            node.byteman_submit(['./byteman/4.0/view_builder_task_sleep.btm'])
+            node.byteman_submit([os.path.dirname(__file__) + '/byteman/4.0/view_builder_task_sleep.btm'])
 
         logger.debug("Create a MV")
         session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
@@ -1206,7 +1207,7 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Slowing down MV build with byteman")
         for node in nodes:
-            node.byteman_submit(['./byteman/4.0/view_builder_task_sleep.btm'])
+            node.byteman_submit([os.path.dirname(__file__) + '/byteman/4.0/view_builder_task_sleep.btm'])
 
         logger.debug("Create a MV")
         session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
@@ -1265,7 +1266,7 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Slowing down MV build with byteman")
         for node in nodes:
-            node.byteman_submit(['./byteman/4.0/view_builder_task_sleep.btm'])
+            node.byteman_submit([os.path.dirname(__file__) + '/byteman/4.0/view_builder_task_sleep.btm'])
 
         logger.debug("Create a MV")
         session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t "
@@ -2507,7 +2508,7 @@ class TestMaterializedViews(Tester):
         session.cluster.control_connection.wait_for_schema_agreement()
 
         logger.debug('Make node1 fail {} view writes'.format(fail_phase))
-        node1.byteman_submit(['./byteman/fail_{}_view_write.btm'.format(fail_phase)])
+        node1.byteman_submit([os.path.dirname(__file__) + '/byteman/fail_{}_view_write.btm'.format(fail_phase)])
 
         logger.debug('Write 1000 rows - all node1 writes should fail')
 
