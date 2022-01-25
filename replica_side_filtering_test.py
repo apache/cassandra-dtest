@@ -1,16 +1,20 @@
 from abc import abstractmethod
 
 import pytest
+import logging
 from cassandra import ConsistencyLevel as CL
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks
 from tools.assertions import (assert_all, assert_none, assert_one)
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
+logger = logging.getLogger(__name__)
 keyspace = 'ks'
 
-class ReplicaSideFiltering(Tester):
+
+class ReplicaSideFilteringBase(Tester):
     """
     @jira_ticket CASSANDRA-8272, CASSANDRA-8273
     Base consistency test for queries involving replica-side filtering when some of the replicas have stale data.
@@ -33,9 +37,12 @@ class ReplicaSideFiltering(Tester):
             cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
             cluster.set_batch_commitlog(enabled=True)
 
-        cluster.populate(2)
-        node1, node2 = cluster.nodelist()
-        cluster.start()
+        if len(cluster.nodelist()) == 0:
+            cluster.populate(2)
+            node1, node2 = cluster.nodelist()
+            cluster.start()
+        else:
+            node1, node2 = cluster.nodelist()
 
         session = self.patient_exclusive_cql_connection(node1, consistency_level=CL.ALL)
         create_ks(session, keyspace, 2)
@@ -116,7 +123,10 @@ class ReplicaSideFiltering(Tester):
         """
         pass
 
-    def test_update_on_skinny_table(self):
+
+class ReplicaSideFilteringBaseTests(ReplicaSideFilteringBase):
+
+    def testupdate_on_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
             create_index="CREATE INDEX ON t(v)",
@@ -126,7 +136,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    def test_update_on_wide_table(self):
+    def testupdate_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, s int STATIC, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -139,7 +149,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, -1, 9, 'old'], [0, 1, 9, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 0, 9, 'new']])
 
-    def test_update_on_static_column_with_empty_partition(self):
+    def testupdate_on_static_column_with_empty_partition(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, s text STATIC, PRIMARY KEY (k, c))",
@@ -151,7 +161,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE s = 'old'", row=[1, None, 'old', None])
         self._assert_one("SELECT * FROM t WHERE s = 'new'", row=[0, None, 'new', None])
 
-    def test_update_on_static_column_with_not_empty_partition(self):
+    def testupdate_on_static_column_with_not_empty_partition(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, s text STATIC, PRIMARY KEY (k, c))",
@@ -167,7 +177,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 'old'", rows=[[1, 30, 'old', 300], [1, 40, 'old', 400]])
         self._assert_all("SELECT * FROM t WHERE s = 'new'", rows=[[0, 10, 'new', 100], [0, 20, 'new', 200]])
 
-    def test_update_on_collection(self):
+    def testupdate_on_collection(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v set<int>)",
             create_index="CREATE INDEX ON t(v)",
@@ -177,7 +187,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v CONTAINS 0")
         self._assert_one("SELECT * FROM t WHERE v CONTAINS 1", row=[0, [-1, 1]])
 
-    def test_complementary_deletion_with_limit_on_partition_key_column_with_empty_partitions(self):
+    def testcomplementary_deletion_with_limit_on_partition_key_column_with_empty_partitions(self):
         self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k1 int, k2 int, c int, s int STATIC, PRIMARY KEY ((k1, k2), c))",
@@ -189,7 +199,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE k1 = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_on_partition_key_column_with_not_empty_partitions(self):
+    def testcomplementary_deletion_with_limit_on_partition_key_column_with_not_empty_partitions(self):
         self._skip_if_filtering_partition_columns_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k1 int, k2 int, c int, s int STATIC, PRIMARY KEY ((k1, k2), c))",
@@ -201,7 +211,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE k1 = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_on_clustering_key_column(self):
+    def testcomplementary_deletion_with_limit_on_clustering_key_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(c)",
@@ -212,7 +222,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE c = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_on_static_column_with_empty_partitions(self):
+    def testcomplementary_deletion_with_limit_on_static_column_with_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, PRIMARY KEY (k, c))",
@@ -224,7 +234,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_on_static_column_with_empty_partitions_and_rows_after(self):
+    def testcomplementary_deletion_with_limit_on_static_column_with_empty_partitions_and_rows_after(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, PRIMARY KEY (k, c))",
@@ -241,7 +251,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 0 LIMIT 10", rows=[[3, 1, 0], [3, 2, 0]])
         self._assert_all("SELECT * FROM t WHERE s = 0", rows=[[3, 1, 0], [3, 2, 0]])
 
-    def test_complementary_deletion_with_limit_on_static_column_with_not_empty_partitions(self):
+    def testcomplementary_deletion_with_limit_on_static_column_with_not_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, v int, PRIMARY KEY (k, c))",
@@ -253,7 +263,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE s = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_on_static_column_with_not_empty_partitions_and_rows_after(self):
+    def testcomplementary_deletion_with_limit_on_static_column_with_not_empty_partitions_and_rows_after(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s int STATIC, v int, PRIMARY KEY(k, c))",
@@ -270,7 +280,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE s = 0 LIMIT 10", rows=[[3, 1, 0, None], [3, 2, 0, None]])
         self._assert_all("SELECT * FROM t WHERE s = 0", rows=[[3, 1, 0, None], [3, 2, 0, None]])
 
-    def test_complementary_deletion_with_limit_on_regular_column(self):
+    def testcomplementary_deletion_with_limit_on_regular_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -281,7 +291,7 @@ class ReplicaSideFiltering(Tester):
 
         self._assert_none("SELECT * FROM t WHERE v = 0 LIMIT 1")
 
-    def test_complementary_deletion_with_limit_and_rows_after(self):
+    def testcomplementary_deletion_with_limit_and_rows_after(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -298,7 +308,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 3", rows=[[0, 3, 0], [0, 4, 0], [0, 5, 0]])
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 4", rows=[[0, 3, 0], [0, 4, 0], [0, 5, 0]])
 
-    def test_complementary_deletion_with_limit_and_rows_between(self):
+    def testcomplementary_deletion_with_limit_and_rows_between(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v int, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -313,7 +323,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 2", rows=[[0, 2, 0], [0, 3, 0]])
         self._assert_all("SELECT * FROM t WHERE v = 0 LIMIT 3", rows=[[0, 2, 0], [0, 3, 0]])
 
-    def test_complementary_update_with_limit_on_static_column_with_empty_partitions(self):
+    def testcomplementary_update_with_limit_on_static_column_with_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s text STATIC, v int, PRIMARY KEY (k, c))",
@@ -328,7 +338,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT k, c, v, s FROM t WHERE s = 'new'",
                          rows=[[1, None, None, 'new'], [2, None, None, 'new']])
 
-    def test_complementary_update_with_limit_on_static_column_with_not_empty_partitions(self):
+    def testcomplementary_update_with_limit_on_static_column_with_not_empty_partitions(self):
         self._skip_if_index_on_static_is_not_supported()
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, s text STATIC, v int, PRIMARY KEY (k, c))",
@@ -342,7 +352,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT k, c, v, s FROM t WHERE s = 'new' LIMIT 1", row=[1, 10, 100, 'new'])
         self._assert_all("SELECT k, c, v, s FROM t WHERE s = 'new'", rows=[[1, 10, 100, 'new'], [2, 20, 200, 'new']])
 
-    def test_complementary_update_with_limit_on_regular_column(self):
+    def testcomplementary_update_with_limit_on_regular_column(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -355,7 +365,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'new' LIMIT 1", row=[0, 1, 'new'])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 2, 'new']])
 
-    def test_complementary_update_with_limit_and_rows_between(self):
+    def testcomplementary_update_with_limit_and_rows_between(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -372,7 +382,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'new' LIMIT 1", row=[0, 1, 'new'])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 4, 'new']])
 
-    def test_partition_deletion_on_skinny_table(self):
+    def testpartition_deletion_on_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
             create_index="CREATE INDEX ON t(v)",
@@ -382,7 +392,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    def test_partition_deletion_on_wide_table(self):
+    def testpartition_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -392,7 +402,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    def test_row_deletion_on_wide_table(self):
+    def testrow_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -402,7 +412,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old' LIMIT 1")
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
 
-    def test_range_deletion_on_wide_table(self):
+    def testrange_deletion_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -415,7 +425,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_one("SELECT * FROM t WHERE v = 'old' LIMIT 1", row=[0, 1, 'old'])
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, 1, 'old'], [0, 4, 'old']])
 
-    def test_mismatching_insertions_on_skinny_table(self):
+    def testmismatching_insertions_on_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
             create_index="CREATE INDEX ON t(v)",
@@ -426,7 +436,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    def test_mismatching_insertions_on_wide_table(self):
+    def testmismatching_insertions_on_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -437,7 +447,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 1, 'new'])
 
-    def test_consistent_skinny_table(self):
+    def testconsistent_skinny_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
             create_index="CREATE INDEX ON t(v)",
@@ -455,7 +465,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[2, 'old'], [4, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[1, 'new'], [3, 'new']])
 
-    def test_consistent_wide_table(self):
+    def testconsistent_wide_table(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int, c int, v text, PRIMARY KEY (k, c))",
             create_index="CREATE INDEX ON t(v)",
@@ -476,7 +486,7 @@ class ReplicaSideFiltering(Tester):
         self._assert_all("SELECT * FROM t WHERE v = 'old'", rows=[[0, 2, 'old'], [0, 4, 'old']])
         self._assert_all("SELECT * FROM t WHERE v = 'new'", rows=[[0, 1, 'new'], [0, 3, 'new']])
 
-    def test_count(self):
+    def testcount(self):
         self._prepare_cluster(
             create_table="CREATE TABLE t (k int PRIMARY KEY, v text)",
             create_index="CREATE INDEX ON t(v)",
@@ -494,7 +504,8 @@ class ReplicaSideFiltering(Tester):
 
 
 @since('3.0.21')
-class TestSecondaryIndexes(ReplicaSideFiltering):
+@reuse_cluster
+class TestSecondaryIndexes(ReplicaSideFilteringBaseTests):
     """
     @jira_ticket CASSANDRA-8272
     Tests the consistency of secondary indexes queries when some of the replicas have stale data.
@@ -505,8 +516,20 @@ class TestSecondaryIndexes(ReplicaSideFiltering):
         return True
 
 
+#@reuse_cluster
+class TestAllowFiltering1Node(ReplicaSideFilteringBaseTests):
+    """
+    @jira_ticket CASSANDRA-8273
+    Test the consistency of queries using ``ALLOW FILTERING`` when some of the replicas have stale data.
+    """
+    __test__ = True
+
+    def create_index(self):
+        return False
+
+
 @since('3.0.21')
-class TestAllowFiltering(ReplicaSideFiltering):
+class TestAllowFiltering(ReplicaSideFilteringBase):
     """
     @jira_ticket CASSANDRA-8273
     Test the consistency of queries using ``ALLOW FILTERING`` when some of the replicas have stale data.
@@ -550,9 +573,9 @@ class TestAllowFiltering(ReplicaSideFiltering):
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
     @since('4.0')
-    def test_update_missed_by_transient_replica(self):
+    def testupdate_missed_by_transient_replica(self):
         self._test_missed_update_with_transient_replicas(missed_by_transient=True)
 
     @since('4.0')
-    def test_update_only_on_transient_replica(self):
+    def testupdate_only_on_transient_replica(self):
         self._test_missed_update_with_transient_replicas(missed_by_transient=False)

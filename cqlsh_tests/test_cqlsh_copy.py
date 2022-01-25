@@ -32,6 +32,7 @@ from .cqlsh_tools import (assert_csvs_items_equal,
                           csv_rows, monkeypatch_driver, random_list,
                           unmonkeypatch_driver, write_rows_to_csv)
 
+reuse_cluster = pytest.mark.reuse_cluster
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ PARTITIONERS = {
 }
 
 
-class TestCqlshCopy(Tester):
+class TestCqlshCopyBase(Tester):
     """
     Tests the COPY TO and COPY FROM features in cqlsh.
     @jira_ticket CASSANDRA-3906
@@ -97,7 +98,7 @@ class TestCqlshCopy(Tester):
 
     def prepare(self, nodes=1, partitioner="murmur3", configuration_options=None, tokens=None, auth_enabled=False):
         p = PARTITIONERS[partitioner]
-        if not self.cluster.nodelist():
+        if len(self.cluster.nodelist()) == 0:
             self.cluster.set_partitioner(p)
             if auth_enabled:
                 if configuration_options is None:
@@ -358,6 +359,433 @@ class TestCqlshCopy(Tester):
 
         return processed
 
+    def prepare_copy_to_with_failures(self):
+        """
+        Create a cluster for testing COPY TO with failure injection, we need at least 3 token ranges
+        so if VNODES are disabled we need to manually fix them and specify the correct start and end
+        tokens for injecting failures. If VNODES are enabled instead, we will have several ranges
+        so we pick an arbitrary range.
+
+        @jira_ticket CASSANDRA-10858
+        """
+        if not self.dtest_config.use_vnodes:
+            tokens = sorted(self.cluster.balanced_tokens(3))
+            logger.debug('Using tokens {}'.format(tokens))
+            self.prepare(nodes=3, tokens=tokens)
+            start = tokens[1]
+            end = tokens[2]
+        else:
+            self.prepare(nodes=1)
+            metadata = self.session.cluster.metadata
+            metadata.token_map.rebuild_keyspace(self.ks, build_if_absent=True)
+            ring = [t.value for t in list(metadata.token_map.tokens_to_hosts_by_ks[self.ks].keys())]
+            assert len(ring) >= 3, 'Not enough ranges in the ring for this test'
+            ring.sort()
+            idx = len(ring) // 2
+            start = ring[idx]
+            end = ring[idx + 1]
+
+        logger.debug("Using failure range: {}, {}".format(start, end))
+        return start, end
+
+
+class TestCqlshCopy(TestCqlshCopyBase):
+    def test_round_trip_murmur3(self):
+        self._test_round_trip(nodes=3, partitioner="murmur3")
+
+    def test_round_trip_random(self):
+        self._test_round_trip(nodes=3, partitioner="random")
+
+    def test_round_trip_order_preserving(self):
+        self._test_round_trip(nodes=3, partitioner="order")
+
+    def test_round_trip_byte_ordered(self):
+        self._test_round_trip(nodes=3, partitioner="byte")
+
+    def test_bulk_round_trip_default(self):
+        """
+        Test bulk import with default stress import (one row per operation)
+
+        @jira_ticket CASSANDRA-9302
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+
+    def test_bulk_round_trip_non_prepared_statements(self):
+        """
+        Test bulk import with default stress import (one row per operation) and without
+        prepared statements.
+
+        @jira_ticket CASSANDRA-11053
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000,
+                                   copy_from_options={'PREPAREDSTATEMENTS': False})
+
+    def test_bulk_round_trip_blogposts(self):
+        """
+        Test bulk import with a user profile that inserts 10 rows per operation and has a replication factor 3
+
+        @jira_ticket CASSANDRA-9302
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
+                                   configuration_options={'batch_size_warn_threshold_in_kb': '10'},
+                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
+                                   stress_table='stresscql.blogposts')
+
+    def test_bulk_round_trip_blogposts_with_max_connections(self):
+        """
+        Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
+        accept to simulate a failed connection to a replica that is up. Here we are interested in testing COPY TO,
+        where we should have at most worker_processes * nodes connections + 1 connections, the +1 is the cqlsh
+        connection. For COPY FROM the driver handles retries, we use only 2 worker processes to make sure it succeeds.
+
+        @jira_ticket CASSANDRA-10938
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
+                                   configuration_options={'native_transport_max_concurrent_connections': '12',
+                                                          'batch_size_warn_threshold_in_kb': '10'},
+                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
+                                   stress_table='stresscql.blogposts',
+                                   copy_to_options={'NUMPROCESSES': 5, 'MAXATTEMPTS': 20},
+                                   copy_from_options={'NUMPROCESSES': 2})
+
+    def test_bulk_round_trip_with_timeouts(self):
+        """
+        Test bulk import with very short read and write timeout values, this should exercise the
+        retry and back-off policies. We cannot check the counts because "SELECT COUNT(*)" could timeout
+        on Jenkins making the test flacky.
+
+        @jira_ticket CASSANDRA-9302
+        """
+        self._test_bulk_round_trip(nodes=1, partitioner="murmur3", num_operations=100000,
+                                   configuration_options={'range_request_timeout_in_ms': '200',
+                                                          'write_request_timeout_in_ms': '100'},
+                                   copy_from_options={'MAXINSERTERRORS': -1},
+                                   skip_count_checks=True)
+
+    def test_bulk_round_trip_with_low_ingestrate(self):
+        """
+        Test bulk import with default stress import (one row per operation) and a low
+        ingestrate of only 1500 rows per second.
+
+        @jira_ticket CASSANDRA-9303
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
+                                   copy_from_options={'INGESTRATE': 1500})
+
+    def test_bulk_round_trip_with_single_core(self):
+        """
+        Perform a round trip on a simulated single core machine. When determining the number of cores,
+        copyutil.py will return the number carried by the environment variable CQLSH_COPY_TEST_NUM_CORES if it has
+        been set.
+
+        @jira_ticket CASSANDRA-11053
+        """
+        os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
+        ret = self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
+        if self.cluster.version() >= LooseVersion('3.6'):
+            logger.debug('Checking that number of cores detected is correct')
+            for out in ret:
+                assert "Detected 1 core" in out[0]
+
+    @since('3.0.5')
+    def test_bulk_round_trip_with_backoff(self):
+        """
+        Test bulk import with default stress import (one row per operation) and COPY options
+        that exercise the new back-off policy introduced by CASSANDRA-11320.
+
+        @jira_ticket CASSANDRA-11320
+        """
+        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=250000,
+                                   copy_from_options={'MAXINFLIGHTMESSAGES': 64, 'MAXPENDINGCHUNKS': 1})
+
+    @since('2.2.5')
+    def test_copy_from_with_large_cql_rows(self):
+        """
+        Test importing CQL rows that are larger than batch_size_warn_threshold_in_kb and
+        batch_size_fail_threshold_in_kb. Test with and without prepared statements.
+
+        @jira_ticket CASSANDRA-11474
+        """
+        num_records = 100
+        self.prepare(nodes=1, configuration_options={'batch_size_warn_threshold_in_kb': '1',  # warn with 1kb and fail
+                                                     'batch_size_fail_threshold_in_kb': '5'})  # with 5kb size batches
+
+        logger.debug('Running stress')
+        stress_table_name = 'standard1'
+        self.ks = 'keyspace1'
+        stress_ks_table_name = self.ks + '.' + stress_table_name
+        self.node1.stress(['write', 'n={}'.format(num_records),
+                           'no-warmup',
+                           '-rate', 'threads=50',
+                           '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
+
+        tempfile = self.get_temp_file()
+        logger.debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
+        self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_ks_table_name, tempfile.name))
+
+        # Import using prepared statements (the default) and verify
+        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
+
+        logger.debug('Importing from csv file {}'.format(tempfile.name))
+        self.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1".format(stress_ks_table_name, tempfile.name))
+
+        results = self.stringify_results(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)),
+                                         format_fn=self.format_blob)
+        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
+
+        # Import without prepared statements and verify
+        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
+
+        logger.debug('Importing from csv file with MAXBATCHSIZE=1 {}'.format(tempfile.name))
+        self.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
+                       .format(stress_ks_table_name, tempfile.name))
+
+        results = self.stringify_results(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)),
+                                         format_fn=self.format_blob)
+        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
+
+    def _test_bulk_round_trip(self, nodes, partitioner,
+                              num_operations, profile=None,
+                              stress_table='keyspace1.standard1',
+                              configuration_options=None,
+                              skip_count_checks=False,
+                              copy_to_options=None,
+                              copy_from_options=None):
+        """
+        Test exporting a large number of rows into a csv file.
+
+        If skip_count_checks is True then it means we cannot use "SELECT COUNT(*)" as it may time out but
+        it also means that we can be sure that one cassandra-stress operation is one record and hence
+        num_records=num_operations.
+
+        Perform the following:
+        - create the records with cassandra-stress
+        - export the records to a csv file
+        - truncate the table and import the csv file
+        - export the records to another csv file
+        - check that the length of the two csv files is the same
+
+        Therefore, 3 COPY operations are run in total. Return a list of tuples, containing stdout and stderr
+        for all 3 copy operations.
+        """
+        if configuration_options is None:
+            configuration_options = {}
+        if copy_to_options is None:
+            copy_to_options = {}
+
+        # The default truncate timeout of 10 seconds that is set in init_default_config() is not
+        # enough for truncating larger tables, see CASSANDRA-11157
+        if 'truncate_request_timeout_in_ms' not in configuration_options:
+            configuration_options['truncate_request_timeout_in_ms'] = 60000
+
+        self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
+
+        ret = []
+
+        def create_records():
+            if not profile:
+                logger.debug('Running stress without any user profile')
+                self.node1.stress(['write', 'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
+            else:
+                logger.debug('Running stress with user profile {}'.format(profile))
+                self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
+                                   'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
+
+            if skip_count_checks:
+                return num_operations
+            else:
+                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL,
+                                                  retry_policy=FlakyRetryPolicy(max_retries=3))
+                ret = rows_to_list(self.session.execute(count_statement))[0][0]
+                logger.debug('Generated {} records'.format(ret))
+                assert ret >= num_operations, 'cassandra-stress did not import enough records'
+                return ret
+
+        def run_copy_to(filename):
+            logger.debug('Exporting to csv file: {}'.format(filename.name))
+            start = datetime.datetime.now()
+            copy_to_cmd = "CONSISTENCY ALL; COPY {} TO '{}'".format(stress_table, filename.name)
+            if copy_to_options:
+                copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.items())
+            logger.debug('Running {}'.format(copy_to_cmd))
+            result = self.run_cqlsh(cmds=copy_to_cmd)
+            ret.append(result)
+            logger.debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
+
+        def run_copy_from(filename):
+            logger.debug('Importing from csv file: {}'.format(filename.name))
+            start = datetime.datetime.now()
+            copy_from_cmd = "COPY {} FROM '{}'".format(stress_table, filename.name)
+            if copy_from_options:
+                copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.items())
+            logger.debug('Running {}'.format(copy_from_cmd))
+            result = self.run_cqlsh(cmds=copy_from_cmd)
+            ret.append(result)
+            logger.debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
+
+        num_records = create_records()
+
+        # Copy to the first csv files
+        tempfile1 = self.get_temp_file()
+        run_copy_to(tempfile1)
+
+        # check all records generated were exported
+        with io.open(tempfile1.name, encoding="utf-8", newline='') as csvfile:
+            assert num_records == sum(1 for _ in csv.reader(csvfile, quotechar='"', escapechar='\\'))
+
+        # import records from the first csv file
+        logger.debug('Truncating {}...'.format(stress_table))
+        self.session.execute("TRUNCATE {}".format(stress_table))
+        run_copy_from(tempfile1)
+
+        # export again to a second csv file
+        tempfile2 = self.get_temp_file()
+        run_copy_to(tempfile2)
+
+        # check the length of both files is the same to ensure all exported records were imported
+        assert sum(1 for _ in open(tempfile1.name)) == sum(1 for _ in open(tempfile2.name))
+
+        return ret
+
+    def _test_round_trip(self, nodes, partitioner, num_records=10000):
+        """
+        Test a simple round trip of a small CQL table to and from a CSV file via
+        COPY.
+
+        - creating and populating a table,
+        - COPYing that table to a CSV file,
+        - SELECTing the contents of the table,
+        - TRUNCATEing the table,
+        - COPYing the written CSV file back into the table, and
+        - asserting that the previously-SELECTed contents of the table match the
+        current contents of the table.
+        """
+        self.prepare(nodes=nodes, partitioner=partitioner)
+        self.session.execute("""
+            CREATE TABLE testcopyto (
+                a text PRIMARY KEY,
+                b int,
+                c float,
+                d uuid
+            )""")
+
+        insert_statement = self.session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
+        args = [(str(i), i, float(i) + 0.5, uuid4()) for i in range(num_records)]
+        execute_concurrent_with_args(self.session, insert_statement, args)
+
+        results = list(self.session.execute("SELECT * FROM testcopyto"))
+
+        tempfile = self.get_temp_file()
+        logger.debug('Exporting to csv file: {}'.format(tempfile.name))
+        out, err, _ = self.run_cqlsh(cmds="COPY ks.testcopyto TO '{}'".format(tempfile.name))
+        logger.debug(out)
+
+        # check all records were exported
+        assert num_records == sum(1 for line in open(tempfile.name))
+
+        # import the CSV file with COPY FROM
+        self.session.execute("TRUNCATE ks.testcopyto")
+        logger.debug('Importing from csv file: {}'.format(tempfile.name))
+        out, err, _ = self.run_cqlsh(cmds="COPY ks.testcopyto FROM '{}'".format(tempfile.name))
+        logger.debug(out)
+
+        new_results = list(self.session.execute("SELECT * FROM testcopyto"))
+        assert sorted(results) == sorted(new_results)
+
+
+@reuse_cluster
+class TestCqlshCopy3Nodes(TestCqlshCopyBase):
+    def test_copy_to_with_more_failures_than_max_attempts(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will fail more times than the maximum number of attempts, therefore
+        we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        start, end = self.prepare_copy_to_with_failures()
+
+        logger.debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
+
+        tempfile = self.get_temp_file()
+        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 5}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+
+        logger.debug('Exporting to csv file: {} with {} and 3 max attempts'
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
+                                     .format(stress_table, tempfile.name))
+        logger.debug(out)
+        logger.debug(err)
+
+        assert 'some records might be missing' in err
+        assert len(open(tempfile.name).readlines()) < num_records
+
+    def test_copy_to_with_fewer_failures_than_max_attempts(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will fail fewer times than the maximum number of attempts, therefore
+        we expect this COPY TO job to succeed.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        start, end = self.prepare_copy_to_with_failures()
+
+        logger.debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
+
+        tempfile = self.get_temp_file()
+        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 3}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+        logger.debug('Exporting to csv file: {} with {} and 5 max attemps'
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
+                                     .format(stress_table, tempfile.name))
+        logger.debug(out)
+        logger.debug(err)
+
+        assert 'some records might be missing' not in err
+        assert num_records == len(open(tempfile.name).readlines())
+
+    def test_copy_to_with_child_process_crashing(self):
+        """
+        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
+        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
+        Here we set a token range that will cause a child process processing this range to exit, therefore
+        we expect this COPY TO job to fail.
+
+        @jira_ticket CASSANDRA-9304
+        """
+        num_records = 100000
+        start, end = self.prepare_copy_to_with_failures()
+
+        logger.debug('Running stress')
+        stress_table = 'keyspace1.standard1'
+        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
+
+        tempfile = self.get_temp_file()
+        failures = {'exit_range': {'start': start, 'end': end}}
+        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
+
+        logger.debug('Exporting to csv file: {} with {}'
+                     .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
+        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
+        logger.debug(out)
+        logger.debug(err)
+
+        assert 'some records might be missing' in err
+        assert len(open(tempfile.name).readlines()) < num_records
+
+
+@reuse_cluster
+class TestCqlshCopyReuse(TestCqlshCopyBase):
     def test_list_data(self):
         """
         Tests the COPY TO command with the list datatype by:
@@ -2252,63 +2680,6 @@ class TestCqlshCopy(Tester):
         assert not self.session.execute("SELECT * FROM testcolumns")
         assert 'Failed to import' in err
 
-    def _test_round_trip(self, nodes, partitioner, num_records=10000):
-        """
-        Test a simple round trip of a small CQL table to and from a CSV file via
-        COPY.
-
-        - creating and populating a table,
-        - COPYing that table to a CSV file,
-        - SELECTing the contents of the table,
-        - TRUNCATEing the table,
-        - COPYing the written CSV file back into the table, and
-        - asserting that the previously-SELECTed contents of the table match the
-        current contents of the table.
-        """
-        self.prepare(nodes=nodes, partitioner=partitioner)
-        self.session.execute("""
-            CREATE TABLE testcopyto (
-                a text PRIMARY KEY,
-                b int,
-                c float,
-                d uuid
-            )""")
-
-        insert_statement = self.session.prepare("INSERT INTO testcopyto (a, b, c, d) VALUES (?, ?, ?, ?)")
-        args = [(str(i), i, float(i) + 0.5, uuid4()) for i in range(num_records)]
-        execute_concurrent_with_args(self.session, insert_statement, args)
-
-        results = list(self.session.execute("SELECT * FROM testcopyto"))
-
-        tempfile = self.get_temp_file()
-        logger.debug('Exporting to csv file: {}'.format(tempfile.name))
-        out, err, _ = self.run_cqlsh(cmds="COPY ks.testcopyto TO '{}'".format(tempfile.name))
-        logger.debug(out)
-
-        # check all records were exported
-        assert num_records == sum(1 for line in open(tempfile.name))
-
-        # import the CSV file with COPY FROM
-        self.session.execute("TRUNCATE ks.testcopyto")
-        logger.debug('Importing from csv file: {}'.format(tempfile.name))
-        out, err, _ = self.run_cqlsh(cmds="COPY ks.testcopyto FROM '{}'".format(tempfile.name))
-        logger.debug(out)
-
-        new_results = list(self.session.execute("SELECT * FROM testcopyto"))
-        assert sorted(results) == sorted(new_results)
-
-    def test_round_trip_murmur3(self):
-        self._test_round_trip(nodes=3, partitioner="murmur3")
-
-    def test_round_trip_random(self):
-        self._test_round_trip(nodes=3, partitioner="random")
-
-    def test_round_trip_order_preserving(self):
-        self._test_round_trip(nodes=3, partitioner="order")
-
-    def test_round_trip_byte_ordered(self):
-        self._test_round_trip(nodes=3, partitioner="byte")
-
     def test_source_copy_round_trip(self):
         """
         Like test_round_trip, but uses the SOURCE command to execute the
@@ -2353,322 +2724,6 @@ class TestCqlshCopy(Tester):
         self.run_cqlsh(cmds="SOURCE '{name}'".format(name=commandfile.name))
         new_results = list(self.session.execute("SELECT * FROM testcopyto"))
         assert sorted(results) == sorted(new_results)
-
-    def _test_bulk_round_trip(self, nodes, partitioner,
-                              num_operations, profile=None,
-                              stress_table='keyspace1.standard1',
-                              configuration_options=None,
-                              skip_count_checks=False,
-                              copy_to_options=None,
-                              copy_from_options=None):
-        """
-        Test exporting a large number of rows into a csv file.
-
-        If skip_count_checks is True then it means we cannot use "SELECT COUNT(*)" as it may time out but
-        it also means that we can be sure that one cassandra-stress operation is one record and hence
-        num_records=num_operations.
-
-        Perform the following:
-        - create the records with cassandra-stress
-        - export the records to a csv file
-        - truncate the table and import the csv file
-        - export the records to another csv file
-        - check that the length of the two csv files is the same
-
-        Therefore, 3 COPY operations are run in total. Return a list of tuples, containing stdout and stderr
-        for all 3 copy operations.
-        """
-        if configuration_options is None:
-            configuration_options = {}
-        if copy_to_options is None:
-            copy_to_options = {}
-
-        # The default truncate timeout of 10 seconds that is set in init_default_config() is not
-        # enough for truncating larger tables, see CASSANDRA-11157
-        if 'truncate_request_timeout_in_ms' not in configuration_options:
-            configuration_options['truncate_request_timeout_in_ms'] = 60000
-
-        self.prepare(nodes=nodes, partitioner=partitioner, configuration_options=configuration_options)
-
-        ret = []
-
-        def create_records():
-            if not profile:
-                logger.debug('Running stress without any user profile')
-                self.node1.stress(['write', 'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
-            else:
-                logger.debug('Running stress with user profile {}'.format(profile))
-                self.node1.stress(['user', 'profile={}'.format(profile), 'ops(insert=1)',
-                                   'n={} cl=ALL'.format(num_operations), 'no-warmup', '-rate', 'threads=50'])
-
-            if skip_count_checks:
-                return num_operations
-            else:
-                count_statement = SimpleStatement("SELECT COUNT(*) FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL,
-                                                  retry_policy=FlakyRetryPolicy(max_retries=3))
-                ret = rows_to_list(self.session.execute(count_statement))[0][0]
-                logger.debug('Generated {} records'.format(ret))
-                assert ret >= num_operations, 'cassandra-stress did not import enough records'
-                return ret
-
-        def run_copy_to(filename):
-            logger.debug('Exporting to csv file: {}'.format(filename.name))
-            start = datetime.datetime.now()
-            copy_to_cmd = "CONSISTENCY ALL; COPY {} TO '{}'".format(stress_table, filename.name)
-            if copy_to_options:
-                copy_to_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_to_options.items())
-            logger.debug('Running {}'.format(copy_to_cmd))
-            result = self.run_cqlsh(cmds=copy_to_cmd)
-            ret.append(result)
-            logger.debug("COPY TO took {} to export {} records".format(datetime.datetime.now() - start, num_records))
-
-        def run_copy_from(filename):
-            logger.debug('Importing from csv file: {}'.format(filename.name))
-            start = datetime.datetime.now()
-            copy_from_cmd = "COPY {} FROM '{}'".format(stress_table, filename.name)
-            if copy_from_options:
-                copy_from_cmd += ' WITH ' + ' AND '.join('{} = {}'.format(k, v) for k, v in copy_from_options.items())
-            logger.debug('Running {}'.format(copy_from_cmd))
-            result = self.run_cqlsh(cmds=copy_from_cmd)
-            ret.append(result)
-            logger.debug("COPY FROM took {} to import {} records".format(datetime.datetime.now() - start, num_records))
-
-        num_records = create_records()
-
-        # Copy to the first csv files
-        tempfile1 = self.get_temp_file()
-        run_copy_to(tempfile1)
-
-        # check all records generated were exported
-        with io.open(tempfile1.name, encoding="utf-8", newline='') as csvfile:
-            assert num_records == sum(1 for _ in csv.reader(csvfile, quotechar='"', escapechar='\\'))
-
-        # import records from the first csv file
-        logger.debug('Truncating {}...'.format(stress_table))
-        self.session.execute("TRUNCATE {}".format(stress_table))
-        run_copy_from(tempfile1)
-
-        # export again to a second csv file
-        tempfile2 = self.get_temp_file()
-        run_copy_to(tempfile2)
-
-        # check the length of both files is the same to ensure all exported records were imported
-        assert sum(1 for _ in open(tempfile1.name)) == sum(1 for _ in open(tempfile2.name))
-
-        return ret
-
-    def test_bulk_round_trip_default(self):
-        """
-        Test bulk import with default stress import (one row per operation)
-
-        @jira_ticket CASSANDRA-9302
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
-
-    def test_bulk_round_trip_non_prepared_statements(self):
-        """
-        Test bulk import with default stress import (one row per operation) and without
-        prepared statements.
-
-        @jira_ticket CASSANDRA-11053
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000,
-                                   copy_from_options={'PREPAREDSTATEMENTS': False})
-
-    def test_bulk_round_trip_blogposts(self):
-        """
-        Test bulk import with a user profile that inserts 10 rows per operation and has a replication factor 3
-
-        @jira_ticket CASSANDRA-9302
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
-                                   configuration_options={'batch_size_warn_threshold_in_kb': '10'},
-                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
-                                   stress_table='stresscql.blogposts')
-
-    def test_bulk_round_trip_blogposts_with_max_connections(self):
-        """
-        Same as test_bulk_round_trip_blogposts but limit the maximum number of concurrent connections a host will
-        accept to simulate a failed connection to a replica that is up. Here we are interested in testing COPY TO,
-        where we should have at most worker_processes * nodes connections + 1 connections, the +1 is the cqlsh
-        connection. For COPY FROM the driver handles retries, we use only 2 worker processes to make sure it succeeds.
-
-        @jira_ticket CASSANDRA-10938
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
-                                   configuration_options={'native_transport_max_concurrent_connections': '12',
-                                                          'batch_size_warn_threshold_in_kb': '10'},
-                                   profile=os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blogposts.yaml'),
-                                   stress_table='stresscql.blogposts',
-                                   copy_to_options={'NUMPROCESSES': 5, 'MAXATTEMPTS': 20},
-                                   copy_from_options={'NUMPROCESSES': 2})
-
-    def test_bulk_round_trip_with_timeouts(self):
-        """
-        Test bulk import with very short read and write timeout values, this should exercise the
-        retry and back-off policies. We cannot check the counts because "SELECT COUNT(*)" could timeout
-        on Jenkins making the test flacky.
-
-        @jira_ticket CASSANDRA-9302
-        """
-        self._test_bulk_round_trip(nodes=1, partitioner="murmur3", num_operations=100000,
-                                   configuration_options={'range_request_timeout_in_ms': '200',
-                                                          'write_request_timeout_in_ms': '100'},
-                                   copy_from_options={'MAXINSERTERRORS': -1},
-                                   skip_count_checks=True)
-
-    def test_bulk_round_trip_with_low_ingestrate(self):
-        """
-        Test bulk import with default stress import (one row per operation) and a low
-        ingestrate of only 1500 rows per second.
-
-        @jira_ticket CASSANDRA-9303
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=10000,
-                                   copy_from_options={'INGESTRATE': 1500})
-
-    def test_bulk_round_trip_with_single_core(self):
-        """
-        Perform a round trip on a simulated single core machine. When determining the number of cores,
-        copyutil.py will return the number carried by the environment variable CQLSH_COPY_TEST_NUM_CORES if it has
-        been set.
-
-        @jira_ticket CASSANDRA-11053
-        """
-        os.environ['CQLSH_COPY_TEST_NUM_CORES'] = '1'
-        ret = self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=100000)
-        if self.cluster.version() >= LooseVersion('3.6'):
-            logger.debug('Checking that number of cores detected is correct')
-            for out in ret:
-                assert "Detected 1 core" in out[0]
-
-    @since('3.0.5')
-    def test_bulk_round_trip_with_backoff(self):
-        """
-        Test bulk import with default stress import (one row per operation) and COPY options
-        that exercise the new back-off policy introduced by CASSANDRA-11320.
-
-        @jira_ticket CASSANDRA-11320
-        """
-        self._test_bulk_round_trip(nodes=3, partitioner="murmur3", num_operations=250000,
-                                   copy_from_options={'MAXINFLIGHTMESSAGES': 64, 'MAXPENDINGCHUNKS': 1})
-
-    def prepare_copy_to_with_failures(self):
-        """
-        Create a cluster for testing COPY TO with failure injection, we need at least 3 token ranges
-        so if VNODES are disabled we need to manually fix them and specify the correct start and end
-        tokens for injecting failures. If VNODES are enabled instead, we will have several ranges
-        so we pick an arbitrary range.
-
-        @jira_ticket CASSANDRA-10858
-        """
-        if not self.dtest_config.use_vnodes:
-            tokens = sorted(self.cluster.balanced_tokens(3))
-            logger.debug('Using tokens {}'.format(tokens))
-            self.prepare(nodes=3, tokens=tokens)
-            start = tokens[1]
-            end = tokens[2]
-        else:
-            self.prepare(nodes=1)
-            metadata = self.session.cluster.metadata
-            metadata.token_map.rebuild_keyspace(self.ks, build_if_absent=True)
-            ring = [t.value for t in list(metadata.token_map.tokens_to_hosts_by_ks[self.ks].keys())]
-            assert len(ring) >= 3, 'Not enough ranges in the ring for this test'
-            ring.sort()
-            idx = len(ring) // 2
-            start = ring[idx]
-            end = ring[idx + 1]
-
-        logger.debug("Using failure range: {}, {}".format(start, end))
-        return start, end
-
-    def test_copy_to_with_more_failures_than_max_attempts(self):
-        """
-        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
-        Here we set a token range that will fail more times than the maximum number of attempts, therefore
-        we expect this COPY TO job to fail.
-
-        @jira_ticket CASSANDRA-9304
-        """
-        num_records = 100000
-        start, end = self.prepare_copy_to_with_failures()
-
-        logger.debug('Running stress')
-        stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
-
-        tempfile = self.get_temp_file()
-        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 5}}
-        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
-
-        logger.debug('Exporting to csv file: {} with {} and 3 max attempts'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='3'"
-                                     .format(stress_table, tempfile.name))
-        logger.debug(out)
-        logger.debug(err)
-
-        assert 'some records might be missing' in err
-        assert len(open(tempfile.name).readlines()) < num_records
-
-    def test_copy_to_with_fewer_failures_than_max_attempts(self):
-        """
-        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
-        Here we set a token range that will fail fewer times than the maximum number of attempts, therefore
-        we expect this COPY TO job to succeed.
-
-        @jira_ticket CASSANDRA-9304
-        """
-        num_records = 100000
-        start, end = self.prepare_copy_to_with_failures()
-
-        logger.debug('Running stress')
-        stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
-
-        tempfile = self.get_temp_file()
-        failures = {'failing_range': {'start': start, 'end': end, 'num_failures': 3}}
-        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
-        logger.debug('Exporting to csv file: {} with {} and 5 max attemps'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}' WITH MAXATTEMPTS='5'"
-                                     .format(stress_table, tempfile.name))
-        logger.debug(out)
-        logger.debug(err)
-
-        assert 'some records might be missing' not in err
-        assert num_records == len(open(tempfile.name).readlines())
-
-    def test_copy_to_with_child_process_crashing(self):
-        """
-        Test exporting rows with failure injection by setting the environment variable CQLSH_COPY_TEST_FAILURES,
-        which is used by ExportProcess in pylib/copyutil.py to deviate its behavior from performing normal queries.
-        Here we set a token range that will cause a child process processing this range to exit, therefore
-        we expect this COPY TO job to fail.
-
-        @jira_ticket CASSANDRA-9304
-        """
-        num_records = 100000
-        start, end = self.prepare_copy_to_with_failures()
-
-        logger.debug('Running stress')
-        stress_table = 'keyspace1.standard1'
-        self.node1.stress(['write', 'n={}'.format(num_records), 'no-warmup', '-rate', 'threads=50'])
-
-        tempfile = self.get_temp_file()
-        failures = {'exit_range': {'start': start, 'end': end}}
-        os.environ['CQLSH_COPY_TEST_FAILURES'] = json.dumps(failures)
-
-        logger.debug('Exporting to csv file: {} with {}'
-              .format(tempfile.name, os.environ['CQLSH_COPY_TEST_FAILURES']))
-        out, err, _ = self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_table, tempfile.name))
-        logger.debug(out)
-        logger.debug(err)
-
-        assert 'some records might be missing' in err
-        assert len(open(tempfile.name).readlines()) < num_records
 
     def test_copy_from_with_more_failures_than_max_attempts(self):
         """
@@ -2817,52 +2872,6 @@ class TestCqlshCopy(Tester):
         assert 'No records inserted in 30 seconds, aborting' in err
         num_records_imported = rows_to_list(self.session.execute("SELECT COUNT(*) FROM {}".format(stress_table)))[0][0]
         assert num_records_imported < num_records
-
-    @since('2.2.5')
-    def test_copy_from_with_large_cql_rows(self):
-        """
-        Test importing CQL rows that are larger than batch_size_warn_threshold_in_kb and
-        batch_size_fail_threshold_in_kb. Test with and without prepared statements.
-
-        @jira_ticket CASSANDRA-11474
-        """
-        num_records = 100
-        self.prepare(nodes=1, configuration_options={'batch_size_warn_threshold_in_kb': '1',   # warn with 1kb and fail
-                                                     'batch_size_fail_threshold_in_kb': '5'})  # with 5kb size batches
-
-        logger.debug('Running stress')
-        stress_table_name = 'standard1'
-        self.ks = 'keyspace1'
-        stress_ks_table_name = self.ks + '.' + stress_table_name
-        self.node1.stress(['write', 'n={}'.format(num_records),
-                           'no-warmup',
-                           '-rate', 'threads=50',
-                           '-col', 'n=FIXED(10)', 'SIZE=FIXED(1024)'])  # 10 columns of 1kb each
-
-        tempfile = self.get_temp_file()
-        logger.debug('Exporting to csv file {} to generate a file'.format(tempfile.name))
-        self.run_cqlsh(cmds="COPY {} TO '{}'".format(stress_ks_table_name, tempfile.name))
-
-        # Import using prepared statements (the default) and verify
-        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
-
-        logger.debug('Importing from csv file {}'.format(tempfile.name))
-        self.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1".format(stress_ks_table_name, tempfile.name))
-
-        results = self.stringify_results(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)),
-                                         format_fn=self.format_blob)
-        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
-
-        # Import without prepared statements and verify
-        self.session.execute("TRUNCATE {}".format(stress_ks_table_name))
-
-        logger.debug('Importing from csv file with MAXBATCHSIZE=1 {}'.format(tempfile.name))
-        self.run_cqlsh(cmds="COPY {} FROM '{}' WITH MAXBATCHSIZE=1 AND PREPAREDSTATEMENTS=FALSE"
-                       .format(stress_ks_table_name, tempfile.name))
-
-        results = self.stringify_results(self.session.execute("SELECT * FROM {}".format(stress_ks_table_name)),
-                                         format_fn=self.format_blob)
-        self.assertCsvResultEqual(tempfile.name, results, stress_table_name)
 
     def test_copy_from_with_brackets_in_UDT(self):
         """
