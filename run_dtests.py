@@ -52,20 +52,20 @@ class RunDTests():
                                                                                                              max_help_position=100,
                                                                                                              width=200))
 
-        # this is a bit ugly: all of our command line arguments are added and configured as part
-        # of pytest. however, we also have this wrapper script to make it easier for those who
+        # This is a bit ugly: all of our command line arguments are added and configured as part
+        # of pytest. However, we also have this wrapper script to make it easier for those who
         # aren't comfortable calling pytest directly. To avoid duplicating code (e.g. have the options
         # in two separate places) we directly use the pytest_addoption fixture from conftest.py. Unfortunately,
         # pytest wraps ArgumentParser, so, first we add the options to a pytest Parser, and then we pull
         # all of those custom options out and add them to the unwrapped ArgumentParser we want to use
         # here inside of run_dtests.py.
         #
-        # So NOTE: to add a command line argument, if you're trying to do so by adding it here, you're doing it wrong!
+        # So NOTE: To add a command line argument, if you're trying to do so by adding it here, you're doing it wrong!
         # add it to conftest.py:pytest_addoption
         pytest_parser = Parser()
         pytest_addoption(pytest_parser)
 
-        # add all of the options from the pytest Parser we created, and add them into our ArgumentParser instance
+        # Add all of the options from the pytest Parser we created, and add them into our ArgumentParser instance
         pytest_custom_opts = pytest_parser._anonymous
         for opt in pytest_custom_opts.options:
             parser.add_argument(opt._long_opts[0], action=opt._attrs['action'],

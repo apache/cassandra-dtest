@@ -6,9 +6,13 @@ import platform
 import re
 import shutil
 import time
+from cassandra import OperationTimedOut
 from datetime import datetime
 from distutils.version import LooseVersion
 # Python 3 imports
+from cassandra.connection import ConnectionShutdown
+from cassandra import Unauthorized
+from enum import Enum
 from itertools import zip_longest
 
 import ccmlib.repository
@@ -24,7 +28,8 @@ from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
 
 logger = logging.getLogger(__name__)
-
+reusable_dtest_setup = None
+last_test_class = None
 
 def check_required_loopback_interfaces_available():
     """
@@ -122,6 +127,35 @@ def fixture_dtest_setup_overrides(dtest_config):
     """
     return DTestSetupOverrides()
 
+class Reuse_cluster(Enum):
+    REUSE_CLUSTER_NO = 1
+    REUSE_CLUSTER_YES = 2
+
+@pytest.fixture(scope='function', autouse=True)
+def fixture_dtest_reuse_cluster(request):
+    marker = None
+    for node_mark, marker in request.node.iter_markers_with_node("reuse_cluster"):
+        if not isinstance(node_mark, request.node.Class):
+            err = "'reuse_cluster' is only applicable at class level: " + str(node_mark) + " / " + str(marker)
+            logger.error(err)
+            pytest.fail(err)
+
+    if marker is None:
+        return Reuse_cluster.REUSE_CLUSTER_NO
+    else:
+        return Reuse_cluster.REUSE_CLUSTER_YES
+
+
+@pytest.fixture(scope='session', autouse=True)
+def fixture_dtest_clean_reused_cluster(request):
+    """
+    Clean re-used cluster at end of session
+    """
+
+    yield
+
+    global reusable_dtest_setup
+    safe_cluster_cleanup(request, reusable_dtest_setup)
 
 @pytest.fixture(scope='function')
 def fixture_dtest_cluster_name():
@@ -322,20 +356,60 @@ def fixture_dtest_setup(request,
                         fixture_dtest_setup_overrides,
                         fixture_logging_setup,
                         fixture_dtest_cluster_name,
-                        fixture_dtest_create_cluster_func):
-    if running_in_docker():
-        cleanup_docker_environment_before_test_execution()
+                        fixture_dtest_create_cluster_func,
+                        fixture_dtest_reuse_cluster):
+    #TODO Reuse nodes taking into account
+    #Byteman cleanup
+    #Auto detect configuration options
 
-    # do all of our setup operations to get the enviornment ready for the actual test
-    # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
+    reuse_option = fixture_dtest_reuse_cluster
+    # Use reuse_option = Reuse_cluster.REUSE_CLUSTER_NO to fully disable node-reusage
+    #reuse_option = Reuse_cluster.REUSE_CLUSTER_NO
+
+    dtest_setup = None
+    global reusable_dtest_setup
+    global last_test_class
+
     initial_environment = copy.deepcopy(os.environ)
-    dtest_setup = DTestSetup(dtest_config=dtest_config,
-                             setup_overrides=fixture_dtest_setup_overrides,
-                             cluster_name=fixture_dtest_cluster_name)
-    dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
 
-    if not dtest_config.disable_active_log_watching:
-        dtest_setup.begin_active_log_watch()
+    # Create new node if:
+    # - Not wanting to reuse clusters
+    # - Reusing clusters but explicitly asking for a new one
+    # - Wanting to reuse but env doesn't allow reusing
+    # - Wanting to reuse but no reusable cluster available
+    logger.info("Reuse cluster: %s", reuse_option)
+    cant_reuse_reason = cant_reuse_cluster_reason(request, reusable_dtest_setup, last_test_class, dtest_config)
+    cant_reuse = reusable_dtest_setup is not None and cant_reuse_reason is not None
+    missing_reuse_cluster = reusable_dtest_setup is None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES
+    if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO\
+            or cant_reuse\
+            or missing_reuse_cluster:
+
+        reason = ("non-reusable" if reuse_option == Reuse_cluster.REUSE_CLUSTER_NO else "reusable") + " requested"
+        if cant_reuse:
+            reason = cant_reuse_reason
+        if missing_reuse_cluster:
+            reason = "Requested reusable cluster but none present"
+
+        logger.info("Cleaning previous cluster if needed")
+        safe_cluster_cleanup(request, reusable_dtest_setup)
+        reusable_dtest_setup = None
+
+        logger.info("Creating new cluster reason: %s", reason)
+        dtest_setup = setup_cluster(dtest_config,
+                                    fixture_dtest_setup_overrides,
+                                    fixture_dtest_cluster_name,
+                                    fixture_dtest_create_cluster_func,
+                                    False)
+
+        reusable_dtest_setup = dtest_setup
+    elif reusable_dtest_setup is not None and reuse_option == Reuse_cluster.REUSE_CLUSTER_YES:
+        drop_test_ks(reusable_dtest_setup)
+        dtest_setup = reusable_dtest_setup
+    else:
+        pytest.fail(msg="Unrecognized cluster reusage option: " + reuse_option)
+
+    last_test_class = str(request.cls.__name__)
 
     # at this point we're done with our setup operations in this fixture
     # yield to allow the actual test to run
@@ -348,6 +422,10 @@ def fixture_dtest_setup(request,
     dtest_setup.jvm_args = []
 
     for con in dtest_setup.connections:
+        try:
+            con.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+        except (ConnectionShutdown, Unauthorized) as e:
+            pass
         con.cluster.shutdown()
     dtest_setup.connections = []
 
@@ -359,6 +437,8 @@ def fixture_dtest_setup(request,
                 failed = True
                 pytest.fail(msg='Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
                             .format(errors=str.join(", ", errors)), pytrace=False)
+        for node in dtest_setup.cluster.nodelist():
+            node.mark_log_for_errors()
     finally:
         try:
             # save the logs for inspection
@@ -367,7 +447,87 @@ def fixture_dtest_setup(request,
         except Exception as e:
             logger.error("Error saving log:", str(e))
         finally:
+            if failed or reuse_option == Reuse_cluster.REUSE_CLUSTER_NO:
+                safe_cluster_cleanup(request, dtest_setup)
+                reusable_dtest_setup = None
+
+
+def cant_reuse_cluster_reason(request, dtest_setup, last_test_class, dtest_config):
+    if dtest_setup is None:
+        return "Can't reuse bc reusable cluster is None"
+
+    # Can't reuse if some nodes down
+    if dtest_setup is not None \
+            and len([node for node in dtest_setup.cluster.nodelist() if
+                    node.is_live()]) != len(dtest_setup.cluster.nodelist()):
+        return "Can't reuse bc num live nodes doesn't match"
+
+    # When passing tests as line items to pytest a 'class' fixture won't work hence this hack
+    current_test_class = str(request.cls.__name__)
+    if last_test_class is not None and last_test_class != current_test_class:
+        return "Can't reuse bc new test class: " + last_test_class + " -> " + current_test_class
+
+    #Only reuse nodes starting at 4.0
+    current_vesion = dtest_config.cassandra_version_from_build
+    if loose_version_compare(LooseVersion('4.0.1'), current_vesion) > 0:
+        return "Can't reuse bc current version: " + str(current_vesion) + " is not gt 4.0.1 "
+
+    return None
+
+
+def safe_cluster_cleanup(request, dtest_setup):
+    if dtest_setup is not None:
+        try:
             dtest_setup.cleanup_cluster(request)
+        except FileNotFoundError:
+            pass
+
+
+def drop_test_ks(dtest_setup):
+    wait_schema_agreement = False
+    session = None
+
+    try:
+        if len(dtest_setup.cluster.nodelist()) != 0:
+            node1 = dtest_setup.cluster.nodelist()[0]
+            if node1.is_running():
+                # Clear KS
+                session = dtest_setup.cql_connection(node1, user='cassandra', password='cassandra')
+                query = "select * from system_schema.keyspaces"
+                rows = session.execute(query=query, timeout=120)
+                for row in rows:
+                    ks = str(row.keyspace_name)
+                    if not ks.startswith("system"):
+                        query = "drop keyspace " + ks
+                        session.execute(query=query, timeout=120)
+                        wait_schema_agreement = True
+
+        if wait_schema_agreement:
+            session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
+    except OperationTimedOut:
+        pass
+
+
+def setup_cluster(dtest_config,
+                  fixture_dtest_setup_overrides,
+                  fixture_dtest_cluster_name,
+                  fixture_dtest_create_cluster_func,
+                  reuse_cluster = False):
+    if running_in_docker():
+        cleanup_docker_environment_before_test_execution(reuse_cluster)
+
+    # do all of our setup operations to get the enviornment ready for the actual test
+    # to run (e.g. bring up a cluster with the necessary config, populate variables, etc)
+    # initial_environment = copy.deepcopy(os.environ)
+    dtest_setup = DTestSetup(dtest_config=dtest_config,
+                             setup_overrides=fixture_dtest_setup_overrides,
+                             cluster_name=fixture_dtest_cluster_name)
+    dtest_setup.initialize_cluster(fixture_dtest_create_cluster_func)
+
+    if not dtest_config.disable_active_log_watching:
+        dtest_setup.begin_active_log_watch()
+
+    return dtest_setup
 
 
 # Based on https://bugs.python.org/file25808/14894.patch
