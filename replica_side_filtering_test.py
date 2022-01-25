@@ -4,7 +4,7 @@ import pytest
 from cassandra import ConsistencyLevel as CL
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, mk_bman_path
 from tools.assertions import (assert_all, assert_none, assert_one)
 
 since = pytest.mark.since
@@ -542,7 +542,7 @@ class TestAllowFiltering(ReplicaSideFiltering):
 
         # update the previous value with CL=ONE only in one replica
         node = cluster.nodelist()[1 if missed_by_transient else 0]
-        node.byteman_submit(['./byteman/stop_writes.btm'])
+        node.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.session.execute(SimpleStatement("UPDATE t SET v = 'new' WHERE k = 0", consistency_level=CL.ONE))
 
         # query with CL=ALL to verify that no old values are resurrected

@@ -8,7 +8,7 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from ccmlib.node import TimeoutError, ToolError
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.assertions import assert_almost_equal, assert_all, assert_none
 from tools.data import insert_c1c2, query_c1c2
 
@@ -234,9 +234,9 @@ class TestTopology(Tester):
         # Execute first rebuild, should fail
         with pytest.raises(ToolError):
             if cluster.version() >= '4.0':
-                script = ['./byteman/4.0/decommission_failure_inject.btm']
+                script = [mk_bman_path('4.0/decommission_failure_inject.btm')]
             else:
-                script = ['./byteman/pre4.0/decommission_failure_inject.btm']
+                script = [mk_bman_path('pre4.0/decommission_failure_inject.btm')]
             node2.byteman_submit(script)
             node2.nodetool('decommission')
 

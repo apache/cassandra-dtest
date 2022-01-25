@@ -12,7 +12,7 @@ from cassandra.metadata import NetworkTopologyStrategy, SimpleStrategy
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, mk_bman_path
 from distutils.version import LooseVersion
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
@@ -775,7 +775,7 @@ class TestMiscellaneousCQL(CQLTester):
         cluster = self.cluster
         cluster.populate(3, install_byteman=True).start()
         node1, _, node3 = cluster.nodelist()
-        node3.byteman_submit(['./byteman/truncate_fail.btm'])
+        node3.byteman_submit([mk_bman_path('truncate_fail.btm')])
 
         session = self.patient_exclusive_cql_connection(node1)
         create_ks(session, 'ks', 3)

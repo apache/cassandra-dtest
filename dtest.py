@@ -35,6 +35,8 @@ LAST_LOG = os.path.join(LOG_SAVED_DIR, "last")
 
 LAST_TEST_DIR = 'last_test_dir'
 
+BYTEMAN_DIR = os.path.join(os.path.dirname(__file__), 'byteman')
+
 DEFAULT_DIR = './'
 config = configparser.RawConfigParser()
 if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
@@ -65,6 +67,9 @@ def get_sha(repo_dir):
         else:
             # git call failed for some unknown reason
             raise
+
+def mk_bman_path(path):
+    return os.path.join(BYTEMAN_DIR, path)
 
 
 # copy the initial environment variables so we can reset them later:

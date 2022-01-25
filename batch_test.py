@@ -377,7 +377,7 @@ class TestBatch(Tester):
                                      protocol_version=protocol_version, install_byteman=True)
 
         coordinator = self.cluster.nodelist()[coordinator_idx]
-        coordinator.byteman_submit(['./byteman/fail_after_batchlog_write.btm'])
+        coordinator.byteman_submit([mk_bman_path('fail_after_batchlog_write.btm')])
         logger.debug("Injected byteman scripts to enable batchlog replay {}".format(coordinator.name))
 
         query = """

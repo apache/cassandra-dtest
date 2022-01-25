@@ -13,7 +13,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 from ccmlib.node import ToolError
 
-from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf
+from dtest import FlakyRetryPolicy, Tester, create_ks, create_cf, mk_bman_path
 from tools.data import insert_c1c2, query_c1c2
 from tools.jmxutils import JolokiaAgent, make_mbean
 from repair_tests.incremental_repair_test import assert_parent_repair_session_count
@@ -1287,7 +1287,7 @@ class TestRepair(BaseRepairTest):
 
         logger.debug("Submitting byteman script to {}".format(node_to_kill.name))
         # Sleep on anticompaction/stream so there will be time for node to be killed
-        node_to_kill.byteman_submit(['./byteman/{}'.format(script)])
+        node_to_kill.byteman_submit([mk_bman_path(script)])
 
         def node1_repair():
             global nodetool_error

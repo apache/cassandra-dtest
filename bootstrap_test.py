@@ -17,7 +17,7 @@ import pytest
 
 from distutils.version import LooseVersion
 
-from dtest import Tester, create_ks, create_cf, data_size
+from dtest import Tester, create_ks, create_cf, data_size, mk_bman_path
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
 from tools.data import query_c1c2
@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 class BootstrapTester(Tester):
-    byteman_submit_path_pre_4_0 = './byteman/pre4.0/stream_failure.btm'
-    byteman_submit_path_4_0 = './byteman/4.0/stream_failure.btm'
+    byteman_submit_path_pre_4_0 = mk_bman_path('pre4.0/stream_failure.btm')
+    byteman_submit_path_4_0 = mk_bman_path('4.0/stream_failure.btm')
 
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
@@ -189,7 +189,7 @@ class BootstrapTester(Tester):
 
         logger.debug("Submitting byteman script to {} to".format(node1.name))
         # Sleep longer than streaming_socket_timeout_in_ms to make sure the node will not be killed
-        node1.byteman_submit(['./byteman/stream_5s_sleep.btm'])
+        node1.byteman_submit([mk_bman_path('stream_5s_sleep.btm')])
 
         # Bootstraping a new node with very small streaming_socket_timeout_in_ms
         node2 = new_node(cluster)
@@ -286,7 +286,7 @@ class BootstrapTester(Tester):
 
              logger.debug("Bootstrap node 2 with delay")
              node2 = new_node(cluster, byteman_port='4200')
-             node2.update_startup_byteman_script('./byteman/bootstrap_5s_sleep.btm')
+             node2.update_startup_byteman_script(mk_bman_path('bootstrap_5s_sleep.btm'))
              node2.start(wait_for_binary_proto=True)
 
              assert_bootstrap_state(self, node2, 'COMPLETED')

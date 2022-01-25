@@ -12,7 +12,7 @@ from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 from pytest import raises
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, mk_bman_path
 from tools.assertions import assert_one
 from tools.data import rows_to_list
 from tools.jmxutils import JolokiaAgent, make_mbean
@@ -504,7 +504,7 @@ class TestSpeculativeReadRepair(Tester):
                                                   'write_request_timeout_in_ms': 1000,
                                                   'read_request_timeout_in_ms': 1000})
         cluster.populate(3, install_byteman=True, debug=True)
-        byteman_validate(cluster.nodelist()[0], './byteman/read_repair/sorted_live_endpoints.btm', verbose=True)
+        byteman_validate(cluster.nodelist()[0], mk_bman_path('read_repair/sorted_live_endpoints.btm'), verbose=True)
         cluster.start(jvm_args=['-XX:-PerfDisableSharedMem'])
         session = fixture_dtest_setup.patient_exclusive_cql_connection(cluster.nodelist()[0], timeout=2)
 
@@ -527,15 +527,15 @@ class TestSpeculativeReadRepair(Tester):
         session = self.get_cql_connection(node1, timeout=2)
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_rr_writes.btm')])
 
         with raises(WriteTimeout):
             session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)"))
 
-        node2.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
         session = self.get_cql_connection(node2)
         with StorageProxy(node2) as storage_proxy:
             assert storage_proxy.blocking_read_repair == 0
@@ -560,15 +560,15 @@ class TestSpeculativeReadRepair(Tester):
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
 
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes
-        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
 
-        node2.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
         coordinator = node2
         # Stop reads on coordinator in order to make sure we do not go through
         # the messaging service for the local reads
@@ -597,20 +597,20 @@ class TestSpeculativeReadRepair(Tester):
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
 
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes
-        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
 
-        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
         version = self.cluster.cassandra_version()
         if version < '4.1':
-            node1.byteman_submit(['./byteman/request_verb_timing.btm'])
+            node1.byteman_submit([mk_bman_path('request_verb_timing.btm')])
         else:
-            node1.byteman_submit(['./byteman/post4.0/request_verb_timing.btm'])
+            node1.byteman_submit([mk_bman_path('post4.0/request_verb_timing.btm')])
 
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.blocking_read_repair == 0
@@ -618,7 +618,7 @@ class TestSpeculativeReadRepair(Tester):
             assert storage_proxy.speculated_rr_write == 0
 
             session = self.get_cql_connection(node1)
-            node2.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
+            node2.byteman_submit([mk_bman_path('read_repair/stop_data_reads.btm')])
             results = session.execute(quorum("SELECT * FROM ks.tbl WHERE k=1"))
 
             timing = request_verb_timing(node1)
@@ -646,15 +646,15 @@ class TestSpeculativeReadRepair(Tester):
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
 
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes on node 3, leave them off on node2
-        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes.btm')])
 
-        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.blocking_read_repair == 0
             assert storage_proxy.speculated_rr_read == 0
@@ -682,21 +682,21 @@ class TestSpeculativeReadRepair(Tester):
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
 
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes
-        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
 
         # force endpoint order
-        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
 
-        # node2.byteman_submit(['./byteman/read_repair/stop_digest_reads.btm'])
-        node2.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+        # node2.byteman_submit([mk_bman_path('read_repair/stop_digest_reads.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_data_reads.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_rr_writes.btm')])
 
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 0
@@ -727,21 +727,21 @@ class TestSpeculativeReadRepair(Tester):
 
         session.execute(quorum("INSERT INTO ks.tbl (k, c, v) VALUES (1, 0, 1)"))
 
-        node2.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
 
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes
-        node2.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
-        node3.byteman_submit(['-u', './byteman/read_repair/stop_writes.btm'])
+        node2.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
+        node3.byteman_submit(['-u', mk_bman_path('read_repair/stop_writes.btm')])
 
         # force endpoint order
-        node1.byteman_submit(['./byteman/read_repair/sorted_live_endpoints.btm'])
+        node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
 
-        node2.byteman_submit(['./byteman/read_repair/stop_digest_reads.btm'])
-        node3.byteman_submit(['./byteman/read_repair/stop_data_reads.btm'])
-        node2.byteman_submit(['./byteman/read_repair/stop_rr_writes.btm'])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_digest_reads.btm')])
+        node3.byteman_submit([mk_bman_path('read_repair/stop_data_reads.btm')])
+        node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes.btm')])
 
         with StorageProxy(node1) as storage_proxy:
             assert storage_proxy.get_table_metric("ks", "tbl", "SpeculativeRetries") == 0
@@ -762,7 +762,7 @@ class TestSpeculativeReadRepair(Tester):
 
 @contextmanager
 def _byteman_cycle(nodes, scripts):
-    script_path = lambda name: './byteman/read_repair/' + name + '.btm'
+    script_path = lambda name: mk_bman_path('read_repair/') + name + '.btm'
 
     for script in scripts:
         byteman_validate(nodes[0], script_path(script))

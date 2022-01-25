@@ -8,7 +8,7 @@ from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
 
 from tools.assertions import assert_invalid, assert_length_equal, assert_one
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.data import rows_to_list
 
 since = pytest.mark.since
@@ -97,11 +97,11 @@ class TestCounters(Tester):
         # Have node 1 and 3 cheat a bit during the leader election for a counter mutation; note that cheating
         # takes place iff there is an actual chance for node 2 to be picked.
         if cluster.version() < '4.0':
-            nodes[0].update_startup_byteman_script('./byteman/pre4.0/election_counter_leader_favor_node2.btm')
-            nodes[2].update_startup_byteman_script('./byteman/pre4.0/election_counter_leader_favor_node2.btm')
+            nodes[0].update_startup_byteman_script(mk_bman_path('pre4.0/election_counter_leader_favor_node2.btm'))
+            nodes[2].update_startup_byteman_script(mk_bman_path('pre4.0/election_counter_leader_favor_node2.btm'))
         else:
-            nodes[0].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
-            nodes[2].update_startup_byteman_script('./byteman/4.0/election_counter_leader_favor_node2.btm')
+            nodes[0].update_startup_byteman_script(mk_bman_path('4.0/election_counter_leader_favor_node2.btm'))
+            nodes[2].update_startup_byteman_script(mk_bman_path('4.0/election_counter_leader_favor_node2.btm'))
 
         cluster.start()
         session = self.patient_cql_connection(nodes[0])
@@ -111,7 +111,7 @@ class TestCounters(Tester):
         # Now stop the node and restart but first install a rule to slow down how fast node 2 will update the list
         # nodes that are alive
         nodes[1].stop(wait=True, wait_other_notice=False)
-        nodes[1].update_startup_byteman_script('./byteman/gossip_alive_callback_sleep.btm')
+        nodes[1].update_startup_byteman_script(mk_bman_path('gossip_alive_callback_sleep.btm'))
         nodes[1].start(no_wait=True, wait_other_notice=False)
 
         # Until node 2 is fully alive try to force other nodes to pick him as mutation leader.

@@ -10,7 +10,7 @@ import logging
 from ccmlib import common as ccmcommon
 from ccmlib.node import ToolError
 
-from dtest import Tester, create_ks, create_cf, MAJOR_VERSION_4
+from dtest import Tester, create_ks, create_cf, mk_bman_path, MAJOR_VERSION_4
 from tools.assertions import assert_all, assert_none, assert_one
 
 since = pytest.mark.since
@@ -394,7 +394,7 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
         assert_one(session, "SELECT * FROM k.t WHERE v = 8", [0, 2, 8])
 
         # Load SSTables with a failure during index creation
-        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        node.byteman_submit([mk_bman_path('index_build_failure.btm')])
         with pytest.raises(Exception):
             self.load_sstables(cluster, node, 'k')
 

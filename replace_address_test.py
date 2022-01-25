@@ -13,7 +13,7 @@ from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 
-from dtest import Tester
+from dtest import Tester, mk_bman_path
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
 
@@ -493,13 +493,13 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         btmmark = self.query_node.mark_log()
 
         if self.cluster.version() < '4.0':
-            self.query_node.byteman_submit(['./byteman/pre4.0/stream_failure.btm'])
+            self.query_node.byteman_submit([mk_bman_path('pre4.0/stream_failure.btm')])
             self._do_replace(jvm_option='replace_address_first_boot',
                              opts={'streaming_socket_timeout_in_ms': 1000},
                              wait_for_binary_proto=False,
                              wait_other_notice=True)
         else:
-            self.query_node.byteman_submit(['./byteman/4.0/stream_failure.btm'])
+            self.query_node.byteman_submit([mk_bman_path('4.0/stream_failure.btm')])
             self._do_replace(jvm_option='replace_address_first_boot', wait_for_binary_proto=False, wait_other_notice=True)
 
         # Make sure bootstrap did not complete successfully

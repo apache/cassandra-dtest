@@ -9,7 +9,7 @@ from threading import Thread
 from cassandra import ConsistencyLevel
 from ccmlib.node import ToolError
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.data import insert_c1c2, query_c1c2
 
 since = pytest.mark.since
@@ -211,9 +211,9 @@ class TestRebuild(Tester):
 
         # Path to byteman script which makes the streaming to node2 throw an exception, making rebuild fail
         if cluster.version() < '4.0':
-            script = ['./byteman/pre4.0/inject_failure_streaming_to_node2.btm']
+            script = [mk_bman_path('pre4.0/inject_failure_streaming_to_node2.btm')]
         else:
-            script = ['./byteman/4.0/inject_failure_streaming_to_node2.btm']
+            script = [mk_bman_path('4.0/inject_failure_streaming_to_node2.btm')]
         node3.byteman_submit(script)
 
         # First rebuild must fail and data must be incomplete

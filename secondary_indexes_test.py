@@ -14,7 +14,7 @@ from cassandra.concurrent import (execute_concurrent,
 from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count, \
     assert_length_equal, assert_all
 from tools.data import block_until_index_is_built, rows_to_list
@@ -353,7 +353,7 @@ class TestSecondaryIndexes(Tester):
         # Simulate a failing index rebuild
         before_files = self._index_sstables_files(node, 'k', 't', 'idx')
         mark = node.mark_log()
-        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        node.byteman_submit([mk_bman_path('index_build_failure.btm')])
         with pytest.raises(Exception):
             node.nodetool("rebuild_index k t idx")
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
@@ -387,7 +387,7 @@ class TestSecondaryIndexes(Tester):
         # Simulate another failing index rebuild
         before_files = after_files
         mark = node.mark_log()
-        node.byteman_submit(['./byteman/index_build_failure.btm'])
+        node.byteman_submit([mk_bman_path('index_build_failure.btm')])
         with pytest.raises(Exception):
             node.nodetool("rebuild_index k t idx")
         after_files = self._index_sstables_files(node, 'k', 't', 'idx')
@@ -1212,9 +1212,9 @@ class TestPreJoinCallback(Tester):
             node1.start(wait_for_binary_proto=True)
 
             if cluster.version() < '4.0':
-                node1.byteman_submit(['./byteman/pre4.0/inject_failure_streaming_to_node2.btm'])
+                node1.byteman_submit([mk_bman_path('pre4.0/inject_failure_streaming_to_node2.btm')])
             else:
-                node1.byteman_submit(['./byteman/4.0/inject_failure_streaming_to_node2.btm'])
+                node1.byteman_submit([mk_bman_path('4.0/inject_failure_streaming_to_node2.btm')])
 
             node2 = new_node(cluster)
 

@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement
 from cassandra.protocol import ConfigurationException
 from ccmlib.node import Node
 
-from dtest import Tester
+from dtest import Tester, mk_bman_path
 from tools.jmxutils import JolokiaAgent, make_mbean
 from tools.data import rows_to_list
 from tools.assertions import (assert_all)
@@ -177,7 +177,7 @@ class TransientReplicationBase(Tester):
         self.node1, self.node2, self.node3 = self.nodes
 
         # Make sure digest is not attempted against the transient node
-        self.node3.byteman_submit(['./byteman/throw_on_digest.btm'])
+        self.node3.byteman_submit([mk_bman_path('throw_on_digest.btm')])
 
     def stream_entire_sstables(self):
         return True
@@ -317,7 +317,7 @@ class TestTransientReplication(TransientReplicationBase):
         with tm(self.node1) as tm1, tm(self.node2) as tm2, tm(self.node3) as tm3:
             self.insert_row(1, 1, 1)
             # Stop writes to the other full node
-            self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+            self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
             self.insert_row(1, 2, 2)
 
         # node1 should contain both rows
@@ -342,7 +342,7 @@ class TestTransientReplication(TransientReplicationBase):
         tm = lambda n: self.table_metrics(n)
         self.insert_row(1, 1, 1)
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.insert_row(1, 2, 2)
 
         # Stop reads from the node that will hold the second row
@@ -367,7 +367,7 @@ class TestTransientReplication(TransientReplicationBase):
         self.insert_row(1, 2, 2)
 
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.delete_row(1, 1, node = self.node1)
 
         # Stop reads from the node that will hold the second row
@@ -397,7 +397,7 @@ class TestTransientReplication(TransientReplicationBase):
         self.insert_row(1, 1, 1)
         self.insert_row(1, 2, 2)
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.delete_row(1, 2)
 
         self.assert_local_rows(self.node3,
@@ -432,7 +432,7 @@ class TestTransientReplication(TransientReplicationBase):
     def test_speculative_write(self):
         """ if a full replica isn't responding, we should send the write to the transient replica """
         session = self.exclusive_cql_connection(self.node1)
-        self.node2.byteman_submit(['./byteman/slow_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('slow_writes.btm')])
 
         self.insert_row(1, 1, 1, session=session)
         self.assert_local_rows(self.node1, [[1,1,1]])
@@ -467,7 +467,7 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
         if use_lcs:
             self.use_lcs()
 
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         # self.insert_row(1)
         tm = lambda n: self.table_metrics(n)
         with tm(self.node1) as tm1, tm(self.node2) as tm2, tm(self.node3) as tm3:
@@ -601,7 +601,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
         session.execute("ALTER TABLE %s.%s WITH speculative_retry = 'ALWAYS';" % (self.keyspace, self.table))
         self.insert_row(1, 1, 1)
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.insert_row(1, 2, 2)
 
         for node in self.nodes:
@@ -618,7 +618,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
         session.execute("ALTER TABLE %s.%s WITH speculative_retry = '99.99PERCENTILE';" % (self.keyspace, self.table))
         self.insert_row(1, 1, 1)
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.insert_row(1, 2, 2)
 
         for node in self.nodes:
@@ -652,7 +652,7 @@ class TestMultipleTransientNodes(TransientReplicationBase):
         tm = lambda n: self.table_metrics(n)
         self.insert_row(1, 1, 1)
         # Stop writes to the other full node
-        self.node2.byteman_submit(['./byteman/stop_writes.btm'])
+        self.node2.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.insert_row(1, 2, 2)
 
         self.assert_local_rows(self.node1,
