@@ -9,7 +9,7 @@ import ccmlib.common as common
 
 logger = logging.getLogger(__name__)
 
-JOLOKIA_JAR = os.path.join('lib', 'jolokia-jvm-1.6.2-agent.jar')
+JOLOKIA_JAR = os.path.join(os.path.dirname(__file__), '..', 'lib', 'jolokia-jvm-1.6.2-agent.jar')
 CLASSPATH_SEP = ';' if common.is_win() else ':'
 
 
