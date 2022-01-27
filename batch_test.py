@@ -6,7 +6,7 @@ import logging
 from cassandra import ConsistencyLevel, Timeout, Unavailable
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, mk_bman_path
 from tools.assertions import (assert_all, assert_invalid, assert_one,
                               assert_unavailable)
 from tools.jmxutils import (JolokiaAgent, make_mbean)
