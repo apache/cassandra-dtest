@@ -153,8 +153,9 @@ class TestRebuild(Tester):
             r'Streaming error occurred on session with peer 127.0.0.3',
             r'Remote peer 127.0.0.3 failed stream session',
             r'Streaming error occurred on session with peer 127.0.0.3:7000',
-            r'Remote peer 127.0.0.3:7000 failed stream session',
-            r'Stream receive task .* already finished'
+            r'Remote peer /?127.0.0.3:7000 failed stream session',
+            r'Stream receive task .* already finished',
+            r'stream operation from /?127.0.0.1:.* failed'
         ]
 
         cluster = self.cluster
