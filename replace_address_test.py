@@ -538,7 +538,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             self._cleanup(self.replacement_node)
             self.replacement_node.start(jvm_args=["-Dcassandra.replace_address_first_boot={}"
                                         .format(self.replaced_node.address())],
-                                        wait_for_binary_proto=True)
+                                        wait_for_binary_proto=120)
         else:
             raise RuntimeError('invalid mode value {mode}'.format(mode=mode))
 
