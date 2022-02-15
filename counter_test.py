@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class TestCounters(Tester):
 
     @since('3.0', max_version='3.12')
+    @pytest.mark.no_offheap_memtables
     def test_13691(self):
         """
         2.0 -> 2.1 -> 3.0 counters upgrade test
