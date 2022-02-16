@@ -248,6 +248,8 @@ class TestOfflineTools(Tester):
         (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
         assert rc == 0, str(rc)
 
+        # only works on existing ks/cf, but we just created them
+        node1.nodetool("disableautocompaction")
         # Generate multiple sstables and test works properly in the simple case
         node1.stress(['write', 'n=100K', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
