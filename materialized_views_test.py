@@ -1249,6 +1249,15 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Verify that the MV has been successfully created")
         self._wait_for_view('ks', 't_by_v')
+        # The original byteman delay it's still there and can make this flaky CASSANDRA-16962
+        for i in range(10):
+            try:
+                assert_one(session, "SELECT COUNT(*) FROM t_by_v", [5000])
+            except AssertionError:
+                time.sleep(1)
+            else:
+                break
+
         assert_one(session, "SELECT COUNT(*) FROM t_by_v", [5000])
 
     @since('4.0')
