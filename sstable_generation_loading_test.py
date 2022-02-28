@@ -455,4 +455,7 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
         assert len(ret) > 0, "Expected to stream at least 1 table"
         for exit_status, _, stderr in ret:
             assert exit_status == 0, "Expected exit code 0, got {}".format(exit_status)
-            assert len(stderr) == 0, "Expected empty stderr, got {}".format(stderr)
+            # Below warning is emitted in trunk/4.1 because of CASSANDRA-15234. We exploit the backward compatibility
+            # framework with DTests instead of changing config in all old tests.
+            if len(stderr) > 0 and stderr is not "parameters have been deprecated. They have new names and/or value format":
+                "Expected empty stderr, got {}".format(stderr)
