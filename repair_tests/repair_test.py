@@ -708,6 +708,37 @@ class TestRepair(BaseRepairTest):
         else:
             assert len(node1.grep_log('parallelism=PARALLEL')) == 1, str(node1.grep_log('parallelism'))
 
+
+    @since('3.11')
+    def test_repair_validates_dc(self):
+        """
+        * Set up a multi DC cluster
+        * Perform a -dc repair with nonexistent dc and without local dc
+        * Assert that the repair is not trigger in both cases
+        """
+        cluster = self._setup_multi_dc()
+        node1 = cluster.nodes["node1"]
+        node2 = cluster.nodes["node2"]
+        node3 = cluster.nodes["node3"]
+
+        opts = ["-dc", "dc1", "-dc", "dc13"]
+        opts += _repair_options(self.cluster.version(), ks="ks", sequential=False)
+        # repair should fail because dc13 does not exist
+        try:
+            node1.repair(opts)
+        except Exception as e:
+            nodetool_error = e
+        assert 'data center(s) [dc13] not found' in repr(nodetool_error)
+
+        opts = ["-dc", "dc2", "-dc", "dc3"]
+        opts += _repair_options(self.cluster.version(), ks="ks", sequential=False)
+        # repair should fail because local dc not included in repair
+        try:
+            node1.repair(opts)
+        except Exception as e:
+            nodetool_error = e
+        assert 'the local data center must be part of the repair' in repr(nodetool_error)
+
     def _setup_multi_dc(self):
         """
         Sets up 3 DCs (2 nodes in 'dc1', and one each in 'dc2' and 'dc3').
