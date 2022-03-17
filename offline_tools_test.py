@@ -235,9 +235,15 @@ class TestOfflineTools(Tester):
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]
 
+        options = []
+        # In versions >= 4.1, we need to explicitly enable force on verify as it's guarded by default
+        # see CASSANDRA-17017
+        if cluster.version() >= '4.1':
+            options.append('-f')
+
         # test on nonexistent keyspace
         try:
-            (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
+            (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", options=options)
         except ToolError as e:
             assert "Unknown keyspace/table keyspace1.standard1" in repr(e)
             assert e.exit_status == 1, str(e.exit_status)
@@ -245,7 +251,7 @@ class TestOfflineTools(Tester):
         # test on nonexistent sstables:
         node1.stress(['write', 'n=100', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
-        (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1")
+        (out, err, rc) = node1.run_sstableverify("keyspace1", "standard1", options=options)
         assert rc == 0, str(rc)
 
         # only works on existing ks/cf, but we just created them
@@ -259,7 +265,7 @@ class TestOfflineTools(Tester):
         node1.flush()
         cluster.stop()
 
-        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1")
+        (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=options)
 
         assert rc == 0, str(rc)
 
@@ -301,7 +307,8 @@ class TestOfflineTools(Tester):
 
         # use verbose to get some coverage on it
         try:
-            (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=['-v'])
+            options.append('-v')
+            (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=options)
             assert False, "sstable verify did not fail; rc={}\nout={}\nerr={}".format(str(rc), out, error)
         except ToolError as e:
             m = re.match("(?ms).*Corrupted SSTable : (?P<sstable>\S+)", str(e))
