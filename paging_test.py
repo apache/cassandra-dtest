@@ -1,3 +1,4 @@
+import datetime
 import time
 import uuid
 import pytest
@@ -12,6 +13,7 @@ from cassandra import InvalidRequest, ReadFailure, ReadTimeout
 from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import (SimpleStatement, dict_factory,
                              named_tuple_factory, tuple_factory)
+from cassandra.util import Date, Time
 
 from dtest import Tester, run_scenarios, create_ks
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
@@ -1447,6 +1449,150 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             res = rows_to_list(
                 session.execute("SELECT DISTINCT a, s, count(a), count(s) FROM test WHERE a IN (1, 2, 3, 4) LIMIT 2"))
             assert res == [[1, 1, 4, 3]]
+
+    @since('4.1')
+    def group_by_time_ranges(self):
+        """
+        Test grouping with floor functions
+        @jira_ticket CASSANDRA-11871.
+        """
+        session = self.prepare(row_factory=tuple_factory)
+        create_ks(session, 'test_paging_with_group_by_and_time_ranges', 2)
+
+        # ------------------------------------
+        # Test with timestamp type
+        # ------------------------------------
+
+        session.execute("CREATE TABLE testWithTimestamp (pk int, time timestamp, v int, primary key (pk, time))")
+
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:10:00 UTC', 1)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:12:00 UTC', 2)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:14:00 UTC', 3)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:15:00 UTC', 4)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:21:00 UTC', 5)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:22:00 UTC', 6)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:26:00 UTC', 7)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (1, '2016-09-27 16:26:20 UTC', 8)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (2, '2016-09-27 16:26:20 UTC', 10)")
+        session.execute("INSERT INTO testWithTimestamp (pk, time, v) VALUES (2, '2016-09-27 16:30:00 UTC', 11)")
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            for startingTime in ('', ', \'2016-09-27 UTC\''):
+
+                res = self.get_rows(session, "SELECT pk, floor(time, 5m{}), min(v), max(v), count(v) FROM testWithTimestamp GROUP BY pk, floor(time, 5m{})".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, datetime.datetime.strptime("2016-09-27 16:10:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 1, 3, 3],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:15:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 4, 4, 1],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:20:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 5, 6, 2],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:25:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 7, 8, 2],
+                                       [2, datetime.datetime.strptime("2016-09-27 16:25:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 10, 10, 1],
+                                       [2, datetime.datetime.strptime("2016-09-27 16:30:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 11, 11, 1]])
+
+                res = self.get_rows(session, "SELECT pk, floor(time, 5m{}), min(v), max(v), count(v) FROM testWithTimestamp GROUP BY pk, floor(time, 5m{}) LIMIT 2".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, datetime.datetime.strptime("2016-09-27 16:10:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 1, 3, 3],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:15:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 4, 4, 1]])
+
+                res = self.get_rows(session, "SELECT pk, floor(time, 5m{}), min(v), max(v), count(v) FROM testWithTimestamp GROUP BY pk, floor(time, 5m{}) PER PARTITION LIMIT 1".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, datetime.datetime.strptime("2016-09-27 16:10:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 1, 3, 3],
+                                       [2, datetime.datetime.strptime("2016-09-27 16:25:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 10, 10, 1]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 5m{}), min(v), max(v), count(v) FROM testWithTimestamp WHERE pk = 1 GROUP BY pk, floor(time, 5m{}) ORDER BY time DESC".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, datetime.datetime.strptime("2016-09-27 16:25:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 7, 8, 2],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:20:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 5, 6, 2],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:15:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 4, 4, 1],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:10:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 1, 3, 3]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 5m{}), min(v), max(v), count(v) FROM testWithTimestamp WHERE pk = 1 GROUP BY pk, floor(time, 5m{}) ORDER BY time DESC LIMIT 2".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, datetime.datetime.strptime("2016-09-27 16:25:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 7, 8, 2],
+                                       [1, datetime.datetime.strptime("2016-09-27 16:20:00 UTC", "%Y-%m-%d %H:%M:%S %Z"), 5, 6, 2]])
+
+        # ------------------------------------
+        # Test with date type
+        # ------------------------------------
+
+        session.execute("CREATE TABLE testWithDate (pk int, time date, v int, primary key (pk, time))")
+
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-09-27', 1)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-09-28', 2)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-09-29', 3)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-09-30', 4)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-10-01', 5)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-10-04', 6)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-10-20', 7)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (1, '2016-11-27', 8)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (2, '2016-11-01', 10)")
+        session.execute("INSERT INTO testWithDate (pk, time, v) VALUES (2, '2016-11-02', 11)")
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            for startingTime in ('', ', \'2016-06-01\''):
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 1mo{}), min(v), max(v), count(v) FROM testWithDate GROUP BY pk, floor(time, 1mo{})".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, Date("2016-09-01"), 1, 4, 4],
+                                       [1, Date("2016-10-01"), 5, 7, 3],
+                                       [1, Date("2016-11-01"), 8, 8, 1],
+                                       [2, Date("2016-11-01"), 10, 11, 2]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 1mo{}), min(v), max(v), count(v) FROM testWithDate GROUP BY pk, floor(time, 1mo{}) LIMIT 2".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, Date("2016-09-01"), 1, 4, 4],
+                                       [1, Date("2016-10-01"), 5, 7, 3]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 1mo{}), min(v), max(v), count(v) FROM testWithDate GROUP BY pk, floor(time, 1mo{}) PER PARTITION LIMIT 1".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, Date("2016-09-01"), 1, 4, 4],
+                                       [2, Date("2016-11-01"), 10, 11, 2]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 1mo{}), min(v), max(v), count(v) FROM testWithDate WHERE pk = 1 GROUP BY pk, floor(time, 1mo{}) ORDER BY time DESC".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, Date("2016-11-01"), 8, 8, 1],
+                                       [1, Date("2016-10-01"), 5, 7, 3],
+                                       [1, Date("2016-09-01"), 1, 4, 4]])
+
+                res =  self.get_rows(session, "SELECT pk, floor(time, 1mo{}), min(v), max(v), count(v) FROM testWithDate WHERE pk = 1 GROUP BY pk, floor(time, 1mo{}) ORDER BY time DESC LIMIT 2".format(startingTime, startingTime))
+                self.assertEqual(res, [[1, Date("2016-11-01"), 8, 8, 1],
+                                       [1, Date("2016-10-01"), 5, 7, 3]])
+
+        # ------------------------------------
+        # Test with time type
+        # ------------------------------------
+
+        session.execute("CREATE TABLE testWithTime (pk int, date date, time time, v int, primary key (pk, date, time))")
+
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:10:00', 1)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:12:00', 2)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:14:00', 3)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:15:00', 4)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:21:00', 5)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:22:00', 6)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:26:00', 7)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-27', '16:26:20', 8)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-28', '16:26:20', 9)")
+        session.execute("INSERT INTO testWithTime (pk, date, time, v) VALUES (1, '2016-09-28', '16:26:30', 10)")
+
+        for page_size in (2, 3, 4, 5, 7, 10):
+            session.default_fetch_size = page_size
+
+            res =  self.get_rows(session, "SELECT pk, date, floor(time, 5m), min(v), max(v), count(v) FROM testWithTime GROUP BY pk, date, floor(time, 5m)")
+            self.assertEqual(res, [[1, Date("2016-09-27"), Time("16:10:00"), 1, 3, 3L],
+                                   [1, Date("2016-09-27"), Time("16:15:00"), 4, 4, 1L],
+                                   [1, Date("2016-09-27"), Time("16:20:00"), 5, 6, 2L],
+                                   [1, Date("2016-09-27"), Time("16:25:00"), 7, 8, 2L],
+                                   [1, Date("2016-09-28"), Time("16:25:00"), 9, 10, 2L]])
+
+            res =  self.get_rows(session, "SELECT pk, date, floor(time, 5m), min(v), max(v), count(v) FROM testWithTime GROUP BY pk, date, floor(time, 5m) LIMIT 2")
+            self.assertEqual(res, [[1, Date("2016-09-27"), Time("16:10:00"), 1, 3, 3L],
+                                   [1, Date("2016-09-27"), Time("16:15:00"), 4, 4, 1L]])
+
+            res =  self.get_rows(session, "SELECT pk, date, floor(time, 5m), min(v), max(v), count(v) FROM testWithTime WHERE pk = 1 GROUP BY pk, date, floor(time, 5m) ORDER BY date DESC, time DESC")
+            self.assertEqual(res, [[1, Date("2016-09-28"), Time("16:25:00"), 9, 10, 2L],
+                                   [1, Date("2016-09-27"), Time("16:25:00"), 7, 8, 2L],
+                                   [1, Date("2016-09-27"), Time("16:20:00"), 5, 6, 2L],
+                                   [1, Date("2016-09-27"), Time("16:15:00"), 4, 4, 1L],
+                                   [1, Date("2016-09-27"), Time("16:10:00"), 1, 3, 3L]])
+
+            res =  self.get_rows(session, "SELECT pk, date, floor(time, 5m), min(v), max(v), count(v) FROM testWithTime WHERE pk = 1 GROUP BY pk, date, floor(time, 5m) ORDER BY date DESC, time DESC LIMIT 2")
+            self.assertEqual(res, [[1, Date("2016-09-28"), Time("16:25:00"), 9, 10, 2L],
+                                   [1, Date("2016-09-27"), Time("16:25:00"), 7, 8, 2L]])
 
     @since('2.0.6')
     def test_static_columns_paging(self):
