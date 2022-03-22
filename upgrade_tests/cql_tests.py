@@ -20,9 +20,9 @@ from dtest import RUN_STATIC_UPGRADE_MATRIX, MAJOR_VERSION_4
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnDef,
-                                              ColumnOrSuperColumn, ColumnParent,
-                                              Deletion, Mutation, SlicePredicate,
-                                              SliceRange)
+                                        ColumnOrSuperColumn, ColumnParent,
+                                        Deletion, Mutation, SlicePredicate,
+                                        SliceRange)
 from thrift_test import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_row_count)
