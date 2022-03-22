@@ -20,9 +20,9 @@ from dtest import RUN_STATIC_UPGRADE_MATRIX, MAJOR_VERSION_4
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnDef,
-                                        ColumnOrSuperColumn, ColumnParent,
-                                        Deletion, Mutation, SlicePredicate,
-                                        SliceRange)
+                                              ColumnOrSuperColumn, ColumnParent,
+                                              Deletion, Mutation, SlicePredicate,
+                                              SliceRange)
 from thrift_test import get_thrift_client
 from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
                               assert_none, assert_one, assert_row_count)
@@ -4361,10 +4361,12 @@ class TestCQL(UpgradeTester):
                 check_applies("l < ['z']")
                 check_applies("l <= ['z']")
                 check_applies("l IN (null, ['foo', 'bar', 'foobar'], ['a'])")
+                check_applies("l CONTAINS 'bar'")
 
                 # multiple conditions
                 check_applies("l > ['aaa', 'bbb'] AND l > ['aaa']")
                 check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
+                check_applies("l CONTAINS 'foo' AND l CONTAINS 'foobar'");
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition),
@@ -4380,10 +4382,12 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("l <= ['a']")
                 check_does_not_apply("l IN (['a'], null)")
                 check_does_not_apply("l IN ()")
+                check_does_not_apply("l CONTAINS 'baz'")
 
                 # multiple conditions
                 check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
                 check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
+                check_does_not_apply("l CONTAINS 'bar' AND l CONTAINS 'baz'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
@@ -4396,10 +4400,8 @@ class TestCQL(UpgradeTester):
                 check_invalid("l >= null")
                 check_invalid("l IN null", expected=SyntaxException)
                 check_invalid("l IN 367", expected=SyntaxException)
-                check_invalid("l CONTAINS KEY 123", expected=SyntaxException)
-
-                # not supported yet
-                check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
+                check_invalid("l CONTAINS null", expected=InvalidRequest)
+                check_invalid("l CONTAINS KEY 123", expected=InvalidRequest)
 
     @since('2.1')
     def test_list_item_conditional(self):
@@ -4556,10 +4558,12 @@ class TestCQL(UpgradeTester):
                 check_applies("s < {'z'}")
                 check_applies("s <= {'z'}")
                 check_applies("s IN (null, {'bar', 'foo'}, {'a'})")
+                check_applies("s CONTAINS 'foo'")
 
                 # multiple conditions
                 check_applies("s > {'a'} AND s < {'z'}")
                 check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
+                check_applies("s CONTAINS 'foo' AND s CONTAINS 'bar'")
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition),
@@ -4576,6 +4580,7 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("s IN ({'a'}, null)")
                 check_does_not_apply("s IN ()")
                 check_does_not_apply("s != null AND s IN ()")
+                check_does_not_apply("s CONTAINS 'baz'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), expected=expected)
@@ -4588,13 +4593,11 @@ class TestCQL(UpgradeTester):
                 check_invalid("s >= null")
                 check_invalid("s IN null", expected=SyntaxException)
                 check_invalid("s IN 367", expected=SyntaxException)
-                check_invalid("s CONTAINS KEY 123", expected=SyntaxException)
+                check_invalid("s CONTAINS null", expected=InvalidRequest)
+                check_invalid("s CONTAINS KEY 123", expected=InvalidRequest)
 
                 # element access is not allow for sets
                 check_invalid("s['foo'] = 'foobar'")
-
-                # not supported yet
-                check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
 
     @since('2.1.1')
     def test_whole_map_conditional(self):
@@ -4634,10 +4637,13 @@ class TestCQL(UpgradeTester):
                 check_applies("m <= {'z': 'z'}")
                 check_applies("m != {'a': 'a'}")
                 check_applies("m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+                check_applies("m CONTAINS 'bar'")
+                check_applies("m CONTAINS KEY 'foo'")
 
                 # multiple conditions
                 check_applies("m > {'a': 'a'} AND m < {'z': 'z'}")
                 check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
+                check_applies("m CONTAINS 'bar' AND m CONTAINS KEY 'foo'")
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
@@ -4653,6 +4659,8 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m IN ({'a': 'a'}, null)")
                 check_does_not_apply("m IN ()")
                 check_does_not_apply("m = null AND m != null")
+                check_does_not_apply("m CONTAINS 'foo'")
+                check_does_not_apply("m CONTAINS KEY 'bar'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
@@ -4663,12 +4671,9 @@ class TestCQL(UpgradeTester):
                 check_invalid("m = {null: 'a'}")
                 check_invalid("m < null")
                 check_invalid("m IN null", expected=SyntaxException)
+                check_invalid("m CONTAINS null", expected=InvalidRequest)
+                check_invalid("m CONTAINS KEY null", expected=InvalidRequest)
 
-                # not supported yet
-                check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
-                check_invalid("m CONTAINS KEY 'foo'", expected=SyntaxException)
-                check_invalid("m CONTAINS null", expected=SyntaxException)
-                check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
     @since('2.1')
     def test_map_item_conditional(self):
