@@ -29,7 +29,7 @@ from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
 from tools.data import rows_to_list
 from tools.misc import add_skip
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0, CASSANDRA_4_1
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -4342,6 +4342,7 @@ class TestCQL(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
+            logger.debug("Current version of {is_upgraded} node: {v} ".format(is_upgraded="upgraded" if is_upgraded else "old", v=self.get_node_version(is_upgraded)))
             cursor.execute("TRUNCATE tlist")
             cursor.execute("TRUNCATE frozentlist")
 
@@ -4361,12 +4362,10 @@ class TestCQL(UpgradeTester):
                 check_applies("l < ['z']")
                 check_applies("l <= ['z']")
                 check_applies("l IN (null, ['foo', 'bar', 'foobar'], ['a'])")
-                check_applies("l CONTAINS 'bar'")
 
                 # multiple conditions
                 check_applies("l > ['aaa', 'bbb'] AND l > ['aaa']")
                 check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
-                check_applies("l CONTAINS 'foo' AND l CONTAINS 'foobar'");
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition),
@@ -4382,12 +4381,10 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("l <= ['a']")
                 check_does_not_apply("l IN (['a'], null)")
                 check_does_not_apply("l IN ()")
-                check_does_not_apply("l CONTAINS 'baz'")
 
                 # multiple conditions
                 check_does_not_apply("l IN () AND l IN (['foo', 'bar', 'foobar'])")
                 check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
-                check_does_not_apply("l CONTAINS 'bar' AND l CONTAINS 'baz'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
@@ -4400,8 +4397,18 @@ class TestCQL(UpgradeTester):
                 check_invalid("l >= null")
                 check_invalid("l IN null", expected=SyntaxException)
                 check_invalid("l IN 367", expected=SyntaxException)
-                check_invalid("l CONTAINS null", expected=InvalidRequest)
-                check_invalid("l CONTAINS KEY 123", expected=InvalidRequest)
+
+                # @jira_ticket CASSANDRA-10537
+                if self.get_node_version(is_upgraded) >= LooseVersion(CASSANDRA_4_1):
+                    check_applies("l CONTAINS 'bar'")
+                    check_applies("l CONTAINS 'foo' AND l CONTAINS 'foobar'")
+                    check_does_not_apply("l CONTAINS 'baz'")
+                    check_does_not_apply("l CONTAINS 'bar' AND l CONTAINS 'baz'")
+                    check_invalid("m CONTAINS 'bar'")
+                    check_invalid("l CONTAINS KEY 123")
+                else:
+                    check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
+                    check_invalid("l CONTAINS KEY 123", expected=SyntaxException)
 
     @since('2.1')
     def test_list_item_conditional(self):
@@ -4558,12 +4565,10 @@ class TestCQL(UpgradeTester):
                 check_applies("s < {'z'}")
                 check_applies("s <= {'z'}")
                 check_applies("s IN (null, {'bar', 'foo'}, {'a'})")
-                check_applies("s CONTAINS 'foo'")
 
                 # multiple conditions
                 check_applies("s > {'a'} AND s < {'z'}")
                 check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
-                check_applies("s CONTAINS 'foo' AND s CONTAINS 'bar'")
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition),
@@ -4580,7 +4585,6 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("s IN ({'a'}, null)")
                 check_does_not_apply("s IN ()")
                 check_does_not_apply("s != null AND s IN ()")
-                check_does_not_apply("s CONTAINS 'baz'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), expected=expected)
@@ -4593,11 +4597,20 @@ class TestCQL(UpgradeTester):
                 check_invalid("s >= null")
                 check_invalid("s IN null", expected=SyntaxException)
                 check_invalid("s IN 367", expected=SyntaxException)
-                check_invalid("s CONTAINS null", expected=InvalidRequest)
-                check_invalid("s CONTAINS KEY 123", expected=InvalidRequest)
 
                 # element access is not allow for sets
                 check_invalid("s['foo'] = 'foobar'")
+
+                # @jira_ticket CASSANDRA-10537
+                if self.get_node_version(is_upgraded) >= LooseVersion(CASSANDRA_4_1):
+                    check_applies("s CONTAINS 'foo'")
+                    check_applies("s CONTAINS 'foo' AND s CONTAINS 'bar'")
+                    check_does_not_apply("s CONTAINS 'baz'")
+                    check_invalid("s CONTAINS null")
+                    check_invalid("s CONTAINS KEY 123")
+                else:
+                    check_invalid("s CONTAINS null", expected=SyntaxException)
+                    check_invalid("s CONTAINS KEY 123", expected=SyntaxException)
 
     @since('2.1.1')
     def test_whole_map_conditional(self):
@@ -4637,13 +4650,10 @@ class TestCQL(UpgradeTester):
                 check_applies("m <= {'z': 'z'}")
                 check_applies("m != {'a': 'a'}")
                 check_applies("m IN (null, {'a': 'a'}, {'foo': 'bar'})")
-                check_applies("m CONTAINS 'bar'")
-                check_applies("m CONTAINS KEY 'foo'")
 
                 # multiple conditions
                 check_applies("m > {'a': 'a'} AND m < {'z': 'z'}")
                 check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
-                check_applies("m CONTAINS 'bar' AND m CONTAINS KEY 'foo'")
 
                 def check_does_not_apply(condition):
                     assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
@@ -4659,8 +4669,6 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m IN ({'a': 'a'}, null)")
                 check_does_not_apply("m IN ()")
                 check_does_not_apply("m = null AND m != null")
-                check_does_not_apply("m CONTAINS 'foo'")
-                check_does_not_apply("m CONTAINS KEY 'bar'")
 
                 def check_invalid(condition, expected=InvalidRequest):
                     assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
@@ -4671,9 +4679,21 @@ class TestCQL(UpgradeTester):
                 check_invalid("m = {null: 'a'}")
                 check_invalid("m < null")
                 check_invalid("m IN null", expected=SyntaxException)
-                check_invalid("m CONTAINS null", expected=InvalidRequest)
-                check_invalid("m CONTAINS KEY null", expected=InvalidRequest)
 
+                # @jira_ticket CASSANDRA-10537
+                if self.get_node_version(is_upgraded) >= LooseVersion(CASSANDRA_4_1):
+                    check_applies("m CONTAINS 'bar'")
+                    check_applies("m CONTAINS KEY 'foo'")
+                    check_applies("m CONTAINS 'bar' AND m CONTAINS KEY 'foo'")
+                    check_does_not_apply("m CONTAINS 'foo'")
+                    check_does_not_apply("m CONTAINS KEY 'bar'")
+                    check_invalid("m CONTAINS null")
+                    check_invalid("m CONTAINS KEY null")
+                else:
+                    check_invalid("m CONTAINS 'bar'", expected=SyntaxException)
+                    check_invalid("m CONTAINS KEY 'foo'", expected=SyntaxException)
+                    check_invalid("m CONTAINS null", expected=SyntaxException)
+                    check_invalid("m CONTAINS KEY null", expected=SyntaxException)
 
     @since('2.1')
     def test_map_item_conditional(self):
