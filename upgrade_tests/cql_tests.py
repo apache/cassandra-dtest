@@ -4342,7 +4342,6 @@ class TestCQL(UpgradeTester):
 
         for is_upgraded, cursor in self.do_upgrade(cursor):
             logger.debug("Querying {} node".format("upgraded" if is_upgraded else "old"))
-            logger.debug("Current version of {is_upgraded} node: {v} ".format(is_upgraded="upgraded" if is_upgraded else "old", v=self.get_node_version(is_upgraded)))
             cursor.execute("TRUNCATE tlist")
             cursor.execute("TRUNCATE frozentlist")
 
@@ -5455,3 +5454,4 @@ for spec in specs:
     if not upgrade_applies_to_env:
         add_skip(cls, 'test not applicable to env.')
     globals()[gen_class_name] = cls
+    
