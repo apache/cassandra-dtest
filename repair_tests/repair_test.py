@@ -757,11 +757,10 @@ class TestRepair(BaseRepairTest):
         node1, node2, node3, node4 = cluster.nodelist()
         session = self.patient_cql_connection(node1)
         session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1, 'dc3':1}")
-        session.execute("USE ks")
         if cluster.version() < '4.0':
-            create_cf(session, 'cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
+            create_cf(session, 'ks.cf', read_repair=0.0, columns={'c1': 'text', 'c2': 'text'})
         else:
-            create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+            create_cf(session, 'ks.cf', columns={'c1': 'text', 'c2': 'text'})
 
         # Insert 1000 keys, kill node 2, insert 1 key, restart node 2, insert 1000 more keys
         logger.debug("Inserting data...")
