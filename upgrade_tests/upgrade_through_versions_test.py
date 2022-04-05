@@ -15,7 +15,7 @@ from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from queue import Empty, Full
 
-from cassandra import ConsistencyLevel, WriteTimeout
+from cassandra import ConsistencyLevel, WriteTimeout, DriverException
 from cassandra.query import SimpleStatement
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
@@ -77,6 +77,14 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
             session.execute(prepared, (val, key))
 
             to_verify_queue.put((key, val,))
+        except DriverException as dex:
+            if "ID mismatch while trying to reprepare" in str(dex):
+                time.sleep(1)  # Pstmnt id mismatch, retry. See CASSANDRA-15252/17140
+                continue
+            else:
+                logger.error("Error in data writer process!", dex)
+                shutdown_gently()
+                raise
         except Exception as ex:
             logger.error("Error in data writer process!", ex)
             shutdown_gently()
@@ -126,6 +134,14 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
             time.sleep(1)  # let's not eat CPU if the queue is empty
             logger.info("to_verify_queue is empty: %d" % to_verify_queue.qsize())
             continue
+        except DriverException as dex:
+            if "ID mismatch while trying to reprepare" in str(dex):
+                time.sleep(1)  # Pstmnt id mismatch, retry. See CASSANDRA-15252/17140
+                continue
+            else:
+                logger.error("Error in data checker process!", dex)
+                shutdown_gently()
+                raise
         except Exception as ex:
             logger.error("Error in data checker process!", ex)
             shutdown_gently()
