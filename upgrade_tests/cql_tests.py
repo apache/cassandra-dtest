@@ -4351,8 +4351,13 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table))
 
                 def check_applies(condition):
+                    # UPDATE statement
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True], cl=self.CL)
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True], cl=self.CL)
+                    assert_none(cursor, "SELECT * FROM {}".format(table))  # read back at default cl.one
+                    cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table))
 
                 check_applies("l = ['foo', 'bar', 'foobar']")
                 check_applies("l != ['baz']")
@@ -4367,9 +4372,14 @@ class TestCQL(UpgradeTester):
                 check_applies("l != null AND l IN (['foo', 'bar', 'foobar'])")
 
                 def check_does_not_apply(condition):
+                    # UPDATE statement
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition),
                                [False, ['foo', 'bar', 'foobar']], cl=self.CL)
-                    assert_one(cursor, "SELECT * FROM {}".format((table)), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition),
+                               [False, ['foo', 'bar', 'foobar']], cl=self.CL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])  # read back at default cl.one
 
                 # should not apply
                 check_does_not_apply("l = ['baz']")
@@ -4386,7 +4396,11 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("l > ['zzz'] AND l < ['zzz']")
 
                 def check_invalid(condition, expected=InvalidRequest):
+                    # UPDATE statement
                     assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']], cl=self.CL)
+                    # DELETE statement
+                    assert_invalid(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), expected=expected)
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']], cl=self.CL)
 
                 check_invalid("l = [null]")
@@ -4475,11 +4489,17 @@ class TestCQL(UpgradeTester):
 
                 table = "frozentlist" if frozen else "tlist"
 
-                cursor.execute("INSERT INTO %s(k, l) VALUES (0, ['foo', 'bar', 'foobar'])" % (table,))
+                cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table,))
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, ['foo', 'bar', 'foobar']])
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_none(cursor, "SELECT * FROM {}".format(table,), cl=ConsistencyLevel.SERIAL)
+                    cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table,))
+
 
                 check_applies("l[1] < 'zzz'")
                 check_applies("l[1] <= 'bar'")
@@ -4495,8 +4515,12 @@ class TestCQL(UpgradeTester):
                 check_applies("l[3] IN (null, 'xxx', 'bar')")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition), [False, ['foo', 'bar', 'foobar']])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [False, ['foo', 'bar', 'foobar']])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [False, ['foo', 'bar', 'foobar']])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])
 
                 check_does_not_apply("l[1] < 'aaa'")
                 check_does_not_apply("l[1] <= 'aaa'")
@@ -4512,8 +4536,12 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("l[3] = 'xxx'")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, ['foo', 'bar', 'foobar']])
+                    # UPDATE statement
+                    assert_invalid(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])
+                    # DELETE statement
+                    assert_invalid(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])
 
                 check_invalid("l[1] < null")
                 check_invalid("l[1] <= null")
@@ -4550,11 +4578,16 @@ class TestCQL(UpgradeTester):
             for frozen in (False, True):
 
                 table = "frozentset" if frozen else "tset"
-                assert_one(cursor, "INSERT INTO %s(k, s) VALUES (0, {'bar', 'foo'}) IF NOT EXISTS" % (table,), [True])
+                assert_one(cursor, "INSERT INTO {}(k, s) VALUES (0, {{'bar', 'foo'}}) IF NOT EXISTS".format(table), [True])
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, set(['bar', 'foo'])], cl=ConsistencyLevel.SERIAL)
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET s = {{'bar', 'foo'}} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_none(cursor, "SELECT * FROM {}".format(table), cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "INSERT INTO {}(k, s) VALUES (0, {{'bar', 'foo'}}) IF NOT EXISTS".format(table), [True])
 
                 check_applies("s = {'bar', 'foo'}")
                 check_applies("s = {'foo', 'bar'}")
@@ -4570,9 +4603,14 @@ class TestCQL(UpgradeTester):
                 check_applies("s IN (null, {'bar', 'foo'}, {'a'}) AND s IN ({'a'}, {'bar', 'foo'}, null)")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition),
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET s = {{'bar', 'foo'}} WHERE k=0 IF {}".format(table, condition),
                                [False, {'bar', 'foo'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition),
+                               [False, {'bar', 'foo'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
 
                 # should not apply
                 check_does_not_apply("s = {'baz'}")
@@ -4586,8 +4624,12 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("s != null AND s IN ()")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET s = {'bar', 'foo'} WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
+                    # UPDATE statement
+                    assert_invalid(cursor, "UPDATE {} SET s = {{'bar', 'foo'}} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_invalid(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'bar', 'foo'}], cl=ConsistencyLevel.SERIAL)
 
                 check_invalid("s = {null}")
                 check_invalid("s < null")
@@ -4639,8 +4681,13 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO %s(k, m) VALUES (0, {'foo' : 'bar'})" % (table,))
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_none(cursor, "SELECT * FROM {}".format(table), cl=ConsistencyLevel.SERIAL)
+                    cursor.execute("INSERT INTO {}(k, m) VALUES (0, {{'foo' : 'bar'}})".format(table))
 
                 check_applies("m = {'foo': 'bar'}")
                 check_applies("m > {'a': 'a'}")
@@ -4655,8 +4702,12 @@ class TestCQL(UpgradeTester):
                 check_applies("m != null AND m IN (null, {'a': 'a'}, {'foo': 'bar'})")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 # should not apply
                 check_does_not_apply("m = {'a': 'a'}")
@@ -4670,8 +4721,12 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m = null AND m != null")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
-                    assert_one(cursor, "SELECT * FROM %s" % (table,), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # UPDATE statement
+                    assert_invalid(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_invalid(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_invalid("m = {null: null}")
                 check_invalid("m = {'a': null}")
@@ -4766,8 +4821,13 @@ class TestCQL(UpgradeTester):
                 cursor.execute("INSERT INTO %s (k, m) VALUES (0, {'foo' : 'bar'})" % table)
 
                 def check_applies(condition):
-                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [True])
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), [True])
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
+                    assert_none(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    cursor.execute("INSERT INTO {} (k, m) VALUES (0, {{'foo' : 'bar'}})".format(table))
 
                 check_applies("m['xxx'] = null")
                 check_applies("m['foo'] < 'zzz'")
@@ -4783,7 +4843,11 @@ class TestCQL(UpgradeTester):
                 check_applies("m['foo'] < 'zzz' AND m['foo'] > 'aaa'")
 
                 def check_does_not_apply(condition):
-                    assert_one(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), [False, {'foo': 'bar'}])
+                    # UPDATE statement
+                    assert_one(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    # DELETE statement
+                    assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [False, {'foo': 'bar'}])
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
 
                 check_does_not_apply("m['foo'] < 'aaa'")
@@ -4797,7 +4861,11 @@ class TestCQL(UpgradeTester):
                 check_does_not_apply("m['foo'] != null AND m['foo'] = null")
 
                 def check_invalid(condition, expected=InvalidRequest):
-                    assert_invalid(cursor, "UPDATE %s SET m = {'foo': 'bar'} WHERE k=0 IF %s" % (table, condition), expected=expected)
+                    # UPDATE statement
+                    assert_invalid(cursor, "UPDATE {} SET m = {{'foo': 'bar'}} WHERE k=0 IF {}".format(table, condition), expected=expected)
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}])
+                    # DELETE statement
+                    assert_invalid(cursor, "DELETE FROM {} WHERE k=0 IF  {}".format(table, condition), expected=expected)
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}])
 
                 check_invalid("m['foo'] < null")
