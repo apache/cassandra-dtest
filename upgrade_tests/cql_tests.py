@@ -4494,10 +4494,10 @@ class TestCQL(UpgradeTester):
                 def check_applies(condition):
                     # UPDATE statement
                     assert_one(cursor, "UPDATE {} SET l = ['foo', 'bar', 'foobar'] WHERE k=0 IF {}".format(table, condition), [True])
-                    assert_one(cursor, "SELECT * FROM {}".format(table,), [0, ['foo', 'bar', 'foobar']])
+                    assert_one(cursor, "SELECT * FROM {}".format(table), [0, ['foo', 'bar', 'foobar']])
                     # DELETE statement
                     assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
-                    assert_none(cursor, "SELECT * FROM {}".format(table,), cl=ConsistencyLevel.SERIAL)
+                    assert_none(cursor, "SELECT * FROM {}".format(table), cl=ConsistencyLevel.SERIAL)
                     cursor.execute("INSERT INTO {}(k, l) VALUES (0, ['foo', 'bar', 'foobar'])".format(table,))
 
 
@@ -4826,7 +4826,7 @@ class TestCQL(UpgradeTester):
                     assert_one(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
                     # DELETE statement
                     assert_one(cursor, "DELETE FROM {} WHERE k=0 IF {}".format(table, condition), [True])
-                    assert_none(cursor, "SELECT * FROM {}".format(table), [0, {'foo': 'bar'}], cl=ConsistencyLevel.SERIAL)
+                    assert_none(cursor, "SELECT * FROM {}".format(table), cl=ConsistencyLevel.SERIAL)
                     cursor.execute("INSERT INTO {} (k, m) VALUES (0, {{'foo' : 'bar'}})".format(table))
 
                 check_applies("m['xxx'] = null")
