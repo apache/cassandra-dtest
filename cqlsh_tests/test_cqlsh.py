@@ -926,6 +926,13 @@ CREATE FUNCTION test.some_function(arg int)
     LANGUAGE java
     AS $$ return arg;
     $$"""
+        create_function_if_not_exists_statement = """
+CREATE FUNCTION IF NOT EXISTS test.some_function(arg int)
+    RETURNS NULL ON NULL INPUT
+    RETURNS int
+    LANGUAGE java
+    AS $$ return arg;
+    $$"""
         create_aggregate_dependencies_statement = """
 CREATE OR REPLACE FUNCTION test.average_state(state tuple<int,bigint>, val int)
     CALLED ON NULL INPUT
@@ -962,7 +969,9 @@ CREATE OR REPLACE AGGREGATE test.average(int)
         self.execute(cql=create_function_statement)
 
         # describe scalar functions
-        if self.cluster.version() >= LooseVersion('3.0'):
+        if self.cluster.version() >= LooseVersion('4.1'):
+            expected_output = create_function_if_not_exists_statement + ';'
+        elif self.cluster.version() >= LooseVersion('3.0'):
             expected_output = create_function_statement + ';'
         else:
             expected_output = create_function_statement
@@ -977,6 +986,15 @@ CREATE OR REPLACE AGGREGATE test.average(int)
             self.execute(cql='DESCRIBE AGGREGATE test.average', expected_output=self.get_describe_aggregate_output())
 
     def get_describe_aggregate_output(self):
+        if self.cluster.version() >= LooseVersion('4.1'):
+            return """
+                CREATE AGGREGATE IF NOT EXISTS test.average(int)
+                    SFUNC average_state
+                    STYPE tuple<int, bigint>
+                    FINALFUNC average_final
+                    INITCOND (0, 0);
+                """
+
         if self.cluster.version() >= LooseVersion("4.0"):
             return """
                 CREATE AGGREGATE test.average(int)
@@ -1021,6 +1039,19 @@ CREATE OR REPLACE AGGREGATE test.average(int)
         self.cluster.start()
 
         create_ks_statement = "CREATE KEYSPACE test WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor' : 1}"
+
+        create_if_not_exists_name_type_statement = """
+CREATE TYPE IF NOT EXISTS test.name_type (
+    firstname text,
+    lastname text
+)"""
+        create_if_not_exists_address_type_statement = """
+CREATE TYPE IF NOT EXISTS test.address_type (
+    name frozen<name_type>,
+    number int,
+    street text,
+    phones set<text>
+)"""
         create_name_type_statement = """
 CREATE TYPE test.name_type (
     firstname text,
@@ -1050,7 +1081,10 @@ CREATE TYPE test.address_type (
                 )"""
 
         # DESCRIBE user defined types
-        if self.cluster.version() >= LooseVersion('3.0'):
+        if self.cluster.version() >= LooseVersion('4.1'):
+            expected_create_name_type_statement = create_if_not_exists_name_type_statement + ';'
+            expected_create_address_type_statement = create_if_not_exists_address_type_statement + ';'
+        elif self.cluster.version() >= LooseVersion('3.0'):
             expected_create_name_type_statement = create_name_type_statement + ';'
             expected_create_address_type_statement = create_address_type_statement + ';'
         else:
@@ -1074,7 +1108,10 @@ CREATE TYPE test.address_type (
         describe_cmd = 'USE ks; DESCRIBE map'
         out, err = self.run_cqlsh(node, describe_cmd)
         assert "" == err
-        assert "CREATE TABLE ks.map (" in out
+        if self.cluster.version() >= LooseVersion('4.1'):
+            assert "CREATE TABLE IF NOT EXISTS ks.map (" in out
+        else:
+            assert "CREATE TABLE ks.map (" in out
 
     @since('3.0')
     def test_describe_mv(self):
@@ -1108,27 +1145,51 @@ CREATE TYPE test.address_type (
         self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
 
     def get_keyspace_output(self):
-        return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
-                self.get_test_table_output(),
-                self.get_users_table_output()]
+        if self.cluster.version() >= LooseVersion('4.1'):
+            return ["CREATE KEYSPACE IF NOT EXISTS test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
+                    self.get_test_table_output(),
+                    self.get_users_table_output()]
+        else:
+            return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
+                    self.get_test_table_output(),
+                    self.get_users_table_output()] 
+          
 
     def get_test_table_output(self, has_val=True, has_val_idx=True):
         create_table = None
-        if has_val:
-            create_table = """
-                CREATE TABLE test.test (
-                    id int,
-                    col int,
-                    val text,
-                PRIMARY KEY (id, col)
-                """
+
+        if self.cluster.version() >= LooseVersion('4.1'):
+            if has_val:
+                create_table = """
+                    CREATE TABLE IF NOT EXISTS test.test (
+                        id int,
+                        col int,
+                        val text,
+                    PRIMARY KEY (id, col)
+                    """
+            else:
+                create_table = """
+                    CREATE TABLE IF NOT EXISTS test.test (
+                        id int,
+                        col int,
+                    PRIMARY KEY (id, col)
+                    """
         else:
-            create_table = """
-                CREATE TABLE test.test (
-                    id int,
-                    col int,
-                PRIMARY KEY (id, col)
-                """
+            if has_val:
+                create_table = """
+                    CREATE TABLE test.test (
+                        id int,
+                        col int,
+                        val text,
+                    PRIMARY KEY (id, col)
+                    """
+            else:
+                create_table = """
+                    CREATE TABLE test.test (
+                        id int,
+                        col int,
+                    PRIMARY KEY (id, col)
+                    """
 
         if self.cluster.version() >= LooseVersion('4.0'):
             create_table += """
@@ -1215,7 +1276,31 @@ CREATE TYPE test.address_type (
         myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
         create_table = None
 
-        if self.cluster.version() >= LooseVersion('4.0'):
+        if self.cluster.version() >= LooseVersion('4.1'):
+           create_table = """
+        CREATE TABLE IF NOT EXISTS test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH additional_write_policy = '99p'
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND cdc = false
+            AND comment = ''
+            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND crc_check_chance = 1.0
+            AND default_time_to_live = 0
+            AND extensions = {}
+            AND gc_grace_seconds = 864000
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair = 'BLOCKING'
+            AND speculative_retry = '99p';
+        """
+        elif self.cluster.version() >= LooseVersion('4.0'):
             create_table = """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
@@ -1317,9 +1402,36 @@ CREATE TYPE test.address_type (
                 pass
             else:
                 index = index[1:-1]
-        return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+        if self.cluster.version() >= LooseVersion('4.1'):
+            return "CREATE INDEX IF NOT EXISTS {} ON {}.{} ({});".format(index, ks, table, col)
+        else:
+            return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
     def get_users_by_state_mv_output(self):
+        if self.cluster.version() >= LooseVersion('4.1'):
+            return """
+                CREATE MATERIALIZED VIEW IF NOT EXISTS test.users_by_state AS
+                SELECT *
+                FROM test.users
+                WHERE state IS NOT NULL AND username IS NOT NULL
+                PRIMARY KEY (state, username)
+                WITH CLUSTERING ORDER BY (username ASC)
+                AND additional_write_policy = '99p'
+                AND bloom_filter_fp_chance = 0.01
+                AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+                AND cdc = false
+                AND comment = ''
+                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+                AND crc_check_chance = 1.0
+                AND extensions = {}
+                AND gc_grace_seconds = 864000
+                AND max_index_interval = 2048
+                AND memtable_flush_period_in_ms = 0
+                AND min_index_interval = 128
+                AND read_repair = 'BLOCKING'
+                AND speculative_retry = '99p';
+               """
         if self.cluster.version() >= LooseVersion('4.0'):
             return """
                 CREATE MATERIALIZED VIEW test.users_by_state AS
@@ -1715,7 +1827,17 @@ CREATE TYPE test.address_type (
     1 |           1 |                    1 |      1 |    1
 """)
 
-        self.verify_output("DESCRIBE TABLE int_checks.values", node1, """
+        if self.cluster.version() >= ('4.1'):
+            self.verify_output("DESCRIBE TABLE int_checks.values", node1, """
+CREATE TABLE IF NOT EXISTS int_checks.values (
+    part text PRIMARY KEY,
+    val1 int,
+    val2 bigint,
+    val3 smallint,
+    val4 tinyint
+""")
+        else:
+             self.verify_output("DESCRIBE TABLE int_checks.values", node1, """
 CREATE TABLE int_checks.values (
     part text PRIMARY KEY,
     val1 int,
@@ -1805,7 +1927,15 @@ CREATE TABLE datetime_checks.values (
  2015-05-14 | 16:30:00.555555555
 """)
 
-        self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
+        if self.cluster.version() >= ('4.1'):
+          self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
+CREATE TABLE IF NOT EXISTS datetime_checks.values (
+    d date,
+    t time,
+    PRIMARY KEY (d, t)
+""")
+        else:
+          self.verify_output("DESCRIBE TABLE datetime_checks.values", node1, """
 CREATE TABLE datetime_checks.values (
     d date,
     t time,
@@ -2337,7 +2467,7 @@ class TestCqlshSmoke(Tester, CqlshMixin):
             terminator="")
         out, err, _ = self.node1.run_cqlsh("DESCRIBE KEYSPACE ks; // post-line comment")
         assert err == ""
-        assert out.strip().startswith("CREATE KEYSPACE ks")
+        assert out.strip().startswith("CREATE KEYSPACE IF NOT EXISTS ks")
 
     def test_colons_in_string_literals(self):
         create_ks(self.session, 'ks', 1)
