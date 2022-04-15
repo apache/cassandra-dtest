@@ -104,18 +104,18 @@ class TestGossip(Tester):
         # Add dc1 nodes
         node1 = self._cluster_create_node(1)
         cluster.add(node1, True, data_center='dc1')
-        node1.start()
+        node1.start(wait_for_binary_proto=True)
         node2 = self._cluster_create_node(2)
         cluster.add(node2, False, data_center='dc1')
-        node2.start()
+        node2.start(wait_for_binary_proto=True)
 
         # Add dc2 nodes
         node3 = self._cluster_create_node(3)
         cluster.add(node3, True, data_center='dc2')
-        node3.start()
+        node3.start(wait_for_binary_proto=True)
         node4 = self._cluster_create_node(4)
         cluster.add(node4, False, data_center='dc2')
-        node4.start()
+        node4.start(wait_for_binary_proto=True)
 
         # Stop cluster
         for node in cluster.nodelist():
