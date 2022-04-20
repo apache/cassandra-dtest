@@ -244,7 +244,7 @@ class TestArchiveCommitlog(SnapshotTester):
         """
         Copy the active commitlogs to the archive directory before restoration
         """
-        self.run_archive_commitlog(restore_point_in_time=False, archive_active_commitlogs=True)
+        self.run_archive_commitlog(restore_point_in_time=False)
 
     def test_dont_archive_commitlog(self):
         """
@@ -258,19 +258,20 @@ class TestArchiveCommitlog(SnapshotTester):
         """
         self.run_archive_commitlog(restore_point_in_time=True)
 
-    def test_archive_commitlog_point_in_time_with_active_commitlog(self):
+    def test_archive_commitlog_point_in_time_ln(self):
         """
         Test archive commit log with restore_point_in_time setting
         """
-        self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True)
+        self.run_archive_commitlog(restore_point_in_time=True, archive_command='ln')
 
-    def test_archive_commitlog_point_in_time_with_active_commitlog_ln(self):
+    @since('4.1')
+    def test_archive_commitlog_restore_skip_by_position(self):
         """
-        Test archive commit log with restore_point_in_time setting
+        Test archive commit log not restored because of specified snapshot commit log position
         """
-        self.run_archive_commitlog(restore_point_in_time=True, archive_active_commitlogs=True, archive_command='ln')
+        self.run_archive_commitlog(restore_point_in_time=True, specify_commitlog_position=True, archive_command='ln')
 
-    def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, archive_active_commitlogs=False, archive_command='cp'):
+    def run_archive_commitlog(self, restore_point_in_time=False, restore_archived_commitlog=True, specify_commitlog_position=False, archive_command='cp'):
         """
         Run archive commit log restoration test
         """
@@ -430,6 +431,11 @@ class TestArchiveCommitlog(SnapshotTester):
                     replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
                                     [(r'^restore_point_in_time=.*$', 'restore_point_in_time={restore_time}'.format(restore_time=restore_time))])
 
+                if specify_commitlog_position:
+                    # specify a high commit log position to skip replaying any commit log data
+                    replace_in_file(os.path.join(node1.get_path(), 'conf', 'commitlog_archiving.properties'),
+                                    [(r'^snapshot_commitlog_position=.*$', 'snapshot_commitlog_position={cl_position}'.format(cl_position="9223372036854775807, 0"))])
+
             logger.debug("Restarting node1..")
             node1.stop()
             node1.start(wait_for_binary_proto=True)
@@ -441,7 +447,7 @@ class TestArchiveCommitlog(SnapshotTester):
             rows = session.execute('SELECT count(*) from ks.cf')
             # Now we should have 30000 rows from the snapshot + 30000 rows
             # from the commitlog backups:
-            if not restore_archived_commitlog:
+            if not restore_archived_commitlog or specify_commitlog_position:
                 assert rows[0][0] == 30000
             elif restore_point_in_time:
                 assert rows[0][0] == 60000
