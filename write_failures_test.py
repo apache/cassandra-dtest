@@ -238,7 +238,7 @@ def assert_write_failure(session, query, consistency_level):
         session.execute(statement)
 
 
-@since('3.0')
+@since('3.0', max_version='4.0.x')
 class TestMultiDCWriteFailures(Tester):
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
