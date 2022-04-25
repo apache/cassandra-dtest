@@ -785,13 +785,13 @@ VALUES (4, blobAsInt(0x), '', blobAsBigint(0x), 0x, blobAsBoolean(0x), blobAsDec
 
         if self.cluster.version() >= LooseVersion('2.2'):
             self.verify_output("LIST ALL PERMISSIONS OF user1", node1, """
- role  | username | resource      | permission
--------+----------+---------------+------------
- user1 |    user1 | <table ks.t1> |      ALTER
- user1 |    user1 | <table ks.t1> |       DROP
- user1 |    user1 | <table ks.t1> |     SELECT
- user1 |    user1 | <table ks.t1> |     MODIFY
- user1 |    user1 | <table ks.t1> |  AUTHORIZE
+ role  | username | resource      | permission | granted | restricted | grantable
+-------+----------+---------------+------------+---------+------------+-----------
+ user1 |    user1 | <table ks.t1> |      ALTER |    True |      False |     False
+ user1 |    user1 | <table ks.t1> |       DROP |    True |      False |     False
+ user1 |    user1 | <table ks.t1> |     SELECT |    True |      False |     False
+ user1 |    user1 | <table ks.t1> |     MODIFY |    True |      False |     False
+ user1 |    user1 | <table ks.t1> |  AUTHORIZE |    True |      False |     False
 
 (5 rows)
 """)
