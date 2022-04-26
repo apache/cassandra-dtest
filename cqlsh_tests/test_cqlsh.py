@@ -2253,7 +2253,7 @@ Tracing session:""")
 
             with NamedTemporaryFile(mode='wt') as credentialsfile:
                 # Ensure the credentials file specified in the command line options is used
-                credentialsfile.write('[plain_text_auth]\nusername=cassandra\npassword=cassandra\n')
+                credentialsfile.write('[PlainTextAuthProvider]\nusername=cassandra\npassword=cassandra\n')
                 credentialsfile.flush()
                 os.chmod(credentialsfile.name, stat.S_IRUSR | stat.S_IWUSR)
                 cqlsh_options = ['--credentials', credentialsfile.name]
