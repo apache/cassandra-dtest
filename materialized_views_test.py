@@ -712,7 +712,7 @@ class TestMaterializedViews(Tester):
                     assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
 
         node4 = new_node(self.cluster, data_center="dc1")
-        node4.set_configuration_options(values={'max_mutation_size_in_kb': 20})  # CASSANDRA-11670
+        node4.set_configuration_options(values={'max_mutation_size_in_kb': 25})  # CASSANDRA-11670
         logger.debug("Start join at {}".format(time.strftime("%H:%M:%S")))
         node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
@@ -765,7 +765,7 @@ class TestMaterializedViews(Tester):
                 assert_one(session, "SELECT * FROM t_by_v WHERE id = {} and v = {}".format(i, j), [j, i])
 
         node4 = new_node(self.cluster, data_center="dc1")
-        node4.set_configuration_options(values={'max_mutation_size_in_kb': 20})  # CASSANDRA-11670
+        node4.set_configuration_options(values={'max_mutation_size_in_kb': 25})  # CASSANDRA-11670
         logger.debug("Start join at {}".format(time.strftime("%H:%M:%S")))
         node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
 
