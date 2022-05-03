@@ -218,7 +218,7 @@ class TestTopology(Tester):
         self.fixture_dtest_setup.ignore_log_patterns = [r'Streaming error occurred',
                                                         r'Error while decommissioning node',
                                                         r'Remote peer 127.0.0.2 failed stream session',
-                                                        r'Remote peer 127.0.0.2:7000 failed stream session']
+                                                        r'Remote peer \/?127.0.0.2:7000 failed stream session']
         cluster = self.cluster
         cluster.set_configuration_options(values={'stream_throughput_outbound_megabits_per_sec': 1})
         cluster.populate(3, install_byteman=True).start()

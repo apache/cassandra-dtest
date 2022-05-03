@@ -44,13 +44,18 @@ def retry_till_success(fun, *args, **kwargs):
                 # brief pause before next attempt
                 time.sleep(0.25)
 
+def default_ignore_log_patterns():
+    # to allow tests to append to the list, make sure to create a new list as the output
+    # to this function, else multiple tests could corrupt the default set
+    return ['.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer']
+
 
 class DTestSetup(object):
     def __init__(self, dtest_config=None, setup_overrides=None, cluster_name="test"):
         self.dtest_config = dtest_config
         self.setup_overrides = setup_overrides
         self.cluster_name = cluster_name
-        self.ignore_log_patterns = []
+        self._ignore_log_patterns = default_ignore_log_patterns()
         self.cluster = None
         self.cluster_options = []
         self.replacement_node = None
@@ -71,6 +76,23 @@ class DTestSetup(object):
         self.jvm_args = []
         self.create_cluster_func = None
         self.iterations = 0
+
+    def set_ignore_log_patterns(self, other):
+        if self._ignore_log_patterns == None:
+            self._ignore_log_patterns = default_ignore_log_patterns()
+        # iteration is used here to allow [] and () patterns to work... anything iterable is allowed
+        for a in other:
+            self._ignore_log_patterns.append(a)
+
+    def get_ignore_log_patterns(self):
+        if self._ignore_log_patterns == None:
+            self._ignore_log_patterns = default_ignore_log_patterns()
+        return self._ignore_log_patterns
+
+    def del_ignore_log_patterns(self):
+        del self._ignore_log_patterns
+
+    ignore_log_patterns = property(get_ignore_log_patterns, set_ignore_log_patterns, del_ignore_log_patterns)
 
     def get_test_path(self):
         test_path = tempfile.mkdtemp(prefix='dtest-')
@@ -289,11 +311,9 @@ class DTestSetup(object):
 
     def __filter_errors(self, errors):
         """Filter errors, removing those that match self.ignore_log_patterns"""
-        if not hasattr(self, 'ignore_log_patterns'):
-            self.ignore_log_patterns = []
         for e in errors:
             for pattern in self.ignore_log_patterns:
-                if re.search(pattern, e):
+                if re.search(pattern, e) or re.search(pattern, e.replace('\n', ' ')):
                     break
             else:
                 yield e
