@@ -219,15 +219,16 @@ def fixture_log_test_name_and_date(request, fixture_logging_setup):
 def _filter_errors(dtest_setup, errors):
     """Filter errors, removing those that match ignore_log_patterns in the current DTestSetup"""
     for e in errors:
+        e = repr(e)
         for pattern in dtest_setup.ignore_log_patterns:
-            if re.search(pattern, repr(e)):
+            if re.search(pattern, e) or re.search(pattern, e.replace('\n', ' ')):
                 break
         else:
             yield e
 
 
 def check_logs_for_errors(dtest_setup):
-    errors = []
+    all_errors = []
     for node in dtest_setup.cluster.nodelist():
         if not os.path.exists(node.logfilename()):
             continue
@@ -240,11 +241,8 @@ def check_logs_for_errors(dtest_setup):
                     error_str = error.strip()
 
                 if error_str:
-                    logger.error("Unexpected error in {node_name} log, error: \n{error}"
-                                 .format(node_name=node.name, error=error_str))
-                    errors.append(error_str)
-                    break
-    return errors
+                    all_errors.append("[{node_name}] {error}".format(node_name=node.name, error=error_str))
+    return all_errors
 
 
 def copy_logs(request, cluster, directory=None, name=None):

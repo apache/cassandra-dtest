@@ -1267,7 +1267,8 @@ class TestRepair(BaseRepairTest):
             "Sync failed between .* and .*",
             "failed to send a stream message/file to peer",
             "failed to send a stream message/data to peer",
-            "Remote peer .* failed stream session"
+            "Remote peer .* failed stream session",
+            "org.apache.cassandra.repair.SomeRepairFailedException: null"
         ]
 
         # stream session will be closed upon EOF, see CASSANDRA-15666
