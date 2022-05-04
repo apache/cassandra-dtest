@@ -522,3 +522,30 @@ class TestNodetool(Tester):
         out, err, _ = nodetool(node2)
         assert_stderr_clean(err)
         assert warning not in out
+
+    def test_ipv4_ipv6_host(self):
+        """
+        Test that both ipv4 and ipv6 hosts are accepted by nodetool
+        """
+        cluster = self.cluster
+        cluster.populate(1)
+        cluster.start()
+
+        node = cluster.nodelist()[0]
+        tool = node.get_tool('nodetool')
+        env = node.get_env()
+
+        def nodetool(host):
+            cmd = [tool, '-h', host, '-p', str(node.jmx_port), 'status']
+            p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            return ccmlib.node.handle_external_tool_process(p, cmd)
+
+        # ipv4 should work
+        nodetool('127.0.0.1')
+        # if ipv6 fails, make sure the reason is valid
+        try:
+            nodetool('::1')
+        except ToolError as e:
+            assert any(reason in e.stderr for reason in ("Connection refused", "Protocol family unavailable"))
+
+
