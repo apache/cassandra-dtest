@@ -47,7 +47,10 @@ def retry_till_success(fun, *args, **kwargs):
 def default_ignore_log_patterns():
     # to allow tests to append to the list, make sure to create a new list as the output
     # to this function, else multiple tests could corrupt the default set
-    return ['.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer']
+    return [
+            '.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer',
+            'failed: Connection reset by peer',
+            ]
 
 
 class DTestSetup(object):
