@@ -1399,22 +1399,41 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 3, 1])
 
         # user provided ttl
+        start = time.time()
         self.update_view(session, "UPDATE t USING TTL 50 SET a = 4 WHERE k = 1", flush)
-        assert_one(session, "SELECT * FROM t", [1, 4, 1])
-        assert_one(session, "SELECT * FROM mv", [1, 4, 1])
+        try:
+            assert_one(session, "SELECT * FROM t", [1, 4, 1])
+            assert_one(session, "SELECT * FROM mv", [1, 4, 1])
+        except AssertionError as ae:
+            if (time.time() - start) < 50:
+                raise ae
 
+        start = time.time()
         self.update_view(session, "UPDATE t USING TTL 40 SET a = 5 WHERE k = 1", flush)
-        assert_one(session, "SELECT * FROM t", [1, 5, 1])
-        assert_one(session, "SELECT * FROM mv", [1, 5, 1])
+        try:
+            assert_one(session, "SELECT * FROM t", [1, 5, 1])
+            assert_one(session, "SELECT * FROM mv", [1, 5, 1])
+        except AssertionError as ae:
+            if (time.time() - start) < 40:
+                raise ae
 
+        start = time.time()
         self.update_view(session, "UPDATE t USING TTL 30 SET a = 6 WHERE k = 1", flush)
-        assert_one(session, "SELECT * FROM t", [1, 6, 1])
-        assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+        try:
+            assert_one(session, "SELECT * FROM t", [1, 6, 1])
+            assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+        except AssertionError as ae:
+            if (time.time() - start) < 30:
+                raise ae
 
         if flush:
             self.cluster.compact()
-            assert_one(session, "SELECT * FROM t", [1, 6, 1])
-            assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+            try:
+                assert_one(session, "SELECT * FROM t", [1, 6, 1])
+                assert_one(session, "SELECT * FROM mv", [1, 6, 1])
+            except AssertionError as ae:
+                if (time.time() - start) < 30:
+                    raise ae
 
     @flaky
     @since('3.0')
