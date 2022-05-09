@@ -1274,6 +1274,7 @@ class TestRepair(BaseRepairTest):
         if cluster.version() < '4.0':
             # CASSANDRA-17466 was not back ported to 3.x, so ignore the error
             self.fixture_dtest_setup.ignore_log_patterns.append('java.lang.InterruptedException')
+            self.fixture_dtest_setup.ignore_log_patterns.append('java.util.concurrent.CancellationException: Task was cancelled')
 
         # stream session will be closed upon EOF, see CASSANDRA-15666
         if cluster.version() >= '4.0':
