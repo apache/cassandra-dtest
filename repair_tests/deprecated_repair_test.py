@@ -86,7 +86,7 @@ class TestDeprecatedRepairAPI(Tester):
                                    String... columnFamilies)
         """
         self.fixture_dtest_setup.ignore_log_patterns = [
-                'Nothing to repair for (0,1000] in ks - aborting'
+                'Nothing to repair for'
         ]
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,java.util.Collection,java.util.Collection,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, ["dc1"], [], False, ["cf"]])
