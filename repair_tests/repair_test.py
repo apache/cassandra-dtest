@@ -977,7 +977,7 @@ class TestRepair(BaseRepairTest):
         assert len(node.grep_log("in repair1 - unreplicated keyspace is ignored since repair was called with --ignore-unreplicated-keyspaces")) > 0
 
         try:
-            self.fixture_dtest_setup.ignore_log_patterns.append("Nothing to repair for .+ in repair1")
+            self.fixture_dtest_setup.ignore_log_patterns.append("Nothing to repair for .+ in .+")
             node.nodetool("repair -st 0 -et 1")
             assert False, "repair should fail"
         except ToolError:
