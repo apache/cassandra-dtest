@@ -368,6 +368,11 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             r'Exception encountered during startup']
 
+        # see CASSANDRA-17611
+        if self.cluster.version() < '4.0':
+            self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+                r'RejectedExecutionException']
+
         self._setup(n=3)
         node1, node2, node3 = self.cluster.nodelist()
         self.cluster.seeds.append(node3.address())
@@ -401,6 +406,11 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         """
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             r'Exception encountered during startup']
+
+        # see CASSANDRA-17611
+        if self.cluster.version() < '4.0':
+            self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
+                r'RejectedExecutionException']
 
         self._setup(n=3)
         self._insert_data()
