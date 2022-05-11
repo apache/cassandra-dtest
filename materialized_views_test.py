@@ -1400,30 +1400,36 @@ class TestMaterializedViews(Tester):
 
         # user provided ttl
         start = time.time()
-        self.update_view(session, "UPDATE t USING TTL 50 SET a = 4 WHERE k = 1", flush)
+        self.update_view(session, "UPDATE t USING TTL 100 SET a = 4 WHERE k = 1", flush)
         try:
             assert_one(session, "SELECT * FROM t", [1, 4, 1])
             assert_one(session, "SELECT * FROM mv", [1, 4, 1])
         except AssertionError as ae:
-            if (time.time() - start) < 50:
+            if (time.time() - start) > 100:
+                pytest.fail("Please increase the 100 TTL which expired before we could test due to a slow env.")
+            else:
                 raise ae
 
         start = time.time()
-        self.update_view(session, "UPDATE t USING TTL 40 SET a = 5 WHERE k = 1", flush)
+        self.update_view(session, "UPDATE t USING TTL 80 SET a = 5 WHERE k = 1", flush)
         try:
             assert_one(session, "SELECT * FROM t", [1, 5, 1])
             assert_one(session, "SELECT * FROM mv", [1, 5, 1])
         except AssertionError as ae:
-            if (time.time() - start) < 40:
+            if (time.time() - start) > 80:
+                pytest.fail("Please increase the 80 TTL which expired before we could test due to a slow env.")
+            else:
                 raise ae
 
         start = time.time()
-        self.update_view(session, "UPDATE t USING TTL 30 SET a = 6 WHERE k = 1", flush)
+        self.update_view(session, "UPDATE t USING TTL 60 SET a = 6 WHERE k = 1", flush)
         try:
             assert_one(session, "SELECT * FROM t", [1, 6, 1])
             assert_one(session, "SELECT * FROM mv", [1, 6, 1])
         except AssertionError as ae:
-            if (time.time() - start) < 30:
+            if (time.time() - start) > 60:
+                pytest.fail("Please increase the 60 TTL which expired before we could test due to a slow env.")
+            else:
                 raise ae
 
         if flush:
@@ -1432,7 +1438,9 @@ class TestMaterializedViews(Tester):
                 assert_one(session, "SELECT * FROM t", [1, 6, 1])
                 assert_one(session, "SELECT * FROM mv", [1, 6, 1])
             except AssertionError as ae:
-                if (time.time() - start) < 30:
+                if (time.time() - start) > 60:
+                    pytest.fail("Please increase the 60 TTL which expired before we could test due to a slow env.")
+                else:
                     raise ae
 
     @flaky
