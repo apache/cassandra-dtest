@@ -385,7 +385,6 @@ class TestUpgrade(Tester):
                 self._create_schema()
         else:
             logger.debug("Skipping schema creation (should already be built)")
-        time.sleep(5)  # sigh...
 
         self._log_current_ver(self.test_version_metas[0])
 
@@ -546,6 +545,7 @@ class TestUpgrade(Tester):
                 c counter,
                 PRIMARY KEY (k1)
                 );""")
+        session.cluster.control_connection.wait_for_schema_agreement()
 
     def _create_schema(self):
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
@@ -563,6 +563,7 @@ class TestUpgrade(Tester):
                 c counter,
                 PRIMARY KEY (k1, k2)
                 );""")
+        session.cluster.control_connection.wait_for_schema_agreement()
 
     def _write_values(self, num=100):
         session = self.patient_cql_connection(self.node2, protocol_version=self.protocol_version)
