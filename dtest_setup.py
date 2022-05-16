@@ -50,7 +50,10 @@ def default_ignore_log_patterns():
     return [
             '.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer',
             'failed: Connection reset by peer',
-            'Invalid or unsupported protocol version \(5\)'
+            'Invalid or unsupported protocol version \(5\)',
+            # See https://github.com/datastax/python-driver/blob/a7295e103023e12152fc0940906071b18356def3/cassandra/__init__.py#L172-L177
+            'Invalid or unsupported protocol version \(65\)', # DSE_V1
+            'Invalid or unsupported protocol version \(66\)', # DSE_V2
             ]
 
 
