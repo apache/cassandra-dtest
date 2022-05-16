@@ -50,6 +50,7 @@ def default_ignore_log_patterns():
     return [
             '.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer',
             'failed: Connection reset by peer',
+            'Invalid or unsupported protocol version \(5\)'
             ]
 
 
