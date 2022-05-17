@@ -54,7 +54,7 @@ def default_ignore_log_patterns():
             # See https://github.com/datastax/python-driver/blob/a7295e103023e12152fc0940906071b18356def3/cassandra/__init__.py#L172-L177
             'Invalid or unsupported protocol version \(65\)', # DSE_V1
             'Invalid or unsupported protocol version \(66\)', # DSE_V2
-            'Beta version of the protocol used \(.*-beta\), but USE_BETA flag is unset',
+            'Beta version of the protocol used',
             ]
 
 
