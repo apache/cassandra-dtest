@@ -64,7 +64,7 @@ class TestAuth(AbstractTestAuth):
         auth_metadata = UpdatingKeyspaceMetadataWrapper(
             cluster=session.cluster,
             ks_name='system_auth',
-            max_schema_agreement_wait=30  # 3x the default of 10
+            max_schema_agreement_wait=60  # 6x the default of 10
         )
         assert 1 == auth_metadata.replication_strategy.replication_factor
 
