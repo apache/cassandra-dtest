@@ -48,10 +48,10 @@ def default_ignore_log_patterns():
     # to allow tests to append to the list, make sure to create a new list as the output
     # to this function, else multiple tests could corrupt the default set
     return [
-            r'.*\[epollEventLoopGroup-.*\].*- Unknown exception in client networking.*: Connection reset by peer',
             'failed: Connection reset by peer',
             r'Invalid or unsupported protocol version \(5\)',
-            # See https://github.com/datastax/python-driver/blob/a7295e103023e12152fc0940906071b18356def3/cassandra/__init__.py#L172-L177
+            # See python-driver, SHA a7295e103023e12152fc0940906071b18356def3
+            # cassandra/__init__.py
             r'Invalid or unsupported protocol version \(65\)',  # DSE_V1
             r'Invalid or unsupported protocol version \(66\)',  # DSE_V2
             'Beta version of the protocol used',
