@@ -300,6 +300,8 @@ class TestUpgrade(Tester):
             r'Cannot update data center or rack from.*for live host',
             # Normal occurance. See CASSANDRA-12026. Likely won't be needed after C* 4.0.
             r'Unknown column cdc during deserialization',
+            # may occur during 2.2 check for existing roles
+            r'Got slice command for nonexistent table system_auth.roles',
         )
 
     def prepare(self):
