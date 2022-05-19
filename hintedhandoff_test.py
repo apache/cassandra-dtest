@@ -183,7 +183,7 @@ class TestHintedHandoff(Tester):
     @pytest.mark.no_vnodes
     def test_hintedhandoff_decom(self):
         self.fixture_dtest_setup.ignore_log_patterns = [
-                'Could not update repaired ranges.*Giving up'
+            'Could not update repaired ranges.*Giving up'
         ]
         self.cluster.populate(4).start()
         [node1, node2, node3, node4] = self.cluster.nodelist()
