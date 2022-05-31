@@ -85,9 +85,6 @@ class TestDeprecatedRepairAPI(Tester):
                                    Collection<String> hosts, boolean fullRepair,
                                    String... columnFamilies)
         """
-        self.fixture_dtest_setup.ignore_log_patterns = [
-            'Nothing to repair for'
-        ]
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,java.util.Collection,java.util.Collection,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, ["dc1"], [], False, ["cf"]])
         assert opt["parallelism"], "parallel" if is_win() else "sequential" == opt
@@ -125,9 +122,6 @@ class TestDeprecatedRepairAPI(Tester):
                                    boolean isLocal, boolean fullRepair,
                                    String... columnFamilies)
         """
-        self.fixture_dtest_setup.ignore_log_patterns = [
-            'Nothing to repair for'
-        ]
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,boolean,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, True, True, ["cf"]])
         assert opt["parallelism"], "parallel" if is_win() else "sequential" == opt
