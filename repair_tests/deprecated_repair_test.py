@@ -85,6 +85,10 @@ class TestDeprecatedRepairAPI(Tester):
                                    Collection<String> hosts, boolean fullRepair,
                                    String... columnFamilies)
         """
+        # when giving token ranges, there needs to be logic to make sure we have partitions for
+        # those tokens... which self._deprecated_repair_jmx does not do... for this reason most
+        # runs will not actually trigger repair and will abort (we check logging, which will happen
+        # still).
         self.fixture_dtest_setup.ignore_log_patterns = [
             'Nothing to repair for'
         ]
@@ -125,6 +129,10 @@ class TestDeprecatedRepairAPI(Tester):
                                    boolean isLocal, boolean fullRepair,
                                    String... columnFamilies)
         """
+        # when giving token ranges, there needs to be logic to make sure we have partitions for
+        # those tokens... which self._deprecated_repair_jmx does not do... for this reason most
+        # runs will not actually trigger repair and will abort (we check logging, which will happen
+        # still).
         self.fixture_dtest_setup.ignore_log_patterns = [
             'Nothing to repair for'
         ]
