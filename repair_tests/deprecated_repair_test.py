@@ -85,6 +85,13 @@ class TestDeprecatedRepairAPI(Tester):
                                    Collection<String> hosts, boolean fullRepair,
                                    String... columnFamilies)
         """
+        # when giving token ranges, there needs to be logic to make sure we have partitions for
+        # those tokens... which self._deprecated_repair_jmx does not do... for this reason most
+        # runs will not actually trigger repair and will abort (we check logging, which will happen
+        # still).
+        self.fixture_dtest_setup.ignore_log_patterns = [
+            'Nothing to repair for'
+        ]
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,java.util.Collection,java.util.Collection,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, ["dc1"], [], False, ["cf"]])
         assert opt["parallelism"], "parallel" if is_win() else "sequential" == opt
@@ -122,6 +129,13 @@ class TestDeprecatedRepairAPI(Tester):
                                    boolean isLocal, boolean fullRepair,
                                    String... columnFamilies)
         """
+        # when giving token ranges, there needs to be logic to make sure we have partitions for
+        # those tokens... which self._deprecated_repair_jmx does not do... for this reason most
+        # runs will not actually trigger repair and will abort (we check logging, which will happen
+        # still).
+        self.fixture_dtest_setup.ignore_log_patterns = [
+            'Nothing to repair for'
+        ]
         opt = self._deprecated_repair_jmx("forceRepairRangeAsync(java.lang.String,java.lang.String,java.lang.String,boolean,boolean,boolean,[Ljava.lang.String;)",
                                           ["0", "1000", "ks", True, True, True, ["cf"]])
         assert opt["parallelism"], "parallel" if is_win() else "sequential" == opt

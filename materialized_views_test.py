@@ -342,6 +342,7 @@ class TestMaterializedViews(Tester):
         session = self.prepare(consistency_level=ConsistencyLevel.QUORUM)
 
         session.execute("CREATE TABLE t (id int, v int, PRIMARY KEY (id, v))")
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         for i in range(5):
             for j in range(10000):
@@ -349,6 +350,7 @@ class TestMaterializedViews(Tester):
 
         session.execute(("CREATE MATERIALIZED VIEW t_by_v AS SELECT * FROM t WHERE v IS NOT NULL "
                          "AND id IS NOT NULL PRIMARY KEY (v, id)"))
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         logger.debug("wait for view to build")
         self._wait_for_view("ks", "t_by_v")
