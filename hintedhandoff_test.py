@@ -8,6 +8,7 @@ from cassandra import ConsistencyLevel
 from dtest import Tester, create_ks
 from tools.data import create_c1c2_table, insert_c1c2, query_c1c2
 from tools.assertions import assert_stderr_clean
+from tools.jmxutils import (JolokiaAgent, make_mbean)
 
 since = pytest.mark.since
 ported_to_in_jvm = pytest.mark.ported_to_in_jvm
@@ -215,7 +216,7 @@ class TestHintedHandoff(Tester):
         """
 
         # hint_window_persistent_enabled is set to true by default
-        self.cluster.set_configuration_options({'max_hint_window_in_ms': 5000,
+        self.cluster.set_configuration_options({'max_hint_window_in_ms': 10000,
                                                 'hinted_handoff_enabled': True,
                                                 'max_hints_delivery_threads': 1,
                                                 'hints_flush_period_in_ms': 100, })
@@ -227,16 +228,48 @@ class TestHintedHandoff(Tester):
 
         # Stop handoff until very end and take node2 down for first round of hints
         node1.nodetool('pausehandoff')
+
         node2.nodetool('disablebinary')
+        node2.watch_log_for(["Stop listening for CQL clients"], timeout=120)
+
         node2.nodetool('disablegossip')
+        node2.watch_log_for(["Announcing shutdown", "state jump to shutdown"], timeout=120)
+        node1.watch_log_for(["state jump to shutdown"], timeout=120)
+
+        log_mark_node_1 = node1.mark_log()
+        log_mark_node_2 = node2.mark_log()
+
         # First round of hints. We expect these to be replayed and the only
         # hints within the window
         insert_c1c2(session, n=(0, 100), consistency=ConsistencyLevel.ONE)
+
         # Let hint window pass
-        time.sleep(10)
+        time.sleep(15)
+
         # Re-enable and disable the node. Prior to CASSANDRA-14215 this should make the hint window on node1 reset.
         node2.nodetool('enablegossip')
+        node2.watch_log_for(["state jump to NORMAL"], timeout=120, from_mark=log_mark_node_2)
+        node1.watch_log_for(["state jump to NORMAL"], timeout=120, from_mark=log_mark_node_1)
+
+        log_mark_node_1 = node1.mark_log()
+        log_mark_node_2 = node2.mark_log()
+
         node2.nodetool('disablegossip')
+
+        node2.watch_log_for(["Announcing shutdown", "state jump to shutdown"], timeout=120, from_mark=log_mark_node_2)
+        node1.watch_log_for(["state jump to shutdown"], timeout=120, from_mark=log_mark_node_1)
+
+        log_mark_node_1 = node1.mark_log()
+        log_mark_node_2 = node2.mark_log()
+
+        def endpoint_downtime(node_to_query, node):
+            mbean = make_mbean('net', type='Gossiper')
+            with JolokiaAgent(node_to_query) as jmx:
+                return jmx.execute_method(mbean, 'getEndpointDowntime(java.lang.String)', [node])
+
+        while endpoint_downtime(node1, "127.0.0.2") <= 5000:
+            time.sleep(1)
+
         # Second round of inserts. We do not expect hints to be stored.
         insert_c1c2(session, n=(100, 200), consistency=ConsistencyLevel.ONE)
 
@@ -250,7 +283,10 @@ class TestHintedHandoff(Tester):
 
         # Enable node2 and wait for hints to be replayed
         node2.nodetool('enablegossip')
+        node2.watch_log_for(["state jump to NORMAL"], timeout=120, from_mark=log_mark_node_2)
+
         node2.nodetool('enablebinary')
+        node2.watch_log_for(["Starting listening for CQL clients"], timeout=120, from_mark=log_mark_node_2)
         node1.nodetool('resumehandoff')
         node1.watch_log_for('Finished hinted handoff')
         # Stop node1 so that we only query node2
