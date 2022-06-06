@@ -417,3 +417,28 @@ class TestCounters(Tester):
         for idx in range(0, 5):
             row = list(session.execute("SELECT data from counter_cs where key = {k}".format(k=idx)))
             assert rows_to_list(row)[0][0] == 5
+
+    def test_counter_node_down(self):
+        """
+        @jira_ticket CASSANDRA-17411
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        create_ks(session, 'counter_tests', 3)
+
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS counter_cs (
+                key text PRIMARY KEY,
+                count counter
+            )
+            """)
+
+        node2.stop(gently=False, wait_other_notice=True)
+
+        for _ in range(0, 20):
+            session.execute("UPDATE counter_cs SET count = count + 1 WHERE key = 'test'")
+
+        row = list(session.execute("SELECT count from counter_cs where key = 'test'"))
+        assert len(row) == 1
