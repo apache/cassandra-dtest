@@ -4,6 +4,7 @@ import re
 import sys
 import tempfile
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -40,3 +41,12 @@ def size_of_files_in_dir(dir_name, verbose=True):
     if verbose:
         logger.debug('getting sizes of these files: {}'.format(files))
     return sum(os.path.getsize(f) for f in files)
+
+def copytree(src, dst, symlinks=False, ignore=None):
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            shutil.copytree(s, d, symlinks, ignore)
+        else:
+            shutil.copy2(s, d)

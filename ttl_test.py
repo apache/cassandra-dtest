@@ -4,7 +4,6 @@ import pytest
 import logging
 
 from collections import OrderedDict
-from distutils import dir_util
 from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel, InvalidRequest
@@ -14,6 +13,7 @@ from cassandra.util import sortedset
 from dtest import Tester, create_ks
 from tools.assertions import (assert_all, assert_almost_equal, assert_none,
                               assert_row_count, assert_unavailable)
+from tools.files import copytree
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -591,7 +591,7 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         corrupt_sstable_dir = os.path.join('sstables', 'ttl_test', version)
         table_dir = self.get_table_paths('ttl_table')[0]
         logger.debug("Copying sstables from {} into {}", corrupt_sstable_dir, table_dir)
-        dir_util.copy_tree(corrupt_sstable_dir, table_dir)
+        copytree(corrupt_sstable_dir, table_dir)
 
         logger.debug("Load corrupted sstable")
         node.nodetool('refresh ks ttl_table')
