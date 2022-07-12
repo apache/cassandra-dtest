@@ -1,6 +1,8 @@
 import pytest
 import logging
 
+from cassandra import ConsistencyLevel
+from cassandra.query import SimpleStatement
 from dtest import Tester
 from tools.assertions import assert_all
 
@@ -93,17 +95,21 @@ class TestCompatibilityFlag(Tester):
 
         session.execute("CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'} ;")
         session.execute("CREATE TABLE test.test (a text PRIMARY KEY, b text, c text);")
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         for i in range(1, 6):
-            session.execute("INSERT INTO test.test (a, b, c) VALUES ('{}', '{}', '{}');".format(i, i + 1, i + 2))
+            session.execute(SimpleStatement("INSERT INTO test.test (a, b, c) VALUES ('{}', '{}', '{}');".format(i, i + 1, i + 2),
+                                            consistency_level=ConsistencyLevel.ALL))
 
         assert_all(session,
                    "SELECT * FROM test.test",
-                   [[str(i), str(i + 1), str(i + 2)] for i in range(1, 6)], ignore_order=True)
+                   [[str(i), str(i + 1), str(i + 2)] for i in range(1, 6)], ignore_order=True,
+                   cl=ConsistencyLevel.ALL)
 
         assert_all(session,
                    "SELECT a,c FROM test.test",
-                   [[str(i), str(i + 2)] for i in range(1, 6)], ignore_order=True)
+                   [[str(i), str(i + 2)] for i in range(1, 6)], ignore_order=True,
+                   cl=ConsistencyLevel.ALL)
 
 
 @since('3.0.14', max_version='3.0.x')
