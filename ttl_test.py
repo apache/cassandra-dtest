@@ -588,7 +588,8 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         version = '2.1' if self.cluster.version() < LooseVersion('3.0') else \
                   ('3.0' if self.cluster.version() < LooseVersion('3.11') else '3.11')
 
-        corrupt_sstable_dir = os.path.join('sstables', 'ttl_test', version)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        corrupt_sstable_dir = os.path.join(base_dir, 'sstables', 'ttl_test', version)
         table_dir = self.get_table_paths('ttl_table')[0]
         logger.debug("Copying sstables from {} into {}", corrupt_sstable_dir, table_dir)
         copytree(corrupt_sstable_dir, table_dir)
