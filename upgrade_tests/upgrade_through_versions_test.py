@@ -302,6 +302,8 @@ class TestUpgrade(Tester):
             r'Unknown column cdc during deserialization',
             # may occur during 2.2 check for existing roles
             r'Got slice command for nonexistent table system_auth.roles',
+            # file may be read while being written; will be read again when done
+            r'Snitch definitions at cassandra-topology.properties do not define a location',
         )
 
     def prepare(self):
