@@ -210,6 +210,14 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
             session.execute(prepared, (key))
 
             to_verify_queue.put_nowait((key, count + 1,))
+        except DriverException as dex:
+            if "ID mismatch while trying to reprepare" in str(dex):
+                time.sleep(1)  # Pstmnt id mismatch, retry. See CASSANDRA-15252/17140
+                continue
+            else:
+                logger.error("Error in counter incrementer process!", dex)
+                shutdown_gently()
+                raise
         except Exception as ex:
             logger.error("Error in counter incrementer process!", ex)
             shutdown_gently()
@@ -258,6 +266,14 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
         except Empty:
             time.sleep(0.1)  # let's not eat CPU if the queue is empty
             continue
+        except DriverException as dex:
+            if "ID mismatch while trying to reprepare" in str(dex):
+                time.sleep(1)  # Pstmnt id mismatch, retry. See CASSANDRA-15252/17140
+                continue
+            else:
+                logger.error("Error in counter verifier process!", dex)
+                shutdown_gently()
+                raise
         except Exception as ex:
             logger.error("Error in counter verifier process!", ex)
             shutdown_gently()
