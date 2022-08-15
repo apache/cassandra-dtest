@@ -2430,6 +2430,7 @@ class TestCQL(UpgradeTester):
             res = list(cursor.execute("SELECT * FROM test LIMIT {}".format(int(nb_keys / 2))))
             assert_length_equal(res, nb_keys / 2)
 
+    @since('2.0', max_version='4.1') # CASSANDRA-8877
     def test_collection_function(self):
         cursor = self.prepare()
 
