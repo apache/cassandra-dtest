@@ -796,7 +796,7 @@ class TestMiscellaneousCQL(CQLTester):
             thrown = True
 
         assert thrown, "No exception has been thrown"
-        assert re.search("Truncate failed on replica /127.0.0.3", str(exception)) is not None
+        assert re.search("Truncate failed on replicas? /127.0.0.3", str(exception)) is not None
 
 @since('3.2')
 class AbortedQueryTester(CQLTester):
