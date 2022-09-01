@@ -1,9 +1,12 @@
 import json
 import os
 import subprocess
+import socket
+import time
 import urllib.request
 import urllib.parse
 import logging
+import random
 
 import ccmlib.common as common
 
@@ -171,16 +174,43 @@ class JolokiaAgent(object):
 
     def __init__(self, node):
         self.node = node
+        random.seed(node.pid)
+        self.port = None
+
+    # See CASSANDRA-17872 for the reason behind this
+    def get_port(self, default=8778):
+        available = None
+        port = default
+        for _ in range(5):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                s.bind((self.node.network_interfaces['binary'][0], port))
+                available = port
+            except socket.error as e:
+                newport = random.randint(8000, 9000)
+                logger.info("Port %s in use, trying again on %s" % (port, newport))
+                port = newport
+            s.close()
+            if available:
+                break
+            time.sleep(2)
+        self.port = available
+        return available
 
     def start(self):
         """
         Starts the Jolokia agent.  The process will fork from the parent
         and continue running until stop() is called.
         """
+        port = self.get_port()
+        if not port:
+            raise Exception("Port 8778 still in use on {}, unable to find another available port in range 8000-9000, cannot launch jolokia".format(socket.gethostname()))
+
         args = (java_bin(),
                 '-cp', jolokia_classpath(),
                 'org.jolokia.jvmagent.client.AgentLauncher',
                 '--host', self.node.network_interfaces['binary'][0],
+                '--port', str(port),
                 'start', str(self.node.pid))
 
         try:
@@ -209,7 +239,7 @@ class JolokiaAgent(object):
 
     def _query(self, body, verbose=True):
         request_data = json.dumps(body).encode("utf-8")
-        url = 'http://%s:8778/jolokia/' % (self.node.network_interfaces['binary'][0],)
+        url = 'http://%s:%s/jolokia/' % (self.node.network_interfaces['binary'][0], self.port)
         req = urllib.request.Request(url)
         response = urllib.request.urlopen(req, data=request_data, timeout=10.0)
         if response.code != 200:
