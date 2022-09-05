@@ -1,5 +1,7 @@
 import os
 import time
+import datetime
+
 import pytest
 import logging
 
@@ -365,8 +367,11 @@ class TestTTL(Tester):
     def _base_expiration_overflow_policy_test(self, default_ttl, policy):
         """
         Checks that expiration date overflow policy is correctly applied
-        @jira_ticket CASSANDRA-14092
+        @jira_ticket CASSANDRA-14092 and CASSANDRA-14227
         """
+        # Post 5.0 TTL may overflow in 2038 (legacy) or 2106 C14227
+        overflow_policy_applies = "NONE" != self.cluster.nodelist()[0].get_conf_option("storage_compatibility_mode") \
+                                  or datetime.date.today().year >= 2086
         MAX_TTL = 20 * 365 * 24 * 60 * 60  # 20 years in seconds
         default_time_to_live = MAX_TTL if default_ttl else None
         self.prepare(default_time_to_live=default_time_to_live)
@@ -384,9 +389,9 @@ class TestTTL(Tester):
         try:
             result = self.session1.execute_async(query + ";")
             result.result()
-            if policy == 'REJECT':
+            if policy == 'REJECT' and overflow_policy_applies:
                 pytest.fail("should throw InvalidRequest")
-            if self.cluster.version() >= '3.0':  # client warn only on 3.0+
+            if self.cluster.version() >= '3.0' and overflow_policy_applies:  # client warn only on 3.0+
                 if policy == 'CAP':
                     logger.debug("Warning is {}".format(result.warnings[0]))
                     assert 'exceeds maximum supported expiration' in result.warnings[0], 'Warning not found'
@@ -399,10 +404,10 @@ class TestTTL(Tester):
 
         self.cluster.flush()
         # Data should be present unless policy is reject
-        assert_row_count(self.session1, 'ttl_table', 0 if policy == 'REJECT' else 1)
+        assert_row_count(self.session1, 'ttl_table', 0 if (policy == 'REJECT' and overflow_policy_applies) else 1)
 
         # Check that warning is always logged, unless policy is REJECT
-        if policy != 'REJECT':
+        if policy != 'REJECT' and overflow_policy_applies:
             node1 = self.cluster.nodelist()[0]
             prefix = 'default ' if default_ttl else ''
             warning = node1.grep_log("Request on table {}.{} with {}ttl of {} seconds exceeds maximum supported expiration"
@@ -599,7 +604,11 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         node.watch_log_for('Loading new SSTables', timeout=10)
 
         logger.debug("Check that there are no rows present")
-        assert_row_count(session, 'ttl_table', 0)
+        # CASSANDRA-14227 5.0 upwards we have long TTL that can read overflowed rows
+        if self.cluster.version() >= '5.0':
+            assert_row_count(session, 'ttl_table', 1)
+        else:
+            assert_row_count(session, 'ttl_table', 0)
 
         logger.debug("Shutting down node")
         self.cluster.stop()

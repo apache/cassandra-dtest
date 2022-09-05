@@ -432,6 +432,7 @@ class TestUpgrade(Tester):
 
                     self.upgrade_to_version(version_meta, partial=True, nodes=(node,), internode_ssl=internode_ssl)
 
+                    logger.debug(str(self.fixture_dtest_setup.subprocs))
                     self._check_on_subprocs(self.fixture_dtest_setup.subprocs)
                     logger.debug('Successfully upgraded %d of %d nodes to %s' %
                           (num + 1, len(self.cluster.nodelist()), version_meta.version))
@@ -488,7 +489,7 @@ class TestUpgrade(Tester):
         if not all(subproc_statuses):
             message = "A subprocess has terminated early. Subprocess statuses: "
             for s in subprocs:
-                message += "{name} (is_alive: {aliveness}), ".format(name=s.name, aliveness=s.is_alive())
+                message += "{name} (is_alive: {aliveness}, exitCode: {exitCode}), ".format(name=s.name, aliveness=s.is_alive(), exitCode=s.exitcode)
             message += "attempting to terminate remaining subprocesses now."
             self._terminate_subprocs()
             raise RuntimeError(message)
@@ -654,7 +655,7 @@ class TestUpgrade(Tester):
         # queue of verified writes, which are update candidates
         verification_done_queue = Queue(maxsize=500)
 
-        writer = Process(target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
+        writer = Process(name="data_writer", target=data_writer, args=(self, to_verify_queue, verification_done_queue, 25))
         # daemon subprocesses are killed automagically when the parent process exits
         writer.daemon = True
         self.fixture_dtest_setup.subprocs.append(writer)
@@ -663,7 +664,7 @@ class TestUpgrade(Tester):
         if wait_for_rowcount > 0:
             self._wait_until_queue_condition('rows written (but not verified)', to_verify_queue, operator.ge, wait_for_rowcount, max_wait_s=max_wait_s)
 
-        verifier = Process(target=data_checker, args=(self, to_verify_queue, verification_done_queue))
+        verifier = Process(name="data_checker", target=data_checker, args=(self, to_verify_queue, verification_done_queue))
         # daemon subprocesses are killed automagically when the parent process exits
         verifier.daemon = True
         self.fixture_dtest_setup.subprocs.append(verifier)
