@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import socket
-import time
 import urllib.request
 import urllib.parse
 import logging
@@ -181,7 +180,7 @@ class JolokiaAgent(object):
     def get_port(self, default=8778):
         available = None
         port = default
-        for _ in range(5):
+        for _ in range(50):
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 s.bind((self.node.network_interfaces['binary'][0], port))
@@ -193,7 +192,6 @@ class JolokiaAgent(object):
             s.close()
             if available:
                 break
-            time.sleep(2)
         self.port = available
         return available
 
