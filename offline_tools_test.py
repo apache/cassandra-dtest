@@ -362,10 +362,12 @@ class TestOfflineTools(Tester):
         elif testversion < '3.0':
             logger.debug('Test version: {} - installing github:apache/cassandra-2.1'.format(testversion))
             cluster.set_install_dir(version='github:apache/cassandra-2.1')
+            self.install_nodetool_legacy_parsing()
         # As of 3.5, sstable format 'ma' from 3.0 is still the latest - install 2.2 to upgrade from
         elif testversion < '4.0':
             logger.debug('Test version: {} - installing github:apache/cassandra-2.2'.format(testversion))
             cluster.set_install_dir(version='github:apache/cassandra-2.2')
+            self.install_nodetool_legacy_parsing()
         # From 4.0, one can only upgrade from 3.0
         else:
             logger.debug('Test version: {} - installing github:apache/cassandra-3.0'.format(testversion))

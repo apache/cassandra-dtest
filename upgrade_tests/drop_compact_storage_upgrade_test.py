@@ -24,6 +24,7 @@ class TestDropCompactStorage(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="2.1.14")
+        self.install_nodetool_legacy_parsing()
         cluster.start(wait_for_binary_proto=True)
 
         session = self.patient_exclusive_cql_connection(node1)

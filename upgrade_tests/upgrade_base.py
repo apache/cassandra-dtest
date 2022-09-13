@@ -106,6 +106,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         cluster = self.cluster
 
         cluster.set_install_dir(version=self.UPGRADE_PATH.starting_version)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         if ordered:

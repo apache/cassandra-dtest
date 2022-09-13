@@ -27,6 +27,7 @@ class TestUpgradeRepair(BaseRepairTest):
         cluster = self.cluster
         logger.debug("Setting version to 2.2.5")
         cluster.set_install_dir(version="2.2.5")
+        self.install_nodetool_legacy_parsing()
         self._populate_cluster()
 
         self._do_upgrade(default_install_dir)

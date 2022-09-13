@@ -43,6 +43,7 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_install_dir(version=indev_3_0_x.version)
         else:
             cluster.set_install_dir(version=indev_2_1_x.version)
+            self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.populate(1).start()
 

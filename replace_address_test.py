@@ -62,6 +62,8 @@ class BaseReplaceAddressTest(Tester):
         if mixed_versions:
             logger.debug("Starting nodes on version 2.2.4")
             self.cluster.set_install_dir(version="2.2.4")
+            self.install_nodetool_legacy_parsing()
+
 
         self.cluster.start()
 

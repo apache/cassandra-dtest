@@ -207,6 +207,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
             node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         for node in nodes:
             node.set_configuration_options(values={'start_rpc': 'true', 'enable_drop_compact_storage': 'true'})
@@ -224,6 +225,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version=cassandra_version)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         cluster.populate(num_nodes)
@@ -397,6 +399,7 @@ class TestUpgradeTo40(Tester):
             connection to the first node in the cluster.
         """
         self.cluster.set_install_dir(version=start_version)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
         self.cluster.populate(num_nodes)
@@ -737,3 +740,4 @@ for spec in specs:
     if not upgrade_applies_to_env:
         add_skip(cls, 'test not applicable to env.')
     globals()[gen_class_name] = cls
+

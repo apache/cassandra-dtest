@@ -27,6 +27,7 @@ class TestLegacySSTables(Tester):
 
         # start with 2.1.20 to generate a legacy sstable
         cluster.set_install_dir(version='2.1.20')
+        self.install_nodetool_legacy_parsing()
 
         cluster.populate(1).start()
         node1 = cluster.nodelist()[0]

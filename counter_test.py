@@ -32,6 +32,7 @@ class TestCounters(Tester):
         #
 
         cluster.set_install_dir(version='2.0.17')
+        self.install_nodetool_legacy_parsing()
         cluster.populate(3)
         cluster.start()
 
@@ -61,6 +62,7 @@ class TestCounters(Tester):
         #
 
         cluster.set_install_dir(version='2.1.17')
+        self.install_nodetool_legacy_parsing()
         cluster.start()
         cluster.nodetool("upgradesstables")
 
