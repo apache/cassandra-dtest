@@ -21,7 +21,7 @@ def _files_in(directory):
 
 def advance_to_next_cl_segment(session, commitlog_dir,
                                keyspace_name='ks', table_name='junk_table',
-                               timeout=120):
+                               timeout=180):
     """
     This is a hack to work around problems like CASSANDRA-11811.
 
@@ -57,8 +57,8 @@ def advance_to_next_cl_segment(session, commitlog_dir,
         elapsed = time.time() - start
         rate_limited_debug_logger('  commitlog-advancing load step has lasted {s:.2f}s'.format(s=elapsed))
         assert (
-            time.time() <= stop_time), "It's been over a {s}s and we haven't written a new " + \
-            "commitlog segment. Something is wrong.".format(s=timeout)
+            time.time() <= stop_time), ("It's been over {s}s and we haven't written a new " +
+                                        "commitlog segment. Something is wrong.").format(s=timeout)
         execute_concurrent(
             session,
             ((prepared_insert, ()) for _ in range(1000)),
