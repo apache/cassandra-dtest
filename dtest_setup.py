@@ -386,9 +386,9 @@ class DTestSetup(object):
         """
         self.log_watch_thread.join(timeout=60)
 
-    def cleanup_cluster(self, request=None):
+    def cleanup_cluster(self, request=None, failure=False):
         with log_filter('cassandra'):  # quiet noise from driver when nodes start going down
-            test_failed = request and hasattr(request.node, 'rep_call') and request.node.rep_call.failed
+            test_failed = (request and hasattr(request.node, 'rep_call') and request.node.rep_call.failed) or failure
             if self.dtest_config.keep_test_dir or (self.dtest_config.keep_failed_test_dir and test_failed):
                 self.cluster.stop(gently=self.dtest_config.enable_jacoco_code_coverage)
             else:

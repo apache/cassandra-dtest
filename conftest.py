@@ -365,7 +365,7 @@ def fixture_dtest_setup(request,
         except Exception as e:
             logger.error("Error saving log:", str(e))
         finally:
-            dtest_setup.cleanup_cluster(request)
+            dtest_setup.cleanup_cluster(request, failed)
 
 
 # Based on https://bugs.python.org/file25808/14894.patch
