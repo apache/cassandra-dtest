@@ -110,6 +110,7 @@ class BaseRepairTest(Tester):
         # Insert 1000 keys, kill node 3, insert 1 key, restart node 3, insert 1000 more keys
         logger.debug("Inserting data...")
         insert_c1c2(session, n=1000, consistency=ConsistencyLevel.ALL, ks='ks')
+        self.install_legacy_parsing(node3)
         node3.flush()
         node3.stop(wait_other_notice=True)
         insert_c1c2(session, keys=(1000, ), consistency=ConsistencyLevel.TWO, ks='ks')

@@ -278,6 +278,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
     def test_dense_supercolumn(self):
         cluster = self.prepare()
+        self.install_nodetool_legacy_parsing()
         node = self.cluster.nodelist()[0]
         node.nodetool("enablethrift")
         cursor = self.patient_cql_connection(node, row_factory=dict_factory)
@@ -325,6 +326,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
     def test_sparse_supercolumn(self):
         cluster = self.prepare()
+        self.install_nodetool_legacy_parsing()
         node = self.cluster.nodelist()[0]
         node.nodetool("enablethrift")
         cursor = self.patient_cql_connection(node, row_factory=dict_factory)

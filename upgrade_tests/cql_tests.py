@@ -2722,6 +2722,7 @@ class TestCQL(UpgradeTester):
         execute_concurrent_with_args(cursor,
                                      cursor.prepare("INSERT INTO t1 (a, b) VALUES (?, ?)"),
                                      [(i, i) for i in range(100)])
+        self.install_nodetool_legacy_parsing()
         self.cluster.flush()
 
         def check_read_all(cursor):

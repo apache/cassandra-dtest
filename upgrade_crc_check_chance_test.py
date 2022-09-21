@@ -123,6 +123,7 @@ class TestCrcCheckChanceUpgrade(Tester):
     def upgrade_to_version(self, tag, node):
         format_args = {'node': node.name, 'tag': tag}
         logger.debug('Upgrading node {node} to {tag}'.format(**format_args))
+        self.install_legacy_parsing(node)
         # drain and shutdown
         node.drain()
         node.watch_log_for("DRAINED")
@@ -134,6 +135,7 @@ class TestCrcCheckChanceUpgrade(Tester):
 
         logger.debug('Set new cassandra dir for {node}: {tag}'.format(**format_args))
         node.set_install_dir(version='git:' + tag, verbose=True)
+        self.install_legacy_parsing(node)
         # Restart node on new version
         logger.debug('Starting {node} on new version ({tag})'.format(**format_args))
         # Setup log4j / logback again (necessary moving from 2.0 -> 2.1):

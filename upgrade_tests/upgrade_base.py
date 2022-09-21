@@ -151,6 +151,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         returned instead.
         """
         session.cluster.shutdown()
+        self.install_nodetool_legacy_parsing()
         node1 = self.cluster.nodelist()[0]
         node2 = self.cluster.nodelist()[1]
 
@@ -172,6 +173,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         switch_jdks(self.UPGRADE_PATH.upgrade_meta.java_version)
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
+        self.install_legacy_parsing(node1)
 
         # this is a bandaid; after refactoring, upgrades should account for protocol version
         new_version_from_build = get_version_from_build(node1.get_install_dir())

@@ -362,12 +362,10 @@ class TestOfflineTools(Tester):
         elif testversion < '3.0':
             logger.debug('Test version: {} - installing github:apache/cassandra-2.1'.format(testversion))
             cluster.set_install_dir(version='github:apache/cassandra-2.1')
-            self.install_nodetool_legacy_parsing()
         # As of 3.5, sstable format 'ma' from 3.0 is still the latest - install 2.2 to upgrade from
         elif testversion < '4.0':
             logger.debug('Test version: {} - installing github:apache/cassandra-2.2'.format(testversion))
             cluster.set_install_dir(version='github:apache/cassandra-2.2')
-            self.install_nodetool_legacy_parsing()
         # From 4.0, one can only upgrade from 3.0
         else:
             logger.debug('Test version: {} - installing github:apache/cassandra-3.0'.format(testversion))
@@ -375,6 +373,7 @@ class TestOfflineTools(Tester):
 
         # Start up last major version, write out an sstable to upgrade, and stop node
         cluster.populate(1).start()
+        self.install_nodetool_legacy_parsing()
         [node1] = cluster.nodelist()
         # Check that node1 is actually what we expect
         logger.debug('Downgraded install dir: {}'.format(node1.get_install_dir()))
@@ -392,6 +391,7 @@ class TestOfflineTools(Tester):
         logger.debug('Upgraded to original install dir: {}'.format(node1.get_install_dir()))
         # Perform a node start/stop so system tables get internally updated, otherwise we may get "Unknown keyspace/table ks.cf"
         cluster.start()
+        self.install_nodetool_legacy_parsing()
         node1.flush()
         cluster.stop()
 

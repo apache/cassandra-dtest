@@ -43,7 +43,7 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_install_dir(version=indev_3_0_x.version)
         else:
             cluster.set_install_dir(version=indev_2_1_x.version)
-            self.install_nodetool_legacy_parsing()
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.populate(1).start()
 
@@ -57,6 +57,7 @@ class TestStorageEngineUpgrade(Tester):
 
     def _do_upgrade(self, login_keyspace=True):
         cluster = self.cluster
+        self.install_nodetool_legacy_parsing()
         node1 = cluster.nodelist()[0]
 
         node1.flush()
@@ -64,10 +65,12 @@ class TestStorageEngineUpgrade(Tester):
         node1.stop(wait_other_notice=True)
 
         node1.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
+        self.install_legacy_parsing(node1)
         node1.start(wait_for_binary_proto=True)
 
         if self.fixture_dtest_setup.bootstrap:
             cluster.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
+            self.install_nodetool_legacy_parsing()
             # Add a new node, bootstrap=True ensures that it is not a seed
             node2 = new_node(cluster, bootstrap=True)
             node2.start(wait_for_binary_proto=True, jvm_args=self.fixture_dtest_setup.jvm_args)
@@ -278,6 +281,7 @@ class TestStorageEngineUpgrade(Tester):
         ROWS = 100
 
         session = self._setup_cluster()
+        self.install_nodetool_legacy_parsing()
 
         session.execute('CREATE TABLE t (k int, t int, v1 int, v2 blob, v3 set<int>, PRIMARY KEY (k, t))')
 
@@ -338,6 +342,7 @@ class TestStorageEngineUpgrade(Tester):
             for r in range(ROWS):
                 session.execute("INSERT INTO t(k, t, v1, v2) VALUES ({}, {}, {}, {})".format(p, r, r % 2, r * 2))
 
+        self.install_nodetool_legacy_parsing()
         self.cluster.flush()
 
         assert_all(session,

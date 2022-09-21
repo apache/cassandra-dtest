@@ -32,9 +32,9 @@ class TestCounters(Tester):
         #
 
         cluster.set_install_dir(version='2.0.17')
-        self.install_nodetool_legacy_parsing()
         cluster.populate(3)
         cluster.start()
+        self.install_nodetool_legacy_parsing()
 
         node1, node2, node3 = cluster.nodelist()
 

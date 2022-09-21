@@ -58,9 +58,9 @@ class TestAuthUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="2.1.16")
-        self.install_nodetool_legacy_parsing()
 
         cluster.populate(3).start()
+        self.install_nodetool_legacy_parsing()
 
         node1, node2, node3 = cluster.nodelist()
 
@@ -121,8 +121,8 @@ class TestAuthUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version="github:apache/cassandra-2.1")
-        self.install_nodetool_legacy_parsing()
         cluster.populate(3).start()
+        self.install_nodetool_legacy_parsing()
 
         node1, node2, node3 = cluster.nodelist()
 

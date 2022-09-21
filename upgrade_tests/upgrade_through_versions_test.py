@@ -327,6 +327,7 @@ class TestUpgrade(Tester):
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         cluster = self.cluster
         cluster.set_install_dir(version=self.test_version_metas[0].version)
+        self.install_nodetool_legacy_parsing()
         switch_jdks(self.test_version_metas[0].java_version)
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         logger.debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
@@ -435,6 +436,7 @@ class TestUpgrade(Tester):
                           (num + 1, len(self.cluster.nodelist()), version_meta.version))
 
                 self.cluster.set_install_dir(version=version_meta.version)
+                self.install_nodetool_legacy_parsing()
                 self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
             # Stop write processes
@@ -454,6 +456,7 @@ class TestUpgrade(Tester):
 
                 self.upgrade_to_version(version_meta, internode_ssl=internode_ssl)
                 self.cluster.set_install_dir(version=version_meta.version)
+                self.install_nodetool_legacy_parsing()
                 self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
                 self._check_values()
@@ -511,6 +514,7 @@ class TestUpgrade(Tester):
         if not partial:
             nodes = self.cluster.nodelist()
 
+        self.install_nodetool_legacy_parsing()
         for node in nodes:
             logger.debug('Shutting down node: ' + node.name)
             node.drain()
@@ -519,6 +523,7 @@ class TestUpgrade(Tester):
 
         for node in nodes:
             node.set_install_dir(version=version_meta.version)
+            self.install_legacy_parsing(node)
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
             if internode_ssl and (LooseVersion(version_meta.family) >= CASSANDRA_4_0):
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})

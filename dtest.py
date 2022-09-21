@@ -402,6 +402,7 @@ def data_size(node, ks, cf):
     @param cf: table name
     @return: data size in bytes
     """
+    hack_legacy_parsing(node)
     cfstats = node.nodetool("cfstats {}.{}".format(ks,cf))[0]
     regex = re.compile(r'[\t]')
     stats_lines = [regex.sub("", s) for s in cfstats.split('\n')
@@ -517,3 +518,18 @@ def run_scenarios(scenarios, handler, deferred_exceptions=tuple()):
 
     if errors:
         raise MultiError(errors, tracebacks)
+
+def hack_legacy_parsing(node):
+	""" Hack node's shell script for nodetool legacy URL parsing, ala CASSANDRA-17581 """
+	nodetool = os.path.join(node.get_install_dir(), 'bin', 'nodetool')
+	with open(nodetool, 'r+') as fd:
+		contents = fd.readlines()
+		if "legacy" in contents[len(contents)-6]:
+			logger.debug("nodetool already hacked")
+		elif not contents[len(contents)-5].endswith('\\\n'):
+			logger.debug("version does not appear to need hacking")
+		else:
+			contents.insert(len(contents)-5, "      -Dcom.sun.jndi.rmiURLParsing=legacy \\\n")
+			fd.seek(0)
+			fd.writelines(contents)
+

@@ -20,7 +20,7 @@ from ccmlib.common import is_win
 from ccmlib.cluster import Cluster
 
 from dtest import (get_ip_from_node, make_execution_profile, get_auth_provider, get_port_from_node,
-                   get_eager_protocol_version)
+                   get_eager_protocol_version, hack_legacy_parsing)
 from distutils.version import LooseVersion
 
 from tools.context import log_filter
@@ -84,16 +84,15 @@ class DTestSetup(object):
         self.create_cluster_func = None
         self.iterations = 0
 
+    def install_legacy_parsing(self, node):
+        hack_legacy_parsing(node)
+
     def install_nodetool_legacy_parsing(self):
-        """ Hack nodetool on old versions for legacy URL parsing, ala CASSANDRA-17581 """
-        if self.cluster.version() < LooseVersion('3.0'):
-            logger.debug("hacking nodetool for legacy parsing")
-            nodetool = os.path.join(self.cluster.get_install_dir(), 'bin', 'nodetool')
-            with open(nodetool, 'r+') as fd:
-                contents = fd.readlines()
-                contents.insert(len(contents)-5, "      -Dcom.sun.jndi.rmiURLParsing=legacy \\\n")
-                fd.seek(0)
-                fd.writelines(contents)
+        """ Install nodetool legacy parsing on the cluster """
+        if self.cluster.version() < LooseVersion('3.11.13'):
+            logger.debug("hacking nodetool for legacy parsing on {}".format(self.cluster.version()))
+            for node in self.cluster.nodelist():
+                self.install_legacy_parsing(node)
         else:
             logger.debug("not modifying nodetool on version {}".format(self.cluster.version()))
 

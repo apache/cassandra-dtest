@@ -59,6 +59,7 @@ class TestSCUpgrade(Tester):
 
         # Forcing cluster version on purpose
         cluster.set_install_dir(version=cassandra_version)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         if "memtable_allocation_type" in cluster._config_options:
             del cluster._config_options['memtable_allocation_type']
@@ -89,6 +90,7 @@ class TestSCUpgrade(Tester):
 
     def _upgrade_super_columns_through_versions_test(self, upgrade_path):
         cluster = self.prepare()
+        self.install_nodetool_legacy_parsing()
         node1 = cluster.nodelist()[0]
         node1.run_cqlsh(cmds="""CREATE KEYSPACE supcols WITH replication = {
                                     'class': 'SimpleStrategy',
@@ -161,8 +163,10 @@ class TestSCUpgrade(Tester):
         # Update Cassandra Directory
         for node in nodes:
             node.set_install_dir(version=tag)
+            self.install_nodetool_legacy_parsing()
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
         self.cluster.set_install_dir(version=tag)
+        self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         for node in nodes:
             if tag < "2.1":
