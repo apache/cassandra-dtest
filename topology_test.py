@@ -476,11 +476,13 @@ class TestTopology(Tester):
         node1, node2, node3, node4 = self.cluster.nodelist()
         session = self.patient_cql_connection(node2)
         session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
+        session.cluster.control_connection.wait_for_schema_agreement()
         create_ks(session, 'ks', {'dc1': 2, 'dc2': 2})
         with pytest.raises(ToolError):
             node4.nodetool('decommission')
 
         session.execute('DROP KEYSPACE ks')
+        session.cluster.control_connection.wait_for_schema_agreement()
         create_ks(session, 'ks2', 4)
         with pytest.raises(ToolError):
             node4.nodetool('decommission')
