@@ -14,8 +14,6 @@ from ccmlib.node import NodeError, TimeoutError, ToolError, Node
 
 import pytest
 
-from distutils.version import LooseVersion
-
 from dtest import Tester, create_ks, create_cf, data_size, mk_bman_path
 from tools.assertions import (assert_almost_equal, assert_bootstrap_state, assert_not_running,
                               assert_one, assert_stderr_clean)
@@ -436,13 +434,13 @@ class BootstrapTester(Tester):
 
         # start bootstrapping node3 and wait for streaming
         node3 = new_node(cluster)
-        node3.start(wait_other_notice=False)
+        node3.start(jvm_args=['-Dcassandra.reset_bootstrap_progress=false'], wait_other_notice=False)
 
         # let streaming fail as we expect
         node3.watch_log_for('Some data streaming failed')
 
         # bring back node3 and invoke nodetool bootstrap to resume bootstrapping
-        node3.nodetool('bootstrap resume')
+        node3.nodetool(BootstrapTester.nodetool_resume_command(cluster))
         node3.wait_for_binary_interface()
         assert_bootstrap_state(self, node3, 'COMPLETED')
 
@@ -976,7 +974,7 @@ class BootstrapTester(Tester):
         node2.set_configuration_options(values=config)
         node2.byteman_port = '8101' # set for when we add node3
         node2.import_config_files()
-        node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000"])
+        node2.start(jvm_args=["-Dcassandra.ring_delay_ms=5000", "-Dcassandra.reset_bootstrap_progress=false"])
         self.assert_log_had_msg(node2, 'Some data streaming failed')
 
         try:
@@ -985,7 +983,7 @@ class BootstrapTester(Tester):
         except ToolError as t:
             assert "Cannot join the ring until bootstrap completes" in t.stdout
 
-        node2.nodetool('bootstrap resume')
+        node2.nodetool(BootstrapTester.nodetool_resume_command(cluster))
         node2.wait_for_binary_interface()
         assert_bootstrap_state(self, node2, 'COMPLETED', user='cassandra', password='cassandra')
 
@@ -1000,7 +998,7 @@ class BootstrapTester(Tester):
         else:
             node1.byteman_submit([self.byteman_submit_path_4_0])
             node2.byteman_submit([self.byteman_submit_path_4_0])
-        node3.start(jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.ring_delay_ms=5000"])
+        node3.start(jvm_args=["-Dcassandra.write_survey=true", "-Dcassandra.ring_delay_ms=5000", "-Dcassandra.reset_bootstrap_progress=false"])
         self.assert_log_had_msg(node3, 'Some data streaming failed')
         self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled")
 
@@ -1010,7 +1008,7 @@ class BootstrapTester(Tester):
         except ToolError as t:
             assert "Cannot join the ring until bootstrap completes" in t.stdout
 
-        node3.nodetool('bootstrap resume')
+        node3.nodetool(BootstrapTester.nodetool_resume_command(cluster))
         self.assert_log_had_msg(node3, "Not starting client transports in write_survey mode as it's bootstrapping or auth is enabled")
 
         # Should succeed in joining
@@ -1018,6 +1016,17 @@ class BootstrapTester(Tester):
         self.assert_log_had_msg(node3, "Leaving write survey mode and joining ring at operator request")
         assert_bootstrap_state(self, node3, 'COMPLETED', user='cassandra', password='cassandra')
         node3.wait_for_binary_interface()
+
+    @staticmethod
+    def nodetool_resume_command(cluster):
+        """
+        In versions after 4.1, we disable resumable bootstrap by default (see CASSANDRA-17679). In order to run
+        nodetool boostrap resume in these subsequent versions we have to manually indicate the intent to allow resumability.
+        """
+        nt_resume_cmd = 'bootstrap resume'
+        if cluster.version() >= '4.2':
+            nt_resume_cmd += ' -f'
+        return nt_resume_cmd
 
 
 class TestBootstrap(BootstrapTester):

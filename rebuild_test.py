@@ -176,8 +176,8 @@ class TestRebuild(Tester):
         cluster.add(node1, True, data_center='dc1')
         cluster.add(node2, True, data_center='dc1')
 
-        node1.start(wait_for_binary_proto=True)
-        node2.start(wait_for_binary_proto=True)
+        node1.start(wait_for_binary_proto=True, jvm_args=['-Dcassandra.reset_bootstrap_progress=false'])
+        node2.start(wait_for_binary_proto=True, jvm_args=['-Dcassandra.reset_bootstrap_progress=false'])
 
         # Insert data into node1 and node2
         session = self.patient_exclusive_cql_connection(node1)
@@ -200,8 +200,7 @@ class TestRebuild(Tester):
 
         cluster.add(node3, False, data_center='dc2')
 
-        node3.start(wait_other_notice=False, wait_for_binary_proto=True)
-
+        node3.start(wait_other_notice=False, wait_for_binary_proto=True, jvm_args=['-Dcassandra.reset_bootstrap_progress=false'])
         # Wait for snitch to be refreshed
         time.sleep(5)
 

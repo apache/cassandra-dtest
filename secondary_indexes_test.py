@@ -14,6 +14,7 @@ from cassandra.concurrent import (execute_concurrent,
 from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
+from bootstrap_test import BootstrapTester
 from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count, \
     assert_length_equal, assert_all
@@ -1224,10 +1225,10 @@ class TestPreJoinCallback(Tester):
                 yaml_opts['streaming_socket_timeout_in_ms'] = 1000
 
             node2.set_configuration_options(values=yaml_opts)
-            node2.start(wait_for_binary_proto=False)
+            node2.start(wait_for_binary_proto=False, jvm_args=["-Dcassandra.reset_bootstrap_progress=false"])
             node2.watch_log_for('Some data streaming failed. Use nodetool to check bootstrap state and resume.')
 
-            node2.nodetool("bootstrap resume")
+            node2.nodetool(BootstrapTester.nodetool_resume_command(cluster))
             node2.watch_log_for('Starting listening for CQL clients')
             assert_bootstrap_state(self, node2, 'COMPLETED')
             assert node2.grep_log('Executing pre-join post-bootstrap tasks')

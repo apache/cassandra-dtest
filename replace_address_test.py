@@ -13,6 +13,7 @@ from cassandra import ConsistencyLevel, ReadTimeout, Unavailable
 from cassandra.query import SimpleStatement
 from ccmlib.node import Node
 
+from bootstrap_test import BootstrapTester
 from dtest import Tester, mk_bman_path
 from tools.assertions import assert_bootstrap_state, assert_all, assert_not_running
 from tools.data import rows_to_list
@@ -534,7 +535,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             self.replacement_node.watch_log_for("Resetting bootstrap progress to start fresh", from_mark=mark)
         elif mode == 'resume':
             logger.debug("Resuming failed bootstrap")
-            self.replacement_node.nodetool('bootstrap resume')
+            self.replacement_node.nodetool(BootstrapTester.nodetool_resume_command(self.cluster))
             # check if we skipped already retrieved ranges
             self.replacement_node.watch_log_for("already available. Skipping streaming.")
             self.replacement_node.watch_log_for("Resume complete")
