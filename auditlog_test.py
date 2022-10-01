@@ -77,7 +77,13 @@ class TestAuditlog(Tester):
         moved_log_dir, move_script = self._create_script()
         files = []
         for i in range(10):
-            (_, fakelogfile) = tempfile.mkstemp(dir=log_dir, suffix='.cq4')
+            (fd, fakelogfile) = tempfile.mkstemp(dir=log_dir, suffix='.cq4')
+            # empty cq4 files are deleted as part of CASSANDRA-17933 so we write some fake content into them
+            # for the sake of having them archived on startup and not deleted
+            try:
+                os.write(fd, str.encode("somecontent"))
+            finally:
+                os.close(fd)
             files.append(fakelogfile)
         for f in files:
             assert os.path.isfile(f)
