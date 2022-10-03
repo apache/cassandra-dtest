@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import socket
+import time
 import urllib.request
 import urllib.parse
 import logging
@@ -204,6 +205,7 @@ class JolokiaAgent(object):
         if not port:
             raise Exception("Port 8778 still in use on {}, unable to find another available port in range 8000-9000, cannot launch jolokia".format(socket.gethostname()))
 
+        logger.info("Port %s open for jolokia" % port)
         args = (java_bin(),
                 '-cp', jolokia_classpath(),
                 'org.jolokia.jvmagent.client.AgentLauncher',
@@ -211,13 +213,23 @@ class JolokiaAgent(object):
                 '--port', str(port),
                 'start', str(self.node.pid))
 
-        try:
-            subprocess.check_output(args, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as exc:
-            print("Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc))
-            print("Exit status was: %d" % (exc.returncode,))
-            print("Output was: %s" % (exc.output,))
-            raise
+        tries = 3
+        for i in range(tries):
+            try:
+                subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
+                logger.info("Jolokia successful on try %s" % i )
+                return
+            except subprocess.CalledProcessError as exc:
+                if 'Jolokia is already attached' in exc.output:
+                    logger.info("Jolokia reports being attached on try %s, returning successfully" % i)
+                    return;
+                if i < tries - 1:
+                    logger.warn("Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc))
+                    logger.warn("Exit status was: %d" % (exc.returncode,))
+                    logger.warn("Output was: %s" % (exc.output,))
+                    time.sleep(2)
+                else:
+                    raise
 
     def stop(self):
         """
@@ -230,9 +242,9 @@ class JolokiaAgent(object):
         try:
             subprocess.check_output(args, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
-            print("Failed to stop jolokia agent (command was: %s): %s" % (' '.join(args), exc))
-            print("Exit status was: %d" % (exc.returncode,))
-            print("Output was: %s" % (exc.output,))
+            logger.error("Failed to stop jolokia agent (command was: %s): %s" % (' '.join(args), exc))
+            logger.error("Exit status was: %d" % (exc.returncode,))
+            logger.error("Output was: %s" % (exc.output,))
             raise
 
     def _query(self, body, verbose=True):
