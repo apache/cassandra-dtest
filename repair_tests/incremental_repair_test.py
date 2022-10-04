@@ -293,9 +293,9 @@ class TestIncRepair(Tester):
 
         logger.debug("replace node and check data integrity")
         node3.stop(gently=False)
-        node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, ('127.0.0.5', 9042))
+        node5 = Node('node5', cluster, True, ('127.0.0.5', 9160), ('127.0.0.5', 7000), '7500', '0', None, binary_interface=('127.0.0.5', 9042))
         cluster.add(node5, False, data_center="dc1")
-        node5.start(replace_address='127.0.0.3')
+        node5.start(replace_address='127.0.0.3', wait_for_binary_proto=120)
 
         assert_one(session, "SELECT COUNT(*) FROM ks.cf LIMIT 200", [149])
 
