@@ -30,8 +30,10 @@ class TestDropCompactStorage(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         session.execute(
             "CREATE KEYSPACE drop_compact_storage_test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '2'};")
+        session.cluster.control_connection.wait_for_schema_agreement()
         session.execute(
             "CREATE TABLE drop_compact_storage_test.test (a text PRIMARY KEY, b text, c text) WITH COMPACT STORAGE;")
+        session.cluster.control_connection.wait_for_schema_agreement()
 
         for i in range(1, 100):
             session.execute(
@@ -54,7 +56,7 @@ class TestDropCompactStorage(Tester):
 
         node.set_install_dir(version=to_version)
         node.set_configuration_options(values={'enable_drop_compact_storage': 'true'})
-        node.start(wait_other_notice=False, wait_for_binary_proto=False, verbose=False)
+        node.start(wait_for_binary_proto=True)
 
     @since('3.0', max_version='3.11')
     def test_drop_compact_storage(self):
@@ -94,6 +96,7 @@ class TestDropCompactStorage(Tester):
         time.sleep(2)
 
         session.execute("ALTER TABLE drop_compact_storage_test.test DROP COMPACT STORAGE")
+        session.cluster.control_connection.wait_for_schema_agreement()
         session.execute("SELECT * FROM drop_compact_storage_test.test")
 
     @since('4.0')
@@ -162,4 +165,5 @@ class TestDropCompactStorage(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("SELECT * FROM drop_compact_storage_test.test")
         session.execute("ALTER TABLE drop_compact_storage_test.test DROP COMPACT STORAGE")
+        session.cluster.control_connection.wait_for_schema_agreement()
         session.execute("SELECT * FROM drop_compact_storage_test.test")
