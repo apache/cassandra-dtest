@@ -215,7 +215,7 @@ class TestHintedHandoff(Tester):
         @jira_ticket CASSANDRA-14309
         """
 
-        def wait_for_downtime(node_to_query,node,downtime):
+        def wait_for_downtime(node_to_query, node, downtime):
             def endpoint_downtime(node_to_query, node):
                 mbean = make_mbean('net', type='Gossiper')
                 with JolokiaAgent(node_to_query) as jmx:
@@ -231,9 +231,8 @@ class TestHintedHandoff(Tester):
                         while endpoint_downtime(node_to_query, node) <= downtime:
                             time.sleep(1)
                     run = False
-                except:
+                except Exception:
                     pass
-
 
         # hint_window_persistent_enabled is set to true by default
         self.cluster.set_configuration_options({'max_hint_window_in_ms': 10000,
@@ -333,5 +332,5 @@ class TestHintedHandoff(Tester):
                 exception = ex
                 pass
 
-        if exception != None:
+        if exception is not None:
             raise exception
