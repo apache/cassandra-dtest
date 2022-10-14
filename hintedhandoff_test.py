@@ -215,6 +215,26 @@ class TestHintedHandoff(Tester):
         @jira_ticket CASSANDRA-14309
         """
 
+        def wait_for_downtime(node_to_query,node,downtime):
+            def endpoint_downtime(node_to_query, node):
+                mbean = make_mbean('net', type='Gossiper')
+                with JolokiaAgent(node_to_query) as jmx:
+                    return jmx.execute_method(mbean, 'getEndpointDowntime(java.lang.String)', [node])
+
+            run = True
+            while run:
+                try:
+                    if downtime == 0:
+                        while endpoint_downtime(node_to_query, node) != downtime:
+                            time.sleep(1)
+                    else:
+                        while endpoint_downtime(node_to_query, node) <= downtime:
+                            time.sleep(1)
+                    run = False
+                except:
+                    pass
+
+
         # hint_window_persistent_enabled is set to true by default
         self.cluster.set_configuration_options({'max_hint_window_in_ms': 10000,
                                                 'hinted_handoff_enabled': True,
@@ -233,28 +253,38 @@ class TestHintedHandoff(Tester):
         node2.watch_log_for(["Stop listening for CQL clients"], timeout=120)
 
         node2.nodetool('disablegossip')
+
         node2.watch_log_for(["Announcing shutdown", "state jump to shutdown"], timeout=120)
         node1.watch_log_for(["state jump to shutdown"], timeout=120)
 
         log_mark_node_1 = node1.mark_log()
         log_mark_node_2 = node2.mark_log()
 
+        wait_for_downtime(node1, "127.0.0.2", 1000)
+
         # First round of hints. We expect these to be replayed and the only
         # hints within the window
         insert_c1c2(session, n=(0, 100), consistency=ConsistencyLevel.ONE)
+        node1.nodetool('flush')
 
-        # Let hint window pass
-        time.sleep(15)
+        # let the hint window pass
+        wait_for_downtime(node1, "127.0.0.2", 10000)
 
         # Re-enable and disable the node. Prior to CASSANDRA-14215 this should make the hint window on node1 reset.
         node2.nodetool('enablegossip')
         node2.watch_log_for(["state jump to NORMAL"], timeout=120, from_mark=log_mark_node_2)
         node1.watch_log_for(["state jump to NORMAL"], timeout=120, from_mark=log_mark_node_1)
 
+        # no downtime for node for which we enabled gossip
+        wait_for_downtime(node1, "127.0.0.2", 0)
+
         log_mark_node_1 = node1.mark_log()
         log_mark_node_2 = node2.mark_log()
 
+        # disable gossip again
         node2.nodetool('disablegossip')
+
+        wait_for_downtime(node1, "127.0.0.2", 1000)
 
         node2.watch_log_for(["Announcing shutdown", "state jump to shutdown"], timeout=120, from_mark=log_mark_node_2)
         node1.watch_log_for(["state jump to shutdown"], timeout=120, from_mark=log_mark_node_1)
@@ -262,13 +292,7 @@ class TestHintedHandoff(Tester):
         log_mark_node_1 = node1.mark_log()
         log_mark_node_2 = node2.mark_log()
 
-        def endpoint_downtime(node_to_query, node):
-            mbean = make_mbean('net', type='Gossiper')
-            with JolokiaAgent(node_to_query) as jmx:
-                return jmx.execute_method(mbean, 'getEndpointDowntime(java.lang.String)', [node])
-
-        while endpoint_downtime(node1, "127.0.0.2") <= 5000:
-            time.sleep(1)
+        wait_for_downtime(node1, "127.0.0.2", 5000)
 
         # Second round of inserts. We do not expect hints to be stored.
         insert_c1c2(session, n=(100, 200), consistency=ConsistencyLevel.ONE)
@@ -298,6 +322,16 @@ class TestHintedHandoff(Tester):
         for x in range(0, 100):
             query_c1c2(session, x, ConsistencyLevel.ONE)
 
+        exception = None
+
         # Ensure second and third datasets are not present
         for x in range(100, 300):
-            query_c1c2(session, x, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
+            try:
+                query_c1c2(session, x, ConsistencyLevel.ONE, tolerate_missing=True, must_be_missing=True)
+            except AssertionError as ex:
+                logger.info("failed for %d" % x)
+                exception = ex
+                pass
+
+        if exception != None:
+            raise exception
