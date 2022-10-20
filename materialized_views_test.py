@@ -1277,6 +1277,7 @@ class TestMaterializedViews(Tester):
         session = self.prepare(options={'concurrent_materialized_view_builders': 4}, install_byteman=True)
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
         nodes = self.cluster.nodelist()
+        self.fixture_dtest_setup.ignore_log_patterns = [r'Compaction interrupted: View build']
 
         logger.debug("Inserting initial data")
         for i in range(5000):
