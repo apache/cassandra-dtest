@@ -216,11 +216,11 @@ class JolokiaAgent(object):
         tries = 3
         for i in range(tries):
             try:
-                subprocess.check_output(args, stderr=subprocess.STDOUT, text=True)
+                subprocess.check_output(args, stderr=subprocess.STDOUT)
                 logger.info("Jolokia successful on try %s" % i )
                 return
             except subprocess.CalledProcessError as exc:
-                if 'Jolokia is already attached' in exc.output:
+                if 'Jolokia is already attached'.encode('utf-8') in exc.output:
                     logger.info("Jolokia reports being attached on try %s, returning successfully" % i)
                     return;
                 if i < tries - 1:
