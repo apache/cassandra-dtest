@@ -200,3 +200,28 @@ class TestPaxos(Tester):
             retries = retries + w.retries
 
         assert (value == threads * iterations) and (errors == 0), "value={}, errors={}, retries={}".format(value, errors, retries)
+
+    def test_replica_paxos(self):
+        """
+        @jira_ticket CASSANDRA-17999
+
+        Regression test for a bug (CASSANDRA-17999) where a WriteTimeoutException is encountered when using Paxos v2 in
+        an LWT performance test that only has a single datacenter because Paxos was still waiting for a response from
+        another datacenter during the Commit/Acknowledge phase even though we were running with LOCAL_SERIAL.
+        """
+
+        # Turn on Paxos v2
+        cluster = self.cluster
+        cluster.set_configuration_options({'paxos_variant': "v2", 'write_request_timeout_in_ms': 1000})
+
+        session = self.prepare(nodes=3, rf=3)
+        session.execute("CREATE KEYSPACE ksn WITH replication = {'class':'SimpleStrategy', 'replication_factor':3}")
+        session.execute("CREATE TABLE test (k int PRIMARY KEY, v bigint)")
+        session.execute("INSERT INTO test (k, v) VALUES (5, 5) IF NOT EXISTS")
+
+        text = "UPDATE test SET v = 123 WHERE k = 5 IF EXISTS"
+        statement = SimpleStatement(text, consistency_level=ConsistencyLevel.LOCAL_QUORUM,
+                                    serial_consistency_level=ConsistencyLevel.LOCAL_SERIAL)
+        session.execute(statement)
+
+        session.execute("SELECT * FROM test WHERE k = 5")
