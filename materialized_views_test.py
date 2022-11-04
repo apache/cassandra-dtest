@@ -57,7 +57,7 @@ class TestMaterializedViews(Tester):
         cluster.populate([nodes, 0], install_byteman=install_byteman)
         if options:
             cluster.set_configuration_options(values=options)
-        cluster.start()
+        cluster.start(jvm_args=['-Dcassandra.reset_bootstrap_progress=false'])
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1, **kwargs)
@@ -541,11 +541,15 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Bootstrapping new node in another dc")
         node4 = new_node(self.cluster, data_center='dc2')
-        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)])
+        node4.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT),
+                              "-Dcassandra.reset_bootstrap_progress=false"])
 
         logger.debug("Bootstrapping new node in another dc")
         node5 = new_node(self.cluster, remote_debug_port='1414', data_center='dc2')
-        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT)], wait_for_binary_proto=True)
+        node5.start(jvm_args=["-Dcassandra.migration_task_wait_in_seconds={}".format(MIGRATION_WAIT),
+                              "-Dcassandra.reset_bootstrap_progress=false"],
+                              wait_for_binary_proto=True)
         if nts:
             session.execute("alter keyspace ks with replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1}")
             session.execute("alter keyspace system_auth with replication = {'class':'NetworkTopologyStrategy', 'dc1':1, 'dc2':1}")

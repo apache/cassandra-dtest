@@ -79,6 +79,11 @@ class BaseReplaceAddressTest(Tester):
                     wait_other_notice=False, wait_for_binary_proto=True,
                     replace_address=None, opts=None, data_center=None,
                     extra_jvm_args=None):
+        """
+        This explicitly starts the replacement node with reset_bootstrap_progress=false as the tests were originally
+        authored in a pre 5.0 world where bootstrap resume was enabled by default. As tests that exercise this functionality
+        explicitly set it or assume a world with this config, we should be in good shape.
+        """
         if replace_address is None:
             replace_address = self.replaced_node.address()
         if data_center is None:
@@ -104,7 +109,8 @@ class BaseReplaceAddressTest(Tester):
             extra_jvm_args = []
         extra_jvm_args.extend(["-Dcassandra.{}={}".format(jvm_option, replace_address),
                                "-Dcassandra.ring_delay_ms=10000",
-                               "-Dcassandra.broadcast_interval_ms=10000"])
+                               "-Dcassandra.broadcast_interval_ms=10000",
+                               "-Dcassandra.reset_bootstrap_progress=false"])
 
         self.replacement_node.start(jvm_args=extra_jvm_args,
                                     wait_for_binary_proto=wait_for_binary_proto, wait_other_notice=wait_other_notice)
