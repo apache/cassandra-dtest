@@ -9,7 +9,7 @@ since = pytest.mark.since
 class TestClientRequestMetricsLocalRemote(Tester):
 
     def test_write_and_read(self):
-        session, node = setup(self)
+        session, node = setup_test(self)
 
         read_metrics = ClientRequestMetricsContainer(node, 'Read')
         write_metrics = ClientRequestMetricsContainer(node, 'Write')
@@ -47,7 +47,7 @@ class TestClientRequestMetricsLocalRemote(Tester):
         assert 0 < (r3_r.remote_requests - r2_r.remote_requests)
 
     def test_batch_and_slice(self):
-        session, node = setup(self)
+        session, node = setup_test(self)
 
         read_metrics = ClientRequestMetricsContainer(node, 'Read')
         write_metrics = ClientRequestMetricsContainer(node, 'Write')
@@ -89,7 +89,7 @@ class TestClientRequestMetricsLocalRemote(Tester):
         assert 0 < (r3_r.remote_requests - r2_r.remote_requests)
 
     def test_paxos(self):
-        session, node = setup(self)
+        session, node = setup_test(self)
 
         read_metrics = ClientRequestMetricsContainer(node, 'Read')
         write_metrics = ClientRequestMetricsContainer(node, 'Write')
@@ -177,7 +177,7 @@ def setup_schema(session):
     session.execute("CREATE TABLE test (id int,ord int,val varchar,PRIMARY KEY (id, ord));""")
 
 
-def setup(obj):
+def setup_test(obj):
     cluster = obj.cluster
     cluster.populate(2)
 

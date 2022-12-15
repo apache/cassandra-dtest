@@ -556,7 +556,7 @@ class TestAccuracy(TestHelper):
         logger.debug("Waiting for workers to complete")
         while exceptions_queue.empty():
             time.sleep(0.1)
-            if len([t for t in threads if t.isAlive()]) == 0:
+            if len([t for t in threads if t.is_alive()]) == 0:
                 break
 
         if not exceptions_queue.empty():

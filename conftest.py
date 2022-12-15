@@ -1,5 +1,8 @@
 import copy
-import collections
+try:
+    import collections.abc as collections
+except ImportError:
+    import collections
 import logging
 import os
 import platform
@@ -149,7 +152,7 @@ def fixture_logging_setup(request):
     log_level = logging.INFO
     try:
         # first see if logging level overridden by user as command line argument
-        log_level_from_option = pytest.config.getoption("--log-level")
+        log_level_from_option = request.config.getoption("--log-level")
         if log_level_from_option is not None:
             log_level = logging.getLevelName(log_level_from_option)
         else:
@@ -158,22 +161,22 @@ def fixture_logging_setup(request):
         # nope, user didn't specify it as a command line argument to pytest, check if
         # we have a default in the loaded pytest.ini. Note: words are seperated in variables
         # in .ini land with a "_" while the command line arguments use "-"
-        if pytest.config.inicfg.get("log_level") is not None:
-            log_level = logging.getLevelName(pytest.config.inicfg.get("log_level"))
+        if request.config.inicfg.get("log_level") is not None:
+            log_level = logging.getLevelName(request.config.inicfg.get("log_level"))
 
     logging.root.setLevel(log_level)
 
     logging_format = None
     try:
         # first see if logging level overridden by user as command line argument
-        log_format_from_option = pytest.config.getoption("--log-format")
+        log_format_from_option = request.config.getoption("--log-format")
         if log_format_from_option is not None:
             logging_format = log_format_from_option
         else:
             raise ValueError
     except ValueError:
-        if pytest.config.inicfg.get("log_format") is not None:
-            logging_format = pytest.config.inicfg.get("log_format")
+        if request.config.inicfg.get("log_format") is not None:
+            logging_format = request.config.inicfg.get("log_format")
 
     logging.basicConfig(level=log_level,
                         format=logging_format)
@@ -192,8 +195,8 @@ def fixture_logging_setup(request):
 
 @pytest.fixture(scope="session")
 def log_global_env_facts(fixture_dtest_config, fixture_logging_setup):
-    if pytest.config.pluginmanager.hasplugin('junitxml'):
-        my_junit = getattr(pytest.config, '_xml', None)
+    if fixture_dtest_config.config.pluginmanager.hasplugin('junitxml'):
+        my_junit = getattr(fixture_dtest_config.config, '_xml', None)
         my_junit.add_global_property('USE_VNODES', fixture_dtest_config.use_vnodes)
 
 

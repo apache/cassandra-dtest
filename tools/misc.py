@@ -5,7 +5,10 @@ import hashlib
 import logging
 import pytest
 
-from collections import Mapping
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 
 from ccmlib.node import Node
 
