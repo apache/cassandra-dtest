@@ -388,7 +388,7 @@ class TestTTL(Tester):
                 pytest.fail("should throw InvalidRequest")
             if self.cluster.version() >= '3.0':  # client warn only on 3.0+
                 if policy == 'CAP':
-                    logger.debug("Warning is {}", result.warnings[0])
+                    logger.debug("Warning is {}".format(result.warnings[0]))
                     assert 'exceeds maximum supported expiration' in result.warnings[0], 'Warning not found'
                 else:
                     assert not result.warnings, "There should be no warnings"
@@ -591,7 +591,7 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         corrupt_sstable_dir = os.path.join(base_dir, 'sstables', 'ttl_test', version)
         table_dir = self.get_table_paths('ttl_table')[0]
-        logger.debug("Copying sstables from {} into {}", corrupt_sstable_dir, table_dir)
+        logger.debug("Copying sstables from {} into {}".format(corrupt_sstable_dir, table_dir))
         copytree(corrupt_sstable_dir, table_dir)
 
         logger.debug("Load corrupted sstable")
@@ -609,7 +609,7 @@ class TestRecoverNegativeExpirationDate(TestHelper):
                                                          reinsert_overflowed_ttl=True,
                                                          no_validate=True)
 
-        logger.debug("Executed offline scrub on {}", str(scrubbed_sstables))
+        logger.debug("Executed offline scrub on {}".format(str(scrubbed_sstables)))
 
         logger.debug("Starting node again")
         self.cluster.start()
