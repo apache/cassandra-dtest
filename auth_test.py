@@ -34,7 +34,7 @@ class AbstractTestAuth(Tester):
             permissions = ('ALTER', 'DROP', 'DESCRIBE')
         return [(creator, role, perm) for perm in permissions]
 
-    def cluster_version_has_unmask_permission(self):
+    def cluster_version_has_masking_permissions(self):
         return self.cluster.version() >= LooseVersion('4.2')
 
     def data_resource_creator_permissions(self, creator, resource):
@@ -48,8 +48,9 @@ class AbstractTestAuth(Tester):
         for perm in 'SELECT', 'MODIFY', 'ALTER', 'DROP', 'AUTHORIZE':
             permissions.append((creator, resource, perm))
 
-        if self.cluster_version_has_unmask_permission():
+        if self.cluster_version_has_masking_permissions():
             permissions.append((creator, resource, 'UNMASK'))
+            permissions.append((creator, resource, 'SELECT_MASKED'))
 
         if resource.startswith("<keyspace "):
             permissions.append((creator, resource, 'CREATE'))
@@ -1683,8 +1684,9 @@ class TestAuthRoles(AbstractTestAuth):
                        ("mike", "<keyspace ks>", "SELECT"),
                        ("mike", "<keyspace ks>", "MODIFY"),
                        ("mike", "<keyspace ks>", "AUTHORIZE")]
-        if self.cluster_version_has_unmask_permission():
+        if self.cluster_version_has_masking_permissions():
             permissions.append(("mike", "<keyspace ks>", "UNMASK"))
+            permissions.append(("mike", "<keyspace ks>", "SELECT_MASKED"))
         self.assert_permissions_listed(permissions,
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF mike")
@@ -1697,8 +1699,9 @@ class TestAuthRoles(AbstractTestAuth):
                        ("mike", "<table ks.cf>", "SELECT"),
                        ("mike", "<table ks.cf>", "MODIFY"),
                        ("mike", "<table ks.cf>", "AUTHORIZE")]
-        if self.cluster_version_has_unmask_permission():
+        if self.cluster_version_has_masking_permissions():
             permissions.append(("mike", "<table ks.cf>", "UNMASK"))
+            permissions.append(("mike", "<table ks.cf>", "SELECT_MASKED"))
         self.assert_permissions_listed(permissions,
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF mike")
