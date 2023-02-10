@@ -24,7 +24,7 @@ class TestUserFunctions(Tester):
     def fixture_dtest_setup_overrides(self, dtest_config):
         dtest_setup_overrides = DTestSetupOverrides()
 
-        if dtest_config.cassandra_version_from_build >= '3.0':
+        if '3.0' <= dtest_config.cassandra_version_from_build < '4.2':
             dtest_setup_overrides.cluster_options = ImmutableMapping({'enable_user_defined_functions': 'true',
                                                                       'enable_scripted_user_defined_functions': 'true'})
         else:
@@ -170,6 +170,7 @@ class TestUserFunctions(Tester):
         # should now work - unambiguous
         session.execute("DROP FUNCTION overloaded")
 
+    @since('3.0', max_version='4.1.x')
     def test_udf_scripting(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val double);")
@@ -177,19 +178,23 @@ class TestUserFunctions(Tester):
         for x in range(1, 4):
             session.execute("INSERT INTO nums (key, val) VALUES (%d, %d)" % (x, float(x)))
 
-        session.execute("CREATE FUNCTION x_sin(val double) called on null input returns double language javascript as 'Math.sin(val)'")
+        session.execute(
+            "CREATE FUNCTION x_sin(val double) called on null input returns double language javascript as 'Math.sin(val)'")
 
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 1, [1, 1.0, math.sin(1.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 2, [2, 2.0, math.sin(2.0)])
         assert_one(session, "SELECT key, val, x_sin(val) FROM nums where key = %d" % 3, [3, 3.0, math.sin(3.0)])
 
-        session.execute("create function y_sin(val double) called on null input returns double language javascript as 'Math.sin(val).toString()'")
+        session.execute(
+            "create function y_sin(val double) called on null input returns double language javascript as 'Math.sin(val).toString()'")
 
         assert_invalid(session, "select y_sin(val) from nums where key = 1", expected=FunctionFailure)
 
-        assert_invalid(session, "create function compilefail(key int) called on null input returns double language javascript as 'foo bar';")
+        assert_invalid(session,
+                       "create function compilefail(key int) called on null input returns double language javascript as 'foo bar';")
 
-        session.execute("create function plustwo(key int) called on null input returns double language javascript as 'key+2'")
+        session.execute(
+            "create function plustwo(key int) called on null input returns double language javascript as 'key+2'")
 
         assert_one(session, "select plustwo(key) from nums where key = 3", [5])
 
@@ -206,6 +211,16 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT avg(val) FROM nums", [5.0])
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
+        if self.cluster.version() < LooseVersion('4.2'):
+            session.execute("create function test(a int, b double) called on null input returns int language javascript as 'a + b;'")
+        else:
+            session.execute("create function test(a int, b double) called on null input returns int language java as 'return a + Integer.valueOf(b.intValue());'")
+        session.execute("create aggregate aggy(double) sfunc test stype int")
+
+        assert_invalid(session, "create aggregate aggtwo(int) sfunc aggy stype int")
+
+        assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
+
     def test_aggregate_udf(self):
         session = self.prepare()
         session.execute("create table nums (key int primary key, val int);")
@@ -217,13 +232,6 @@ class TestUserFunctions(Tester):
         session.execute("create aggregate suma (int) sfunc plus stype int finalfunc stri initcond 10")
 
         assert_one(session, "select suma(val) from nums", ["16"])
-
-        session.execute("create function test(a int, b double) called on null input returns int language javascript as 'a + b;'")
-        session.execute("create aggregate aggy(double) sfunc test stype int")
-
-        assert_invalid(session, "create aggregate aggtwo(int) sfunc aggy stype int")
-
-        assert_invalid(session, "create aggregate aggthree(int) sfunc test stype int finalfunc aggtwo")
 
     def test_udf_with_udt(self):
         """
