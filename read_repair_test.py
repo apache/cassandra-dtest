@@ -34,6 +34,10 @@ def byteman_validate(node, script, verbose=False, opts=None):
         glob.glob(os.path.join(cdir, 'build', 'lib', 'jars', 'byteman-[0-9]*.jar'))[0],
         os.path.join(cdir, 'build', '*'),
     ]
+
+    if os.path.exists(os.path.join(cdir, 'modules', 'accord')):
+        jars.append(glob.glob(os.path.join(cdir, 'modules', 'accord', 'accord-core', 'build', 'libs', 'accord-core-[0-9].[0-9]-SNAPSHOT.jar'))[0])
+
     byteman_cmd.append(':'.join(jars))
     byteman_cmd.append('org.jboss.byteman.check.TestScript')
     byteman_cmd.append('-p')
