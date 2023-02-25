@@ -24,7 +24,7 @@ from .upgrade_base import switch_jdks
 from .upgrade_manifest import (build_upgrade_pairs,
                                current_2_1_x, current_2_2_x, current_3_0_x,
                                indev_3_11_x,
-                               current_3_11_x, indev_trunk, CASSANDRA_4_0, CASSANDRA_4_2)
+                               current_3_11_x, indev_trunk, CASSANDRA_4_0, CASSANDRA_5_0)
 
 logger = logging.getLogger(__name__)
 
@@ -526,7 +526,7 @@ class TestUpgrade(Tester):
             logger.debug("Set new cassandra dir for %s: %s" % (node.name, node.get_install_dir()))
             if internode_ssl and (LooseVersion(version_meta.family) >= CASSANDRA_4_0):
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
-            if LooseVersion(version_meta.family) >= CASSANDRA_4_2:
+            if LooseVersion(version_meta.family) >= CASSANDRA_5_0:
                 node.set_configuration_options({'enable_scripted_user_defined_functions': 'false'})
 
         # hacky? yes. We could probably extend ccm to allow this publicly.

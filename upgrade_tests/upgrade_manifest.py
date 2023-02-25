@@ -27,8 +27,8 @@ CASSANDRA_3_0 = '3.0'
 CASSANDRA_3_11 = '3.11'
 CASSANDRA_4_0 = '4.0'
 CASSANDRA_4_1 = '4.1'
-CASSANDRA_4_2 = '4.2'
-TRUNK = CASSANDRA_4_2
+CASSANDRA_5_0 = '5.0'
+TRUNK = CASSANDRA_5_0
 
 def is_same_family_current_to_indev(origin, destination):
     """
@@ -101,8 +101,8 @@ def set_version_family():
         version_family = CASSANDRA_4_0
     elif current_version.vstring.startswith('4.1'):
         version_family = CASSANDRA_4_1
-    elif current_version.vstring.startswith('4.2'):
-        version_family = CASSANDRA_4_2
+    elif current_version.vstring.startswith('5.0'):
+        version_family = CASSANDRA_5_0
     else:
         # when this occurs, it's time to update this manifest a bit!
         raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
@@ -182,13 +182,13 @@ indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', ver
 MANIFEST = {
     current_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     current_2_2_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
-    current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_4_0_x, indev_4_1_x, indev_trunk],
-    current_3_11_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x, indev_trunk],
+    current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_4_0_x, indev_4_1_x],
+    current_3_11_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
     current_4_0_x: [indev_4_0_x, indev_4_1_x, indev_trunk],
 
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
-    indev_3_0_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x, indev_trunk],
-    indev_3_11_x: [indev_4_0_x, indev_4_1_x, indev_trunk],
+    indev_3_0_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
+    indev_3_11_x: [indev_4_0_x, indev_4_1_x],
     indev_4_0_x: [indev_4_1_x, indev_trunk],
     indev_4_1_x: [indev_trunk]
 }
