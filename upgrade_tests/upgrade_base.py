@@ -17,25 +17,6 @@ from dtest import Tester, create_ks
 logger = logging.getLogger(__name__)
 
 
-def switch_jdks(major_version_int):
-    """
-    Changes the jdk version globally, by setting JAVA_HOME = JAVA[N]_HOME.
-    This means the environment must have JAVA[N]_HOME set to switch to jdk version N.
-    """
-    new_java_home = 'JAVA{}_HOME'.format(major_version_int)
-
-    try:
-        os.environ[new_java_home]
-    except KeyError:
-        raise RuntimeError("You need to set {} to run these tests!".format(new_java_home))
-
-    # don't change if the same version was requested
-    current_java_home = os.environ.get('JAVA_HOME')
-    if current_java_home != os.environ[new_java_home]:
-        logger.debug("Switching jdk to version {} (JAVA_HOME is changing from {} to {})".format(major_version_int, current_java_home or 'undefined', os.environ[new_java_home]))
-        os.environ['JAVA_HOME'] = os.environ[new_java_home]
-
-
 @pytest.mark.upgrade_test
 @pytest.mark.skipif(sys.platform == 'win32', reason='Skip upgrade tests on Windows')
 class UpgradeTester(Tester, metaclass=ABCMeta):
@@ -73,7 +54,6 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         previous_java_home = os.environ['JAVA_HOME']
         previous_cassandra_version = os.environ['CASSANDRA_VERSION'] if 'CASSANDRA_VERSION' in os.environ else None
 
-        switch_jdks(self.UPGRADE_PATH.starting_meta.java_version)
         os.environ['CASSANDRA_VERSION'] = self.UPGRADE_PATH.starting_version
 
         yield
@@ -170,7 +150,6 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
             node1.mark_log_for_errors()
 
         logger.debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
-        switch_jdks(self.UPGRADE_PATH.upgrade_meta.java_version)
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
         self.install_legacy_parsing(node1)

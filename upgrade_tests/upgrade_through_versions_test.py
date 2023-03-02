@@ -20,7 +20,6 @@ from cassandra.query import SimpleStatement
 
 from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
 from tools.misc import generate_ssl_stores, new_node
-from .upgrade_base import switch_jdks
 from .upgrade_manifest import (build_upgrade_pairs,
                                current_2_1_x, current_2_2_x, current_3_0_x,
                                indev_3_11_x,
@@ -328,7 +327,6 @@ class TestUpgrade(Tester):
         cluster = self.cluster
         cluster.set_install_dir(version=self.test_version_metas[0].version)
         self.install_nodetool_legacy_parsing()
-        switch_jdks(self.test_version_metas[0].java_version)
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         logger.debug("Versions to test (%s): %s" % (type(self), str([v.version for v in self.test_version_metas])))
 
@@ -508,7 +506,6 @@ class TestUpgrade(Tester):
         and upgrade all nodes.
         """
         logger.debug('Upgrading {nodes} to {version}'.format(nodes=[n.name for n in nodes] if nodes is not None else 'all nodes', version=version_meta.version))
-        switch_jdks(version_meta.java_version)
         logger.debug("JAVA_HOME: " + os.environ.get('JAVA_HOME'))
         if not partial:
             nodes = self.cluster.nodelist()
