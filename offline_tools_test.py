@@ -311,7 +311,11 @@ class TestOfflineTools(Tester):
             (out, error, rc) = node1.run_sstableverify("keyspace1", "standard1", options=options)
             assert False, "sstable verify did not fail; rc={}\nout={}\nerr={}".format(str(rc), out, error)
         except ToolError as e:
-            m = re.match("(?ms).*Corrupted file: integrity check .* failed for (?P<sstable>\S+?):.*", str(e))
+            m = None
+            if cluster.version() >= '4.2':
+                m = re.match("(?ms).*Corrupted file: integrity check .* failed for (?P<sstable>\S+?):.*", str(e))
+            else:
+                m = re.match("(?ms).*Corrupted SSTable : (?P<sstable>\S+)", str(e))
             assert m is not None, str(e)
             # MacOS might use the "private" prefix.
             assert os.path.normcase(m.group('sstable')).replace("/private/var/folders", "/var/folders") == sstable1
