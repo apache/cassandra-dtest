@@ -34,6 +34,31 @@ class AbstractTestAuth(Tester):
             permissions = ('ALTER', 'DROP', 'DESCRIBE')
         return [(creator, role, perm) for perm in permissions]
 
+    def cluster_version_has_unmask_permission(self):
+        return self.cluster.version() >= LooseVersion('4.2')
+
+    def data_resource_creator_permissions(self, creator, resource):
+        """
+        Assemble a list of all permissions needed to create data on a given resource
+        @param creator User who needs permissions
+        @param resource The resource to grant permissions on
+        @return A list of permissions for creator on resource
+        """
+        permissions = []
+        for perm in 'SELECT', 'MODIFY', 'ALTER', 'DROP', 'AUTHORIZE':
+            permissions.append((creator, resource, perm))
+
+        if self.cluster_version_has_unmask_permission():
+            permissions.append((creator, resource, 'UNMASK'))
+
+        if resource.startswith("<keyspace "):
+            permissions.append((creator, resource, 'CREATE'))
+            keyspace = resource[10:-1]
+            # also grant the creator of a ks perms on functions in that ks
+            for perm in 'CREATE', 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
+                permissions.append((creator, '<all functions in %s>' % keyspace, perm))
+        return permissions
+
 
 class TestAuth(AbstractTestAuth):
 
@@ -947,9 +972,9 @@ class TestAuth(AbstractTestAuth):
 
         # CASSANDRA-7216 automatically grants permissions on a role to its creator
         if self.cluster.cassandra_version() >= '2.2.0':
-            all_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
-            all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
-            all_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
+            all_permissions.extend(self.data_resource_creator_permissions('cassandra', '<keyspace ks>'))
+            all_permissions.extend(self.data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+            all_permissions.extend(self.data_resource_creator_permissions('cassandra', '<table ks.cf2>'))
             all_permissions.extend(self.role_creator_permissions('cassandra', '<role bob>'))
             all_permissions.extend(self.role_creator_permissions('cassandra', '<role cathy>'))
 
@@ -962,7 +987,7 @@ class TestAuth(AbstractTestAuth):
 
         expected_permissions = [('cathy', '<table ks.cf>', 'MODIFY'), ('bob', '<table ks.cf>', 'DROP')]
         if self.cluster.cassandra_version() >= '2.2.0':
-            expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+            expected_permissions.extend(self.data_resource_creator_permissions('cassandra', '<table ks.cf>'))
         self.assertPermissionsListed(expected_permissions, cassandra, "LIST ALL PERMISSIONS ON ks.cf NORECURSIVE")
 
         expected_permissions = [('cathy', '<table ks.cf2>', 'SELECT')]
@@ -1134,25 +1159,6 @@ class TestAuth(AbstractTestAuth):
         rows = session.execute(query)
         perms = [(str(r.username), str(r.resource), str(r.permission)) for r in rows]
         assert sorted(expected) == sorted(perms)
-
-
-def data_resource_creator_permissions(creator, resource):
-    """
-    Assemble a list of all permissions needed to create data on a given resource
-    @param creator User who needs permissions
-    @param resource The resource to grant permissions on
-    @return A list of permissions for creator on resource
-    """
-    permissions = []
-    for perm in 'SELECT', 'MODIFY', 'ALTER', 'DROP', 'AUTHORIZE':
-        permissions.append((creator, resource, perm))
-    if resource.startswith("<keyspace "):
-        permissions.append((creator, resource, 'CREATE'))
-        keyspace = resource[10:-1]
-        # also grant the creator of a ks perms on functions in that ks
-        for perm in 'CREATE', 'ALTER', 'DROP', 'AUTHORIZE', 'EXECUTE':
-            permissions.append((creator, '<all functions in %s>' % keyspace, perm))
-    return permissions
 
 
 @since('2.2')
@@ -1385,8 +1391,8 @@ class TestAuthRoles(AbstractTestAuth):
         mike_permissions = [('mike', '<all roles>', 'CREATE'),
                             ('mike', '<all keyspaces>', 'CREATE')]
         mike_permissions.extend(self.role_creator_permissions('mike', '<role role1>'))
-        mike_permissions.extend(data_resource_creator_permissions('mike', '<keyspace ks>'))
-        mike_permissions.extend(data_resource_creator_permissions('mike', '<table ks.cf>'))
+        mike_permissions.extend(self.data_resource_creator_permissions('mike', '<keyspace ks>'))
+        mike_permissions.extend(self.data_resource_creator_permissions('mike', '<table ks.cf>'))
         mike_permissions.extend(function_resource_creator_permissions('mike', '<function ks.state_function_1(int, int)>'))
         mike_permissions.extend(function_resource_creator_permissions('mike', '<function ks.simple_aggregate_1(int)>'))
 
@@ -1671,23 +1677,29 @@ class TestAuthRoles(AbstractTestAuth):
 
         # GRANT ALL ON KEYSPACE grants Permission.ALL_DATA
         self.superuser.execute("GRANT ALL ON KEYSPACE ks TO mike")
-        self.assert_permissions_listed([("mike", "<keyspace ks>", "CREATE"),
-                                        ("mike", "<keyspace ks>", "ALTER"),
-                                        ("mike", "<keyspace ks>", "DROP"),
-                                        ("mike", "<keyspace ks>", "SELECT"),
-                                        ("mike", "<keyspace ks>", "MODIFY"),
-                                        ("mike", "<keyspace ks>", "AUTHORIZE")],
+        permissions = [("mike", "<keyspace ks>", "CREATE"),
+                       ("mike", "<keyspace ks>", "ALTER"),
+                       ("mike", "<keyspace ks>", "DROP"),
+                       ("mike", "<keyspace ks>", "SELECT"),
+                       ("mike", "<keyspace ks>", "MODIFY"),
+                       ("mike", "<keyspace ks>", "AUTHORIZE")]
+        if self.cluster_version_has_unmask_permission():
+            permissions.append(("mike", "<keyspace ks>", "UNMASK"))
+        self.assert_permissions_listed(permissions,
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF mike")
         self.superuser.execute("REVOKE ALL ON KEYSPACE ks FROM mike")
 
         # GRANT ALL ON TABLE does not include CREATE (because the table must already be created before the GRANT)
         self.superuser.execute("GRANT ALL ON ks.cf TO MIKE")
-        self.assert_permissions_listed([("mike", "<table ks.cf>", "ALTER"),
-                                        ("mike", "<table ks.cf>", "DROP"),
-                                        ("mike", "<table ks.cf>", "SELECT"),
-                                        ("mike", "<table ks.cf>", "MODIFY"),
-                                        ("mike", "<table ks.cf>", "AUTHORIZE")],
+        permissions = [("mike", "<table ks.cf>", "ALTER"),
+                       ("mike", "<table ks.cf>", "DROP"),
+                       ("mike", "<table ks.cf>", "SELECT"),
+                       ("mike", "<table ks.cf>", "MODIFY"),
+                       ("mike", "<table ks.cf>", "AUTHORIZE")]
+        if self.cluster_version_has_unmask_permission():
+            permissions.append(("mike", "<table ks.cf>", "UNMASK"))
+        self.assert_permissions_listed(permissions,
                                        self.superuser,
                                        "LIST ALL PERMISSIONS OF mike")
         self.superuser.execute("REVOKE ALL ON ks.cf FROM mike")
@@ -1788,8 +1800,8 @@ class TestAuthRoles(AbstractTestAuth):
                                 ("role1", "<table ks.cf>", "SELECT"),
                                 ("role2", "<table ks.cf>", "ALTER"),
                                 ("role2", "<role role1>", "ALTER")]
-        expected_permissions.extend(data_resource_creator_permissions('cassandra', '<keyspace ks>'))
-        expected_permissions.extend(data_resource_creator_permissions('cassandra', '<table ks.cf>'))
+        expected_permissions.extend(self.data_resource_creator_permissions('cassandra', '<keyspace ks>'))
+        expected_permissions.extend(self.data_resource_creator_permissions('cassandra', '<table ks.cf>'))
         expected_permissions.extend(self.role_creator_permissions('cassandra', '<role mike>'))
         expected_permissions.extend(self.role_creator_permissions('cassandra', '<role role1>'))
         expected_permissions.extend(self.role_creator_permissions('cassandra', '<role role2>'))
