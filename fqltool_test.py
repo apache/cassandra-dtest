@@ -10,6 +10,7 @@ from shutil import rmtree
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
+JVM_ARGS = ['-Dchronicle.queue.synchronousFileShrinking=true']
 
 @since('4.0')
 class TestFQLTool(Tester):
@@ -23,7 +24,7 @@ class TestFQLTool(Tester):
         query log, then makes sure that the data is correct.
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(2).start()
+        self.cluster.populate(2).start(jvm_args=JVM_ARGS)
         node1, node2 = self.cluster.nodelist()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -61,7 +62,7 @@ class TestFQLTool(Tester):
         sure that the results match
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(jvm_args=JVM_ARGS)
         node1 = self.cluster.nodelist()[0]
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -87,7 +88,7 @@ class TestFQLTool(Tester):
         then asserts that the replays of each generates a mismatch
         @jira_ticket CASSANDRA-14690
         """
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(jvm_args=JVM_ARGS)
         node1 = self.cluster.nodelist()[0]
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -134,7 +135,7 @@ class TestFQLTool(Tester):
 
     def test_jvmdtest(self):
         """ mimics the behavior of the in-jvm dtest, see CASSANDRA-16720 """
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(jvm_args=JVM_ARGS)
         node1 = self.cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
@@ -165,7 +166,7 @@ class TestFQLTool(Tester):
         test that fql can be enabled on a dirty directory
         @jira_ticket CASSANDRA-17136
         """
-        self.cluster.populate(1).start()
+        self.cluster.populate(1).start(jvm_args=JVM_ARGS)
         node1 = self.cluster.nodelist()[0]
 
         with tempfile.TemporaryDirectory() as temp_dir:
