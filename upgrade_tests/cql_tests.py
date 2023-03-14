@@ -2652,9 +2652,13 @@ class TestCQL(UpgradeTester):
 
             assert_row_count(cursor, 'test', 1, where="k = 0 AND t = {}".format(dates[0]))
 
-            assert_invalid(cursor, "SELECT dateOf(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
+            assert_invalid(cursor, "SELECT minTimeuuid(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
 
-            cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
+            cursor.execute("SELECT toTimestamp(t), toUnixTimestamp(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
+
+            if self.get_node_version(is_upgraded) < LooseVersion('5.0'):
+                cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
+
             cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid(1234567) AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
             # not sure what to check exactly so just checking the query returns
 
@@ -3029,7 +3033,10 @@ class TestCQL(UpgradeTester):
             for i in range(0, 5):
                 cursor.execute("INSERT INTO test (k, t) VALUES (%d, now())" % i)
 
-            cursor.execute("SELECT dateOf(t) FROM test")
+            cursor.execute("SELECT totimestamp(t) FROM test")
+
+            if self.get_node_version(is_upgraded) < LooseVersion('5.0'):
+                cursor.execute("SELECT dateOf(t) FROM test")
 
     def test_conditional_update(self):
         cursor = self.prepare()
@@ -3424,7 +3431,10 @@ class TestCQL(UpgradeTester):
             cursor.execute("TRUNCATE test")
 
             cursor.execute("INSERT INTO test(k) VALUES (0)")
-            assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [None])
+            assert_one(cursor, "SELECT toTimestamp(t) FROM test WHERE k=0", [None])
+
+            if self.get_node_version(is_upgraded) < LooseVersion('5.0'):
+                assert_one(cursor, "SELECT dateOf(t) FROM test WHERE k=0", [None])
 
     def test_cas_simple(self):
         # cursor = self.prepare(nodes=3, rf=3)
