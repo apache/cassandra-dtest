@@ -107,6 +107,9 @@ class TestCompaction(Tester):
         @jira_ticket CASSANDRA-11344
         Check that bloom filter size is between 50KB and 100KB for 100K keys
         """
+
+        self.skip_if_not_supported(strategy)
+
         if not hasattr(self, 'strategy') or strategy == "LeveledCompactionStrategy":
             strategy_string = 'strategy=LeveledCompactionStrategy,sstable_size_in_mb=1'
             min_bf_size = 40000
@@ -164,6 +167,7 @@ class TestCompaction(Tester):
         is deleted upon data deletion.
         """
         self.skip_if_no_major_compaction(strategy)
+        self.skip_if_not_supported(strategy)
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
@@ -199,6 +203,9 @@ class TestCompaction(Tester):
         Insert data setting max_sstable_age_days low, and determine sstable
         is deleted upon data deletion past max_sstable_age_days.
         """
+
+        self.skip_if_not_supported(strategy)
+
         if strategy != 'DateTieredCompactionStrategy':
             pytest.skip('Not implemented unless DateTieredCompactionStrategy is used')
 
@@ -298,7 +305,13 @@ class TestCompaction(Tester):
         Ensure that switching strategies does not result in problems.
         Insert data, switch strategies, then check against data loss.
         """
-        strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
+
+        self.skip_if_not_supported(strategy)
+
+        if self.cluster.version() >= '5.0':
+            strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy']
+        else:
+            strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
         if strategy in strategies:
             strategies.remove(strategy)
@@ -372,6 +385,7 @@ class TestCompaction(Tester):
         """
         Make sure we can enable/disable compaction using nodetool
         """
+        self.skip_if_not_supported(strategy)
         cluster = self.cluster
         cluster.populate(1).start()
         [node] = cluster.nodelist()
@@ -398,6 +412,7 @@ class TestCompaction(Tester):
         """
         Make sure we can disable compaction via the schema compaction parameter 'enabled' = false
         """
+        self.skip_if_not_supported(strategy)
         cluster = self.cluster
         cluster.populate(1).start()
         [node] = cluster.nodelist()
@@ -432,6 +447,7 @@ class TestCompaction(Tester):
         """
         Make sure we can enable compaction using an alter-statement
         """
+        self.skip_if_not_supported(strategy)
         cluster = self.cluster
         cluster.populate(1).start()
         [node] = cluster.nodelist()
@@ -461,6 +477,7 @@ class TestCompaction(Tester):
         """
         Make sure compaction stays disabled after an alter statement where we have disabled using nodetool first
         """
+        self.skip_if_not_supported(strategy)
         cluster = self.cluster
         cluster.populate(1).start()
         [node] = cluster.nodelist()
@@ -570,6 +587,9 @@ class TestCompaction(Tester):
         if self.cluster.version() < '2.2' and strategy == 'LeveledCompactionStrategy':
             pytest.skip(msg='major compaction not implemented for LCS in this version of Cassandra')
 
+    def skip_if_not_supported(self, strategy):
+        if self.cluster.version() >= '5.0' and strategy == 'DateTieredCompactionStrategy':
+            pytest.skip(msg='DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
 
 def grep_sstables_in_each_level(node, table_name):
     output = node.nodetool('cfstats').stdout
