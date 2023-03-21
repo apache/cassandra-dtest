@@ -2564,6 +2564,13 @@ class TestCqlshSmoke(Tester, CqlshMixin):
         assert_all(self.session, 'SELECT key FROM ks.test',
                    [['eggs'], ['spam'], ['sausage']])
 
+    def test_copy_stdout(self):
+        """
+        Smoke test COPY ... TO STDOUT
+        CASSANDRA-12497, CASSANDRA-18353
+        """
+        self.node1.run_cqlsh("COPY system.local(cluster_name) TO STDOUT")
+
     def test_create_keyspace(self):
         assert 'created' not in self.get_keyspace_names()
 
