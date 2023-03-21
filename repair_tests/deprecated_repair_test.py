@@ -10,7 +10,7 @@ from ccmlib.common import is_win
 from ccmlib.node import handle_external_tool_process, ToolError
 import ccmlib.repository
 
-from dtest import Tester, create_ks, create_cf
+from dtest import Tester, create_ks, create_cf, hack_legacy_parsing
 from tools.assertions import assert_length_equal
 from tools.data import insert_c1c2
 from tools.jmxutils import (JolokiaAgent, make_mbean)
@@ -256,6 +256,7 @@ class TestDeprecatedRepairNotifications(Tester):
         logger.debug("Running repair on node1 using legacy nodetool (using options that will cause failure with error)")
         legacy_dirpath = ccmlib.repository.directory_name(legacy_version)
         legacy_nodetool_path = os.path.join(legacy_dirpath, "bin", "nodetool")
+        hack_legacy_parsing(legacy_nodetool_path)
         repair_env = self.get_legacy_environment(legacy_version, node_env=node1.get_env())
         repair_args = [legacy_nodetool_path, "-h", "localhost", "-p", str(node1.jmx_port), "repair", "-hosts", "127.0.0.2"]
         p = subprocess.Popen(repair_args, env=repair_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -266,9 +267,9 @@ class TestDeprecatedRepairNotifications(Tester):
         except ToolError as tool_error:
             nodetool_stderr = tool_error.stderr
 
-        # Check for repair failed message in node1 log
-        repair_failed_logs = node1.grep_log(r"ERROR \[(Repair-Task|Thread)-\d+\] \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} RepairRunnable.java:\d+ - Repair failed")
-        assert len(repair_failed_logs) > 0, "Node logs don't have an error message for the failed repair"
         # Check for error and stacktrace in nodetool output
         assert nodetool_stderr.find("error") > -1, "Legacy nodetool didn't print an error message for the failed repair"
         assert nodetool_stderr.find("-- StackTrace --") > -1, "Legacy nodetool didn't print a stack trace for the failed repair"
+        # Check for repair failed message in node1 log
+        repair_failed_logs = node1.grep_log(r"ERROR \[(Repair-Task|Thread)-\d+\] \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} RepairRunnable.java:\d+ - Repair failed")
+        assert len(repair_failed_logs) > 0, "Node logs don't have an error message for the failed repair"
