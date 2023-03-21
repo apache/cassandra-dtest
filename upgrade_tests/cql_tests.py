@@ -2652,16 +2652,26 @@ class TestCQL(UpgradeTester):
 
             assert_row_count(cursor, 'test', 1, where="k = 0 AND t = {}".format(dates[0]))
 
+            # test function with deprecated pre-5.0 names
+            # not sure what to check exactly so just checking the query returns
             assert_invalid(cursor, "SELECT minTimeuuid(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
-
+            cursor.execute("SELECT t FROM test WHERE k = 0"
+                           " AND t > maxTimeuuid(1234567)"
+                           " AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
             if self.get_node_version(is_upgraded) >= LooseVersion('2.2'):
                 cursor.execute("SELECT toTimestamp(t), toUnixTimestamp(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
 
-            if self.get_node_version(is_upgraded) < LooseVersion('5.0'):
+            # test function with new post-5.0 names
+            if self.get_node_version(is_upgraded) >= LooseVersion('5.0'):
+                assert_invalid(cursor, "SELECT min_timeuuid(k) FROM test WHERE k = 0 AND t = %s" % dates[0])
+                cursor.execute("SELECT t FROM test WHERE k = 0"
+                               " AND t > max_timeuuid(1234567)"
+                               " AND t < min_timeuuid('2012-11-07 18:18:22-0800')")
+                cursor.execute("SELECT to_timestamp(t), to_unix_timestamp(t) FROM test WHERE k = 0 AND t = %s"
+                               % dates[0])
+            # test functions removed in 5.0
+            else:
                 cursor.execute("SELECT dateOf(t), unixTimestampOf(t) FROM test WHERE k = 0 AND t = %s" % dates[0])
-
-            cursor.execute("SELECT t FROM test WHERE k = 0 AND t > maxTimeuuid(1234567) AND t < minTimeuuid('2012-11-07 18:18:22-0800')")
-            # not sure what to check exactly so just checking the query returns
 
     def test_float_with_exponent(self):
         cursor = self.prepare()
