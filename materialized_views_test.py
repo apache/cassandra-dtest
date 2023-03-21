@@ -2981,9 +2981,14 @@ class TestMaterializedViewsLockcontention(Tester):
             for y in range(records2):
                 params.append([x, y])
 
+        if self.cluster.version() < LooseVersion('5.0'):
+            insert = 'INSERT INTO test (int1, int2, date) VALUES (?, ?, toTimestamp(now()))'
+        else:
+            insert = 'INSERT INTO test (int1, int2, date) VALUES (?, ?, to_timestamp(now()))'
+
         execute_concurrent_with_args(
             session,
-            session.prepare('INSERT INTO test (int1, int2, date) VALUES (?, ?, toTimestamp(now()))'),
+            session.prepare(insert),
             params
         )
 
