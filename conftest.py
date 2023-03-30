@@ -439,6 +439,10 @@ def fixture_since(request, fixture_dtest_setup):
         # are excluded by the annotation
         if hasattr(request.cls, "UPGRADE_PATH"):
             upgrade_path = request.cls.UPGRADE_PATH
+            if hasattr(upgrade_path, 'upgrade_meta'):
+                skip_msg = _skip_msg(LooseVersion(upgrade_path.upgrade_meta.family), since, max_version)
+                if skip_msg:
+                    pytest.skip(skip_msg)
             ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
             starting_version = get_version_from_build(ccm_repo_cache_dir)
             skip_msg = _skip_msg(starting_version, since, max_version)
@@ -486,6 +490,10 @@ def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
         # are excluded by the annotation
         if hasattr(request.cls, "UPGRADE_PATH"):
             upgrade_path = request.cls.UPGRADE_PATH
+            if hasattr(upgrade_path, 'upgrade_meta'):
+                skip_msg = _skip_msg(LooseVersion(upgrade_path.upgrade_meta.family), since, max_version)
+                if skip_msg:
+                    pytest.skip(skip_msg)
             ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
             starting_version = get_version_from_build(ccm_repo_cache_dir)
             skip_msg = _skip_ported_msg(starting_version, ported_from_version)
