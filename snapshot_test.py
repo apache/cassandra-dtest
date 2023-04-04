@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess
 import time
+from distutils.version import LooseVersion
+
 import pytest
 import logging
 
@@ -336,6 +338,15 @@ class TestArchiveCommitlog(SnapshotTester):
         else:
             system_cfs_snapshot_dirs = self.make_snapshot(node1, 'system', 'schema_columnfamilies', 'cfs')
 
+        systemlocal_dirs = self.make_snapshot(node1, 'system', 'local', 'local')
+
+        if self.cluster.version() >= LooseVersion('5.1'):
+            local_dirs = self.make_snapshot(node1, 'system', 'local_metadata_log', 'local_metadata_log')
+            metadata_snapshot_dirs = self.make_snapshot(node1, 'system', 'metadata_snapshots', 'metadata_snapshots')
+            sealed_dirs = self.make_snapshot(node1, 'system', 'metadata_sealed_periods', 'metadata_sealed_periods')
+            last_sealed_dirs = self.make_snapshot(node1, 'system', 'metadata_last_sealed_period', 'metadata_last_sealed_period')
+            cluster_metadata_snapshot_dirs = self.make_snapshot(node1, 'system_cluster_metadata', 'distributed_metadata_log', 'distributed_metadata_log')
+
         try:
             # Write more data:
             logger.debug("Writing second 30,000 rows...")
@@ -408,6 +419,21 @@ class TestArchiveCommitlog(SnapshotTester):
             for snapshot_dir in snapshot_dirs:
                 self.restore_snapshot(snapshot_dir, node1, 'ks', 'cf', 'basic')
 
+            for local_dir in systemlocal_dirs:
+                self.restore_snapshot(local_dir, node1, 'system', 'local', 'local')
+
+            if self.cluster.version() >= LooseVersion('5.1'):
+                for local_dir in local_dirs:
+                    self.restore_snapshot(local_dir, node1, 'system', 'local_metadata_log', 'local_metadata_log')
+                for snapshot_dir in metadata_snapshot_dirs:
+                    self.restore_snapshot(snapshot_dir, node1, 'system', 'metadata_snapshots', 'metadata_snapshots')
+                for sealed_dir in sealed_dirs:
+                    self.restore_snapshot(sealed_dir, node1, 'system', 'metadata_sealed_periods', 'metadata_sealed_periods')
+                for last_sealed_dir in last_sealed_dirs:
+                    self.restore_snapshot(last_sealed_dir, node1, 'system', 'metadata_last_sealed_period', 'metadata_last_sealed_period')
+                for cm_dir in cluster_metadata_snapshot_dirs:
+                    self.restore_snapshot(cm_dir, node1, 'system_cluster_metadata', 'distributed_metadata_log', 'distributed_metadata_log')
+
             cluster.start()
 
             session = self.patient_cql_connection(node1)
@@ -471,6 +497,26 @@ class TestArchiveCommitlog(SnapshotTester):
             logger.debug("removing snapshot_dir: " + ",".join(system_col_snapshot_dirs))
             for system_col_snapshot_dir in system_col_snapshot_dirs:
                 shutil.rmtree(system_col_snapshot_dir)
+            logger.debug("removing snapshot_dir: " + ",".join(systemlocal_dirs))
+            for systemlocal_snapshot_dir in systemlocal_dirs:
+                shutil.rmtree(systemlocal_snapshot_dir)
+
+            if self.cluster.version() >= LooseVersion('5.1'):
+                logger.debug("removing snapshot_dir: " + ",".join(local_dirs))
+                for local_snapshot_dir in local_dirs:
+                    shutil.rmtree(local_snapshot_dir)
+                logger.debug("removing snapshot_dir: " + ",".join(metadata_snapshot_dirs))
+                for metadata_snapshot_dir in metadata_snapshot_dirs:
+                    shutil.rmtree(metadata_snapshot_dir)
+                logger.debug("removing snapshot_dir: " + ",".join(sealed_dirs))
+                for sealed_snapshot_dir in sealed_dirs:
+                    shutil.rmtree(sealed_snapshot_dir)
+                logger.debug("removing snapshot_dir: " + ",".join(last_sealed_dirs))
+                for last_sealed_snapshot_dir in last_sealed_dirs:
+                    shutil.rmtree(last_sealed_snapshot_dir)
+                logger.debug("removing snapshot_dir: " + ",".join(cluster_metadata_snapshot_dirs))
+                for cm_snapshot_dir in cluster_metadata_snapshot_dirs:
+                    shutil.rmtree(cm_snapshot_dir)
 
             logger.debug("removing tmp_commitlog: " + tmp_commitlog)
             shutil.rmtree(tmp_commitlog)
