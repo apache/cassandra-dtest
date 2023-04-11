@@ -9,7 +9,7 @@ from cassandra import InvalidRequest
 from cassandra.query import SimpleStatement, dict_factory, named_tuple_factory
 from ccmlib.common import LogPatternToVersion
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, run_scenarios, MAJOR_VERSION_4
+from dtest import run_scenarios, MAJOR_VERSION_4
 
 from tools.assertions import (assert_read_timeout_or_failure, assert_lists_equal_ignoring_order)
 from tools.data import rows_to_list
@@ -17,7 +17,8 @@ from tools.datahelp import create_rows, flatten_into_set, parse_data_into_dicts
 from tools.misc import add_skip
 from tools.paging import PageAssertionMixin, PageFetcher
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs
+from .upgrade_manifest import build_upgrade_pairs, RUN_STATIC_UPGRADE_MATRIX
+
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)

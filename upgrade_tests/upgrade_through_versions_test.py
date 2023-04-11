@@ -18,12 +18,15 @@ from queue import Empty, Full
 from cassandra import ConsistencyLevel, WriteTimeout, DriverException
 from cassandra.query import SimpleStatement
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
+from dtest import Tester
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_manifest import (build_upgrade_pairs,
-                               current_2_1_x, current_2_2_x, current_3_0_x,
-                               indev_3_11_x,
-                               current_3_11_x, indev_trunk, CASSANDRA_4_0, CASSANDRA_5_0)
+                               current_2_2_x,
+                               current_3_0_x, indev_3_11_x, current_3_11_x,
+                               current_4_0_x, indev_4_1_x, current_4_1_x,
+                               indev_trunk,
+                               CASSANDRA_4_0, CASSANDRA_5_0,
+                               RUN_STATIC_UPGRADE_MATRIX)
 
 logger = logging.getLogger(__name__)
 
@@ -897,30 +900,39 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
 MULTI_UPGRADES = (
-    # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.11)
-    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_EndsAt_3_11_X',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_11_x], protocol_version=3, extra_config=None),
-    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_3_11_X_HEAD',
-                 version_metas=[current_2_1_x, current_2_2_x, current_3_0_x, indev_3_11_x], protocol_version=3,
+    # Proto v3 upgrades (v3 is supported on 2.1, 2.2, 3.0, 3.11, 4.0, 4.1, trunk)
+    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, current_4_0_x, current_4_1_x, indev_trunk], protocol_version=3, extra_config=None),
+    MultiUpgrade(name='TestProtoV3Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, current_4_0_x, current_4_1_x, indev_trunk], protocol_version=3,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
 
-    # Proto v4 upgrades (v4 is supported on 2.2, 3.0, 3.1, trunk)
+    # Proto v4 upgrades (v4 is supported on 2.2, 3.0, 3.1, 4.0, 4.1, trunk)
     MultiUpgrade(name='TestProtoV4Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, indev_trunk], protocol_version=4, extra_config=None),
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, current_4_0_x, current_4_1_x, indev_trunk], protocol_version=4, extra_config=None),
     MultiUpgrade(name='TestProtoV4Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, indev_trunk], protocol_version=4,
+                 version_metas=[current_2_2_x, current_3_0_x, current_3_11_x, current_4_0_x, current_4_1_x, indev_trunk], protocol_version=4,
                  extra_config=(
                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
                  )),
+
+    # Proto v5 upgrades (v5 is supported on 4.1, trunk)
+    MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+                  version_metas=[current_4_1_x, indev_trunk], protocol_version=5, extra_config=None),
+    MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+                  version_metas=[current_4_1_x, indev_trunk], protocol_version=5,
+                  extra_config=(
+                      ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
+                  )),
+
     #Beta versions don't work with this test since it doesn't specify use beta in the client
-    #It's fine I guess for now? Can update on release
-    # Proto v5 upgrades (v5 is supported on 3.0, 3.11, trunk)
-    # MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_EndsAt_Trunk_HEAD',
-    #              version_metas=[current_3_0_x, current_3_x, indev_trunk], protocol_version=5, extra_config=None),
-    # MultiUpgrade(name='TestProtoV5Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
-    #              version_metas=[current_3_0_x, current_3_x, indev_trunk], protocol_version=5,
+    # Proto v6 upgrades (v6 is supported on 5.0, trunk)
+    # MultiUpgrade(name='TestProtoV6Upgrade_AllVersions_EndsAt_Trunk_HEAD',
+    #              version_metas=[current_5_0_x, indev_trunk], protocol_version=6, extra_config=None),
+    # MultiUpgrade(name='TestProtoV6Upgrade_AllVersions_RandomPartitioner_EndsAt_Trunk_HEAD',
+    #              version_metas=[current_5_0_x, indev_trunk], protocol_version=6,
     #              extra_config=(
     #                  ('partitioner', 'org.apache.cassandra.dht.RandomPartitioner'),
     #              )),
@@ -938,8 +950,9 @@ for upgrade in MULTI_UPGRADES:
                 newmeta = oldmeta.clone_with_local_env_version()
                 logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
                 metas[-1] = newmeta
-
-        create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
+                create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
+        else:
+            create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
 
 for pair in build_upgrade_pairs():

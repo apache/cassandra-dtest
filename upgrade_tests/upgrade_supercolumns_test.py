@@ -19,9 +19,10 @@ from thrift_bindings.thrift010.Cassandra import (CfDef, Column, ColumnDef,
                                            Mutation, NotFoundException,
                                            SlicePredicate, SliceRange,
                                            SuperColumn)
-from upgrade_tests.upgrade_manifest import indev_2_1_x, indev_2_2_x, indev_3_0_x, indev_3_11_x, indev_trunk, \
+from upgrade_tests.upgrade_manifest import indev_2_2_x, indev_3_0_x, indev_3_11_x, indev_4_0_x, indev_4_1_x, \
     CASSANDRA_4_0
 
+since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 # Use static supercolumn data to reduce total test time and avoid driver issues connecting to C* 1.2.
@@ -32,6 +33,7 @@ NAMES = [name.encode() for name in ["Alice", "Bob", "Claire", "Dave", "Ed", "Fra
 
 
 @pytest.mark.upgrade_test
+@since('2.2', max_version='3.99')
 class TestSCUpgrade(Tester):
     """
     Tests upgrade between a 2.0 cluster with predefined super columns and all other versions. Verifies data with both
@@ -54,7 +56,7 @@ class TestSCUpgrade(Tester):
             # don't alter ignore_log_patterns on the class, just the obj for this test
             fixture_dtest_setup.ignore_log_patterns += [_known_teardown_race_error]
 
-    def prepare(self, num_nodes=1, cassandra_version=indev_2_1_x.version):
+    def prepare(self, num_nodes=1, cassandra_version=indev_2_2_x.version):
         cluster = self.cluster
 
         # Forcing cluster version on purpose
@@ -127,6 +129,7 @@ class TestSCUpgrade(Tester):
         session = self.patient_exclusive_cql_connection(node1)
 
         self.verify_with_cql(session)
+        node1.nodetool("enablethrift")
         self.verify_with_thrift()
 
         for version in upgrade_path:
@@ -144,10 +147,10 @@ class TestSCUpgrade(Tester):
 
     def test_upgrade_super_columns_through_all_versions(self):
         self._upgrade_super_columns_through_versions_test(upgrade_path=[indev_2_2_x, indev_3_0_x,
-                                                                        indev_3_11_x, indev_trunk])
+                                                                        indev_3_11_x, indev_4_0_x, indev_4_1_x])
 
     def test_upgrade_super_columns_through_limited_versions(self):
-        self._upgrade_super_columns_through_versions_test(upgrade_path=[indev_3_0_x, indev_trunk])
+        self._upgrade_super_columns_through_versions_test(upgrade_path=[indev_3_0_x, indev_4_0_x])
 
     def upgrade_to_version(self, tag, nodes=None):
         logger.debug('Upgrading to ' + tag)

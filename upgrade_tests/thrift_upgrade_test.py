@@ -4,7 +4,7 @@ import logging
 
 from cassandra.query import dict_factory, SimpleStatement
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, Tester
+from dtest import Tester
 from thrift_bindings.thrift010 import Cassandra
 from thrift_bindings.thrift010.Cassandra import (Column, ColumnDef,
                                                  ColumnParent, ConsistencyLevel,
@@ -15,7 +15,7 @@ from tools.assertions import (assert_all, assert_length_equal,
                               assert_lists_of_dicts_equal)
 from tools.misc import wait_for_agreement, add_skip
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0, RUN_STATIC_UPGRADE_MATRIX
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -189,6 +189,7 @@ def _validate_dense_thrift(client, cf='dense_super_1'):
         assert cosc.super_column.columns[0].value == 'value1'.encode()
 
 @pytest.mark.upgrade_test
+@since('2.1', max_version='4.99')
 class TestUpgradeSuperColumnsThrough(Tester):
     def upgrade_to_version(self, tag, nodes=None):
         logger.debug('Upgrading to ' + tag)
@@ -324,6 +325,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
         cursor = self.patient_cql_connection(node, row_factory=dict_factory)
         _validate_dense_cql(cursor, cf='dense_super_1', is_version_4_or_greater=node.get_cassandra_version() >= CASSANDRA_4_0)
 
+    @since('3.0.99', max_version='4.99')
     def test_sparse_supercolumn(self):
         cluster = self.prepare()
         self.install_nodetool_legacy_parsing()
@@ -380,7 +382,7 @@ class TestUpgradeSuperColumnsThrough(Tester):
 
 
 @pytest.mark.upgrade_test
-@since('4.0')
+@since('4.0', max_version='4.99')
 class TestUpgradeTo40(Tester):
     """
     Thrift is dead in 4.0. However, we still want to ensure users that used thrift

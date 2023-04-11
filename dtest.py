@@ -21,8 +21,11 @@ from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import ExecutionProfile
 from cassandra.policies import RetryPolicy, RoundRobinPolicy
+from ccmlib.common import get_version_from_build
 from ccmlib.node import ToolError, TimeoutError
 from tools.misc import retry_till_success
+
+from upgrade_tests.upgrade_manifest import build_upgrade_pairs
 
 
 LOG_SAVED_DIR = "logs"
@@ -43,9 +46,8 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR = os.path.expanduser(config.get('main', 'default_dir'))
 
-RUN_STATIC_UPGRADE_MATRIX = os.environ.get('RUN_STATIC_UPGRADE_MATRIX', '').lower() in ('yes', 'true')
-
 MAJOR_VERSION_4 = LooseVersion('4.0')
+MAJOR_VERSION_5 = LooseVersion('5.0')
 
 logger = logging.getLogger(__name__)
 
@@ -247,12 +249,20 @@ class Tester(object):
         self.dtest_config = fixture_dtest_setup.dtest_config
         return None
 
+    def assert_supported_upgrade_path(self, from_version, to_version):
+        for path in build_upgrade_pairs():
+            if from_version.startswith(path.starting_meta.family) and to_version.startswith(path.upgrade_meta.family):
+                return None
+        pytest.fail("Upgrades from {} to {} are not supported and should not be tested".format(from_version, to_version))
+
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
 
         if version:
+            self.assert_supported_upgrade_path(node.get_cassandra_version().vstring, version)
             node.set_install_dir(version=version)
         else:
+            self.assert_supported_upgrade_path(node.get_cassandra_version().vstring, get_version_from_build(self.dtest_config.cassandra_dir).vstring)
             node.set_install_dir(install_dir=self.dtest_config.cassandra_dir)
             os.environ['CASSANDRA_DIR'] = self.dtest_config.cassandra_dir
 

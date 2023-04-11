@@ -16,7 +16,7 @@ from cassandra.protocol import ProtocolException, SyntaxException
 from cassandra.query import SimpleStatement
 from cassandra.util import sortedset
 
-from dtest import RUN_STATIC_UPGRADE_MATRIX, MAJOR_VERSION_4
+from dtest import MAJOR_VERSION_4
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnDef,
@@ -29,7 +29,8 @@ from tools.assertions import (assert_all, assert_invalid, assert_length_equal,
 from tools.data import rows_to_list
 from tools.misc import add_skip
 from .upgrade_base import UpgradeTester
-from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0, CASSANDRA_4_1
+from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_4_0, CASSANDRA_4_1, RUN_STATIC_UPGRADE_MATRIX
+
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)

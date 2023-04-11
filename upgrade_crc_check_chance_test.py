@@ -8,7 +8,7 @@ since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 @pytest.mark.upgrade_test
-@since('3.0')
+@since('3.0', max_version='3.99')
 class TestCrcCheckChanceUpgrade(Tester):
 
     @pytest.fixture(autouse=True)

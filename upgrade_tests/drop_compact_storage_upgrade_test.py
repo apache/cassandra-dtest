@@ -6,13 +6,14 @@ import logging
 from cassandra.protocol import InvalidRequest
 
 from dtest import Tester
+from upgrade_tests.upgrade_manifest import current_2_2_x
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
 
 VERSION_30 = 'github:apache/cassandra-3.0'
 VERSION_311 = 'github:apache/cassandra-3.11'
-VERSION_TRUNK = 'github:apache/trunk'
+VERSION_40 = 'github:apache/cassandra-4.0'
 
 
 @pytest.mark.upgrade_test
@@ -23,7 +24,7 @@ class TestDropCompactStorage(Tester):
         node1, node2, node3 = cluster.nodelist()
 
         # Forcing cluster version on purpose
-        cluster.set_install_dir(version="2.1.14")
+        cluster.set_install_dir(version=current_2_2_x.version)
         self.install_nodetool_legacy_parsing()
         cluster.start(wait_for_binary_proto=True)
 
@@ -99,7 +100,7 @@ class TestDropCompactStorage(Tester):
         session.cluster.control_connection.wait_for_schema_agreement()
         session.execute("SELECT * FROM drop_compact_storage_test.test")
 
-    @since('4.0')
+    @since('4.0', max_version='4.99')
     def test_drop_compact_storage_mixed_cluster(self):
         """
         @jira_ticket CASSANDRA-15897
@@ -143,7 +144,7 @@ class TestDropCompactStorage(Tester):
 
         self.upgrade_node(node2, VERSION_311)
 
-        self.upgrade_node(node3, VERSION_TRUNK)
+        self.upgrade_node(node3, VERSION_40)
 
         node1.nodetool("upgradesstables")
         time.sleep(2)
@@ -156,7 +157,7 @@ class TestDropCompactStorage(Tester):
         self.drop_compact_storage(session, assert_msg_part1, node1.ip_addr, node2.ip_addr, assert_msg_part2)
 
         for node in [node1, node2]:
-            self.upgrade_node(node, VERSION_TRUNK)
+            self.upgrade_node(node, VERSION_40)
             time.sleep(5)
             node.nodetool("upgradesstables")
 

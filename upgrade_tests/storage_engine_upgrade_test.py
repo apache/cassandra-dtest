@@ -3,7 +3,7 @@ import time
 import pytest
 import logging
 
-from dtest import Tester, MAJOR_VERSION_4
+from dtest import Tester, MAJOR_VERSION_4, MAJOR_VERSION_5
 from sstable_generation_loading_test import BaseSStableLoaderTester
 from thrift_bindings.thrift010.Cassandra import (ConsistencyLevel, Deletion,
                                            Mutation, SlicePredicate,
@@ -12,7 +12,7 @@ from thrift_test import composite, get_thrift_client, i32
 from tools.assertions import (assert_all, assert_length_equal, assert_none,
                               assert_one)
 from tools.misc import new_node
-from upgrade_tests.upgrade_manifest import indev_3_0_x, indev_2_1_x
+from upgrade_tests.upgrade_manifest import indev_2_2_x, indev_3_0_x, indev_4_0_x
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -39,10 +39,12 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_configuration_options(cluster_options)
 
         # Forcing cluster version on purpose
-        if self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4:
+        if self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_5:
+            cluster.set_install_dir(version=indev_4_0_x.version)
+        elif self.dtest_config.cassandra_version_from_build >= MAJOR_VERSION_4:
             cluster.set_install_dir(version=indev_3_0_x.version)
         else:
-            cluster.set_install_dir(version=indev_2_1_x.version)
+            cluster.set_install_dir(version=indev_2_2_x.version)
         self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
         cluster.populate(1).start()
