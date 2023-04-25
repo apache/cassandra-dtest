@@ -25,6 +25,7 @@ from dtest import running_in_docker, cleanup_docker_environment_before_test_exec
 from dtest_config import DTestConfig
 from dtest_setup import DTestSetup
 from dtest_setup_overrides import DTestSetupOverrides
+from upgrade_tests import upgrade_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ def pytest_configure(config):
     if not config.getoption("--help"):
         dtest_config = DTestConfig()
         dtest_config.setup(config)
+        upgrade_manifest.set_config(config)
         if dtest_config.metatests and config.args[0] == str(os.getcwd()):
             config.args = ['./meta_tests']
 
