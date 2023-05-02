@@ -1042,7 +1042,8 @@ CREATE OR REPLACE AGGREGATE test.average(int)
         # Describe keyspaces
         expected_keyspaces = ['system_schema', 'system', 'system_traces', 'system_views',
                               'system_auth', 'system_distributed', 'system_virtual_schema']
-
+        if self.cluster.version() >= LooseVersion('5.1'):
+            expected_keyspaces.append('cluster_metadata')
         node1, = self.cluster.nodelist()
         output, err = self.run_cqlsh(node1, "DESCRIBE KEYSPACES")
 
