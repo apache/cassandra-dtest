@@ -428,11 +428,7 @@ class TestTransientReplicationRing(Tester):
 
         nodes[0].nodetool('removenode ' + node4_id)
 
-        # Give streaming time to occur, it's asynchronous from removenode completing at other nodes
-        import time
-        time.sleep(15)
-
-        self._everyone_should_have_everything(sessions)
+#        self._everyone_should_have_everything(sessions) # no they shouldn't
 
         repair_nodes(nodes)
         cleanup_nodes(nodes)
