@@ -12,7 +12,7 @@ class TestGossiper(Tester):
     Test gossip states
     """
 
-    @since('3.11.2')
+    @since('3.11.2', max_version='5.0.x')
     def test_startup_no_live_seeds(self):
         """
         Test that a node won't start with no live seeds.
@@ -40,7 +40,7 @@ class TestGossiper(Tester):
         else:
             pytest.fail("Expecting startup to raise a TimeoutError, but nothing was raised.")
 
-    @since('3.11.2')
+    @since('3.11.2', max_version='5.0.x')
     def test_startup_non_seed_with_peers(self):
         """
         Test that a node can start if peers are alive, or if a node has been bootstrapped
@@ -73,7 +73,7 @@ class TestGossiper(Tester):
         node1.start(wait_other_notice=False, wait_for_binary_proto=120)
         self.assert_log_had_msg(node1, 'Unable to gossip with any peers but continuing anyway since node is in its own seed list', timeout=60)
 
-    @since('3.11.2')
+    @since('3.11.2', max_version='5.0.x')
     def test_startup_after_ring_delay(self):
         """
         Tests that if we start a node with no live seeds, then start a seed after RING_DELAY
