@@ -246,7 +246,7 @@ class TestNodetool(Tester):
                                  filename='debug.log')) >= 0
         assert 'Batchlog replay throttle: 2048 KB/s' in node.nodetool('getbatchlogreplaythrottle').stdout
 
-    @since('3.0')
+    @since('3.0', max_version='5.0.x')
     def test_reloadlocalschema(self):
         """
         @jira_ticket CASSANDRA-13954
