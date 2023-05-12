@@ -3,6 +3,8 @@ import random
 import re
 import time
 import uuid
+from distutils.version import LooseVersion
+
 import pytest
 import logging
 
@@ -327,9 +329,12 @@ class TestSecondaryIndexes(Tester):
         after_files = self._index_sstables_files(node1, 'keyspace1', 'standard1', 'ix_c0')
         assert before_files != after_files
         assert 1 == len(list(session.execute(stmt, [lookup_value])))
+        expected = 1
+        if self.cluster.version() >= LooseVersion('5.1'):
+            expected = 2 # in tcm PaxosUncommittedIndex is is IndexInfo table
 
         # verify that only the expected row is present in the build indexes table
-        assert 1 == len(list(session.execute("""SELECT * FROM system."IndexInfo";""")))
+        assert expected == len(list(session.execute("""SELECT * FROM system."IndexInfo";""")))
 
     @since('4.0')
     def test_failing_manual_rebuild_index(self):
