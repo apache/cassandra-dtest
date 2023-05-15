@@ -6,7 +6,7 @@ import logging
 import re
 
 from cassandra import ConsistencyLevel
-from dtest import Tester
+from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_stderr_clean
 from tools.jmxutils import (JolokiaAgent, make_mbean)
 
@@ -113,6 +113,51 @@ class TestGossipingPropertyFileSnitch(Tester):
         
         assert re.search(ipstr.format(NODE1_LISTEN_ADDRESS), out)
         assert re.search(ipstr.format(NODE2_LISTEN_ADDRESS), out)
+
+    def test_prefer_local_reconnect_on_restart(self):
+        """
+        @jira_ticket CASSANDRA-16718
+        """
+
+        NODE1_LISTEN_ADDRESS = '127.0.0.1'
+        NODE1_BROADCAST_ADDRESS = '127.0.0.3'
+
+        NODE2_LISTEN_ADDRESS = '127.0.0.2'
+        NODE2_BROADCAST_ADDRESS = '127.0.0.4'
+        NODE2_LISTEN_ADDRESS_DIFFERENT = '127.0.0.5'
+
+        STORAGE_PORT = 7000
+
+        cluster = self.cluster
+        cluster.populate(2)
+        node1, node2 = cluster.nodelist()
+
+        cluster.seeds = [NODE1_BROADCAST_ADDRESS]
+        cluster.set_configuration_options(values={'endpoint_snitch': 'org.apache.cassandra.locator.GossipingPropertyFileSnitch',
+                                                  'listen_on_broadcast_address': 'true'})
+        node1.set_configuration_options(values={'broadcast_address': NODE1_BROADCAST_ADDRESS})
+        node2.auto_bootstrap = True
+        node2.set_configuration_options(values={'broadcast_address': NODE2_BROADCAST_ADDRESS})
+
+        for node in cluster.nodelist():
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as snitch_file:
+                snitch_file.write("dc=dc1" + os.linesep)
+                snitch_file.write("rack=rack1" + os.linesep)
+                snitch_file.write("prefer_local=true" + os.linesep)
+
+        node1.start(wait_for_binary_proto=True)
+        node2.start(wait_for_binary_proto=True, wait_other_notice=False)
+
+        node1.stress(['write', 'n=100', 'no-warmup'])
+        node2.stop()
+
+        node2.set_configuration_options(values={'listen_address': NODE2_LISTEN_ADDRESS_DIFFERENT})
+        node2.start(wait_for_binary_proto=True, wait_other_notice=False)
+
+        session = self.patient_cql_connection(node1)
+        query = session.prepare("SELECT * from keyspace1.standard1;");
+        query.consistency_level = ConsistencyLevel.ALL;
+        session.execute(query)
 
 class TestDynamicEndpointSnitch(Tester):
     @pytest.mark.resource_intensive
