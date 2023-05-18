@@ -114,6 +114,7 @@ class TestGossipingPropertyFileSnitch(Tester):
         assert re.search(ipstr.format(NODE1_LISTEN_ADDRESS), out)
         assert re.search(ipstr.format(NODE2_LISTEN_ADDRESS), out)
 
+    @since('4.0')
     def test_prefer_local_reconnect_on_restart(self):
         """
         @jira_ticket CASSANDRA-16718
