@@ -39,7 +39,8 @@ class TestAuditlog(Tester):
         log_dir = tempfile.mkdtemp('logs')
         moved_log_dir, move_script = self._create_script()
         cluster.set_configuration_options(values={'full_query_logging_options': {'log_dir': log_dir,
-                                                                                 'archive_command': 'conf should not be used'}})
+                                                                                 'archive_command': 'conf should not be used',
+                                                                                 'allow_nodetool_archive_command':'true'}})
         cluster.populate(1).start(jvm_args=JVM_ARGS)
         node = cluster.nodelist()[0]
         node.nodetool("enablefullquerylog --archive-command \"%s %%path\" --roll-cycle=TEST_SECONDLY"%move_script)
