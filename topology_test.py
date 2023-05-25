@@ -405,16 +405,21 @@ class TestTopology(Tester):
         node3.stop()
         logger.debug('attempting restart...')
         node3.start(wait_other_notice=False)
+        timedout = False
         try:
             # usually takes 3 seconds, so give it a generous 15
             node3.watch_log_for(rejoin_err, timeout=15)
         except TimeoutError:
             # TimeoutError is not very helpful to the reader of the test output;
             # let that pass and move on to string assertion below
-            pass
+            timedout = True
+
+        n3errors = node3.grep_log_for_errors()
+        if len(n3errors) == 0 and timedout:
+            raise TimeoutError("timed out and did not find log entry: " + rejoin_err)
 
         assert re.search(rejoin_err,
-                         '\n'.join(['\n'.join(err_list) for err_list in node3.grep_log_for_errors()]), re.MULTILINE)
+                         '\n'.join(['\n'.join(err_list) for err_list in n3errors]), re.MULTILINE)
 
         # Give the node some time to shut down once it has detected
         # its invalid state. If it doesn't shut down in the 30 seconds,
