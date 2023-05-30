@@ -77,7 +77,7 @@ class TestHelper(Tester):
         -Statistics.db file (only available in >= 3.0)
         """
         for fname in self.get_sstable_files(self.get_table_paths(table)):
-            if not fname.endswith("-Data.db") and not fname.endswith("-Statistics.db"):
+            if not fname.endswith("-Data.db") and not fname.endswith("-Statistics.db") and not fname.endswith("-CompressionInfo.db"):
                 paths = self.get_table_paths(table)
                 for path in paths:
                     fullname = os.path.join(path, fname)

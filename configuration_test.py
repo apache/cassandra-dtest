@@ -35,8 +35,8 @@ class TestConfiguration(Tester):
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
         alter_chunk_len_query = "ALTER TABLE test_table WITH " \
-                                "compression = {{'sstable_compression' : 'SnappyCompressor', " \
-                                "'chunk_length_kb' : {chunk_length}}};"
+                                "compression = {{'class' : 'SnappyCompressor', " \
+                                "'chunk_length_in_kb' : {chunk_length}}};"
 
         session.execute(create_table_query)
 
