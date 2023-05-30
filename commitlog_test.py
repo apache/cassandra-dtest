@@ -342,7 +342,9 @@ class TestCommitLog(Tester):
         Test the stop_commit commitlog failure policy
         """
         self.prepare(configuration={
-            'commit_failure_policy': 'stop_commit'
+            'commit_failure_policy': 'stop_commit',
+            'write_request_timeout_in_ms': '2000',
+            'cas_contention_timeout_in_ms': '1000'
         })
 
         self.session1.execute("""
