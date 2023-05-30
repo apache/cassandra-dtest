@@ -177,7 +177,7 @@ class TestCounters(Tester):
                 c counter
             )
         """
-        query = query + "WITH compression = { 'sstable_compression' : 'SnappyCompressor' }"
+        query = query + "WITH compression = { 'class' : 'SnappyCompressor' }"
 
         session.execute(query)
         time.sleep(2)
