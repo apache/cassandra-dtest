@@ -1,4 +1,6 @@
 import time
+from distutils.version import LooseVersion
+
 import pytest
 import re
 import logging
@@ -198,12 +200,21 @@ class TestIncRepair(Tester):
         node1.flush()
         node2.flush()
 
-        node3.start()
+        node3.start(wait_other_notice=True)
+        mark = node3.mark_log()
         if node3.get_cassandra_version() < '2.2':
             log_file = 'system.log'
         else:
             log_file = 'debug.log'
-        node3.watch_log_for("Initializing keyspace1.standard1", filename=log_file)
+
+        # in later versions, schema init happens asynchronously via the metadata log
+        # follower so may occur before the server is ready to accept JMX connections
+        if node3.get_cassandra_version() >= LooseVersion('5.1'):
+            ready_message = "Startup complete"
+        else:
+            ready_message = "Initializing keyspace1.standard1"
+
+        node3.watch_log_for(ready_message, filename=log_file, from_mark=mark)
         # wait for things to settle before starting repair
         time.sleep(1)
         if self.cluster.version() >= "2.2":
