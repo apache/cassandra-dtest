@@ -122,7 +122,7 @@ class TestTransientReplicationRing(Tester):
         self.cluster.populate(3, tokens=self.tokens, debug=True, install_byteman=True)
         # self.cluster.populate(3, debug=True, install_byteman=True)
         self.cluster.start(jvm_args=['-Dcassandra.enable_nodelocal_queries=true'],
-                           timeout=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECS * 2)
+                           timeout=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECS * 4)
 
         # enable shared memory
         for node in self.cluster.nodelist():
