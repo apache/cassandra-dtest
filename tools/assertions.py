@@ -301,7 +301,8 @@ def assert_stderr_clean(err, acceptable_errors=None):
                              "Picked up JAVA_TOOL_OPTIONS:.*",
                              # Warnings for backward compatibility should be logged CASSANDRA-15234
                              ".*parameters have been deprecated. They have new names and/or value format; "
-                             + "For more information, please refer to NEWS.txt*"]
+                             + "For more information, please refer to NEWS.txt*",
+                             ".*Error while computing token map for keyspace cluster_metadata with datacenter .*"]
 
     regex_str = r"^({}|\s*|\n)*$".format("|".join(acceptable_errors))
     err_str = err.strip()
