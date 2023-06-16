@@ -11,3 +11,8 @@ upgrade
 html/
 doxygen/doxypy-0.4.2/
 .pytest_cache/
+
+bin/
+lib/
+pyvenv.cfg
+src/

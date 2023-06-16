@@ -443,6 +443,8 @@ class TestTopology(Tester):
         cluster.populate(3).start()
 
         node1, node2 = cluster.nodelist()[0:2]
+        session = self.patient_cql_connection(node1)
+        session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
 
         t = DecommissionInParallel(node1)
         t.start()
@@ -476,6 +478,12 @@ class TestTopology(Tester):
         @jira_ticket CASSANDRA-12510
         @expected_errors ToolError when # nodes will drop below configured replicas in NTS/SimpleStrategy
         """
+
+        # we need to ignore this error log message which is emitted during the test 
+        # because dtest framework which reads the logs would evaluate the node is errorneous and 
+        # it would terminate it prematurely
+        self.fixture_dtest_setup.ignore_log_patterns = (r'.*Not enough live nodes to maintain replication factor*')
+
         cluster = self.cluster
         cluster.populate([2, 2]).start()
         node1, node2, node3, node4 = self.cluster.nodelist()
@@ -491,6 +499,8 @@ class TestTopology(Tester):
         create_ks(session, 'ks2', 4)
         with pytest.raises(ToolError):
             node4.nodetool('decommission')
+
+        self.fixture_dtest_setup.ignore_log_patterns = ()
 
         node4.nodetool('decommission --force')
         decommissioned = node4.watch_log_for("DECOMMISSIONED", timeout=120)
