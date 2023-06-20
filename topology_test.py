@@ -478,6 +478,10 @@ class TestTopology(Tester):
         @jira_ticket CASSANDRA-12510
         @expected_errors ToolError when # nodes will drop below configured replicas in NTS/SimpleStrategy
         """
+
+        # we need to ignore this error log message which is emitted during the test 
+        # because dtest framework which reads the logs would evaluate the node is errorneous and 
+        # it would terminate it prematurely
         self.fixture_dtest_setup.ignore_log_patterns = (r'.*Not enough live nodes to maintain replication factor*')
 
         cluster = self.cluster
