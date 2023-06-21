@@ -78,7 +78,7 @@ class TestOfflineTools(Tester):
         node1.stress(['write', 'n=50K', 'no-warmup', '-schema', 'replication(factor=1)',
                       '-rate', 'threads=8'])
         cluster.flush()
-        self.wait_for_compactions(node1)
+        node1.wait_for_compactions()
         cluster.stop()
 
         initial_levels = self.get_levels(node1.run_sstablemetadata(keyspace="keyspace1", column_families=["standard1"]))
@@ -102,13 +102,6 @@ class TestOfflineTools(Tester):
     def get_levels(self, data):
         (out, err, rc) = data
         return list(map(int, re.findall("SSTable Level: ([0-9])", out)))
-
-    def wait_for_compactions(self, node):
-        pattern = re.compile("pending tasks: 0")
-        while True:
-            output, err, _ = node.nodetool("compactionstats")
-            if pattern.search(output):
-                break
 
     def test_sstableofflinerelevel(self):
         """
@@ -178,7 +171,7 @@ class TestOfflineTools(Tester):
 
         node1.flush()
         logger.debug("Waiting for compactions to finish")
-        self.wait_for_compactions(node1)
+        node1.wait_for_compactions()
         logger.debug("Stopping node")
         cluster.stop()
         logger.debug("Done stopping node")
