@@ -40,7 +40,7 @@ class TestNativeTransportSSL(Tester):
         except NoHostAvailable:
             pass
 
-        if cluster.version() >= '4.0':
+        if cluster.version() >= '4.0' and cluster.version() < '5.0':
             assert len(node1.grep_log("javax.net.ssl.SSLHandshakeException")) > 0, \
                     "Missing SSL handshake exception while connecting with non-SSL enabled client"
         else:
