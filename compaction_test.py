@@ -13,6 +13,7 @@ from dtest import Tester, create_ks
 from tools.assertions import assert_length_equal, assert_none, assert_one
 
 since = pytest.mark.since
+ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
 strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
@@ -346,6 +347,7 @@ class TestCompaction(Tester):
                 time.sleep(5)
                 cluster.start()
 
+    @ported_to_in_jvm('5.0')  # org.apache.cassandra.distributed.test.guardrails.GuardrailPartitionSizeTest
     def test_large_compaction_warning(self):
         """
         @jira_ticket CASSANDRA-9643
