@@ -1,11 +1,15 @@
+from datetime import datetime
 import distutils.dir_util
 import glob
 import os
 import shutil
 import subprocess
 import time
+from pathlib import Path
 import pytest
 import logging
+import json
+import csv
 
 from cassandra.concurrent import execute_concurrent_with_args
 
@@ -31,11 +35,13 @@ class SnapshotTester(Tester):
         args = [(r,) for r in range(start, end)]
         execute_concurrent_with_args(session, insert_statement, args, concurrency=20)
 
-    def make_snapshot(self, node, ks, cf, name):
+    def make_snapshot(self, node, ks, cf, name, ttl=None):
         logger.debug("Making snapshot....")
         node.nodetool('disableautocompaction')
         node.flush()
         snapshot_cmd = 'snapshot {ks} -cf {cf} -t {name}'.format(ks=ks, cf=cf, name=name)
+        if ttl is not None:
+            snapshot_cmd += ' --ttl ' + ttl
         logger.debug("Running snapshot cmd: {snapshot_cmd}".format(snapshot_cmd=snapshot_cmd))
         node.nodetool(snapshot_cmd)
         tmpdir = safe_mkdtemp()
@@ -60,6 +66,9 @@ class SnapshotTester(Tester):
             x += 1
 
         return tmpdir
+
+    def list_snapshots(self, node):
+        return node.nodetool("listsnapshots")
 
     def restore_snapshot(self, snapshot_dir, node, ks, cf):
         logger.debug("Restoring snapshot....")
@@ -119,6 +128,58 @@ class TestSnapshot(SnapshotTester):
         shutil.rmtree(snapshot_dir)
 
         assert rows[0][0] == 100
+
+    def test_ttl_fields(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic', '3m')
+
+        for item in Path(snapshot_dir).rglob("*manifest.json"):
+            fields = json.load(open(item))
+            assert 'expires_at' in fields
+            assert 'created_at' in fields
+            created_at = datetime.strptime(fields['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            expires_at = datetime.strptime(fields['expires_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+            assert (expires_at - created_at).seconds == 180
+
+        snapshot_dir = self.make_snapshot(node1, 'ks', 'cf', 'basic-another')
+        for item in Path(snapshot_dir).rglob("*manifest.json"):
+            fields = json.load(open(item))
+            assert 'expires_at' not in fields
+            assert 'created_at' not in fields
+
+    def test_ttl_simple(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
+        time.sleep(80)
+        output = self.list_snapshots(node1).stdout
+        assert 'basic' not in output
+
+    def test_ttl_stop_and_start(self):
+        cluster = self.cluster
+        cluster.populate(1).start()
+        (node1,) = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+        self.create_schema(session)
+
+        self.insert_rows(session, 0, 100)
+        self.make_snapshot(node1, 'ks', 'cf', 'basic', '1m')
+        node1.stop()
+        node1.start(wait_for_binary_proto=True)
+        time.sleep(90)
+        output = self.list_snapshots(node1).stdout
+        assert 'basic' not in output
 
     @since('3.0')
     def test_snapshot_and_restore_drop_table_remove_dropped_column(self):
