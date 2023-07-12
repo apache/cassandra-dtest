@@ -181,7 +181,8 @@ class TestTransientReplicationRing(Tester):
         for i in range(1, 40, 2):
             self.insert_row(i, i, i, main_session)
 
-        nodes[1].start(wait_for_binary_proto=True)
+        # we don't need to wait for other nodes, see CASSANDRA-18660
+        nodes[1].start(wait_for_binary_proto=True, wait_other_notice=False)
 
         sessions = [self.exclusive_cql_connection(node) for node in [self.node1, self.node2, self.node3]]
 
