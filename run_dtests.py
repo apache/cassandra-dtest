@@ -131,7 +131,7 @@ class RunDTests():
             "import sys\n"
             "sys.exit(pytest.main([{options}]))\n".format(options=original_raw_cmd_args))
         temp = NamedTemporaryFile(dir=getcwd())
-        logger.debug('Writing the following to {}:'.format(temp.name))
+        logger.debug('Writing to {} the following:\n {}'.format(temp.name, to_execute.encode("utf-8")))
 
         temp.write(to_execute.encode("utf-8"))
         temp.flush()

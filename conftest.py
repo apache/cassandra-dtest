@@ -113,8 +113,8 @@ def pytest_configure(config):
 def sufficient_system_resources_for_resource_intensive_tests():
     mem = virtual_memory()
     total_mem_gb = mem.total / 1024 / 1024 / 1024
-    logger.info("total available system memory is %dGB" % total_mem_gb)
-    # todo kjkj: do not hard code our bound.. for now just do 9 instances at 3gb a piece
+    logger.info("total available system memory is %dGB, require 27GB for resource intensive tests" % total_mem_gb)
+    # do not hard code our bound.. for now just do 9 instances at 3gb a piece
     return total_mem_gb >= 9 * 3
 
 

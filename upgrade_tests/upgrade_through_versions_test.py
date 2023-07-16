@@ -22,8 +22,8 @@ from dtest import Tester
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_manifest import (build_upgrade_pairs,
                                current_2_2_x,
-                               current_3_0_x, indev_3_11_x, current_3_11_x,
-                               current_4_0_x, indev_4_1_x, current_4_1_x,
+                               current_3_0_x, current_3_11_x,
+                               current_4_0_x, current_4_1_x,
                                indev_trunk,
                                CASSANDRA_4_0, CASSANDRA_5_0,
                                RUN_STATIC_UPGRADE_MATRIX)
@@ -297,7 +297,6 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
 
 @pytest.mark.upgrade_test
 @pytest.mark.resource_intensive
-@pytest.mark.skip("Fake skip so that this isn't run outside of a generated class that removes this annotation")
 class TestUpgrade(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.
@@ -325,6 +324,8 @@ class TestUpgrade(Tester):
         )
 
     def prepare(self):
+        if type(self).__name__ == "TestUpgrade":
+            pytest.skip("Skip base class, only generated classes run the tests")
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         cluster = self.cluster
@@ -416,12 +417,6 @@ class TestUpgrade(Tester):
 
             # upgrade through versions
             for version_meta in self.test_version_metas[1:]:
-                if version_meta.family > '3.11' and internode_ssl:
-                    seeds =[]
-                    for seed in cluster.seeds:
-                        seeds.append(seed.ip_addr + ':7001')
-                    logger.debug("Forcing seeds to 7001 for internode ssl")
-                    cluster.seeds = seeds
 
                 for num, node in enumerate(self.cluster.nodelist()):
                     # sleep (sigh) because driver needs extra time to keep up with topo and make quorum possible
@@ -877,25 +872,29 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     print("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
     print("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
-    upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
     newcls = type(
             clsname,
             parent_classes,
             {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
         )
-    # Remove the skip annotation in the superclass we just derived from, we will add it back if we actually intend
-    # to skip with a better message
-    newcls.pytestmark = [mark for mark in newcls.pytestmark if not mark.name == "skip"]
-    #if not upgrade_applies_to_env:
-        #print("boo")
-        #newcls.pytestmark.append(pytest.mark.skip("test not applicable to env"))
-    print(newcls.pytestmark)
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
 
     globals()[clsname] = newcls
     return newcls
+
+
+def supported_upgrade_paths(version_metas):
+    metas = []
+    for version_meta in version_metas[:-1]:
+        for path in build_upgrade_pairs():
+            if version_meta.family == path.starting_meta.family and version_metas[-1].family == path.upgrade_meta.family:
+                metas.append(version_meta)
+                break
+
+    metas.append(version_metas[-1])
+    return metas
 
 
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
@@ -942,7 +941,8 @@ MULTI_UPGRADES = (
 for upgrade in MULTI_UPGRADES:
     # if any version_metas are None, this means they are versions not to be tested currently
     if all(upgrade.version_metas):
-        metas = upgrade.version_metas
+        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths compatible with the end "indev_" version
+        metas = supported_upgrade_paths(upgrade.version_metas)
 
         if not RUN_STATIC_UPGRADE_MATRIX:
             if metas[-1].matches_current_env_version_family:
