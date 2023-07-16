@@ -1,16 +1,17 @@
 from distutils.version import LooseVersion
 
+import logging
 import operator
 import os
 import pprint
+import pytest
+import psutil
 import random
 import signal
 import time
 import uuid
-import logging
-import pytest
-import psutil
 
+from ccmlib.common import get_jdk_version_int
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from queue import Empty, Full
@@ -22,8 +23,8 @@ from dtest import Tester
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_manifest import (build_upgrade_pairs,
                                current_2_2_x,
-                               current_3_0_x, indev_3_11_x, current_3_11_x,
-                               current_4_0_x, indev_4_1_x, current_4_1_x,
+                               current_3_0_x, current_3_11_x,
+                               current_4_0_x, current_4_1_x,
                                indev_trunk,
                                CASSANDRA_4_0, CASSANDRA_5_0,
                                RUN_STATIC_UPGRADE_MATRIX)
@@ -297,7 +298,6 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
 
 @pytest.mark.upgrade_test
 @pytest.mark.resource_intensive
-@pytest.mark.skip("Fake skip so that this isn't run outside of a generated class that removes this annotation")
 class TestUpgrade(Tester):
     """
     Upgrades a 3-node Murmur3Partitioner cluster through versions specified in test_version_metas.
@@ -325,6 +325,8 @@ class TestUpgrade(Tester):
         )
 
     def prepare(self):
+        if type(self).__name__ == "TestUpgrade":
+            pytest.skip("Skip base class, only generated classes run the tests")
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         cluster = self.cluster
@@ -416,12 +418,6 @@ class TestUpgrade(Tester):
 
             # upgrade through versions
             for version_meta in self.test_version_metas[1:]:
-                if version_meta.family > '3.11' and internode_ssl:
-                    seeds =[]
-                    for seed in cluster.seeds:
-                        seeds.append(seed.ip_addr + ':7001')
-                    logger.debug("Forcing seeds to 7001 for internode ssl")
-                    cluster.seeds = seeds
 
                 for num, node in enumerate(self.cluster.nodelist()):
                     # sleep (sigh) because driver needs extra time to keep up with topo and make quorum possible
@@ -877,19 +873,11 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     print("  using protocol: v{}, and parent classes: {}".format(protocol_version, parent_class_names))
     print("  to run these tests alone, use `nosetests {}.py:{}`".format(__name__, clsname))
 
-    upgrade_applies_to_env = RUN_STATIC_UPGRADE_MATRIX or version_metas[-1].matches_current_env_version_family
     newcls = type(
             clsname,
             parent_classes,
             {'test_version_metas': version_metas, '__test__': True, 'protocol_version': protocol_version, 'extra_config': extra_config}
         )
-    # Remove the skip annotation in the superclass we just derived from, we will add it back if we actually intend
-    # to skip with a better message
-    newcls.pytestmark = [mark for mark in newcls.pytestmark if not mark.name == "skip"]
-    #if not upgrade_applies_to_env:
-        #print("boo")
-        #newcls.pytestmark.append(pytest.mark.skip("test not applicable to env"))
-    print(newcls.pytestmark)
 
     if clsname in globals():
         raise RuntimeError("Class by name already exists!")
@@ -897,6 +885,34 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     globals()[clsname] = newcls
     return newcls
 
+
+def jdk_compatible_steps(version_metas):
+    metas = []
+    for version_meta in version_metas:
+        # if you want multi-step upgrades to work with versions that require different jdks
+        #   then define the JAVA<jdk_version>_HOME vars (e.g. JAVA8_HOME)
+        #   ccm detects these variables and changes the jdk when starting/upgrading the node
+        # otherwise the default behaviour is to only do upgrade steps that work with the current jdk
+        javan_home_defined = False
+        for meta_java_version in version_meta.java_versions:
+            javan_home_defined |= 'JAVA{}_HOME'.format(meta_java_version) in os.environ
+        if CURRENT_JAVA_VERSION in version_meta.java_versions or javan_home_defined:
+            metas.append(version_meta)
+
+    return metas
+
+
+def current_env_java_version():
+    # $JAVA_HOME/bin/java takes precedence over any java found in $PATH
+    if 'JAVA_HOME' in os.environ:
+        java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    else:
+        java_command = 'java'
+
+    return get_jdk_version_int(java_command)
+
+
+CURRENT_JAVA_VERSION = current_env_java_version()
 
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
@@ -942,17 +958,20 @@ MULTI_UPGRADES = (
 for upgrade in MULTI_UPGRADES:
     # if any version_metas are None, this means they are versions not to be tested currently
     if all(upgrade.version_metas):
-        metas = upgrade.version_metas
+        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths jdk compatible with the end "indev_" version (or any JAVA<jdk_version>_HOME defined)
+        metas = jdk_compatible_steps(upgrade.version_metas)
 
-        if not RUN_STATIC_UPGRADE_MATRIX:
-            if metas[-1].matches_current_env_version_family:
-                # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
-                oldmeta = metas[-1]
-                newmeta = oldmeta.clone_with_local_env_version()
-                logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
-                metas[-1] = newmeta
-                create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
-        else:
+        if len(metas) > 1:
+            if not RUN_STATIC_UPGRADE_MATRIX:
+                # replace matching meta with current version
+                for idx, meta in enumerate(metas):
+                    if meta.matches_current_env_version_family:
+                        assert CURRENT_JAVA_VERSION in meta.java_versions, "Incompatible JDK {} for version {}".format(java_version, meta.family)
+                        newmeta = meta.clone_with_local_env_version()
+                        logger.debug("{} appears applicable to current env. Overriding version from {} to {}".format(upgrade.name, meta.version, newmeta.version))
+                        metas[idx] = newmeta
+                        break
+
             create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
 
