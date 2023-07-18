@@ -286,10 +286,11 @@ class TestCompaction(Tester):
             "MB": 1,
             "MiB": 1,
             "KiB": 1. / 1024,
-            "GiB": 1024
+            "GiB": 1024,
+            "B": 1. / (1024 * 1024),
         }
 
-        units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['KiB', 'MiB', 'GiB']
+        units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['B', 'KiB', 'MiB', 'GiB']
         assert found_units in units
 
         logger.debug(avgthroughput)
