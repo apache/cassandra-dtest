@@ -1,15 +1,17 @@
 from distutils.version import LooseVersion
 
+import logging
 import operator
 import os
 import pprint
-import random
-import signal
-import time
-import uuid
-import logging
 import pytest
 import psutil
+import random
+import re
+import signal
+import subprocess
+import time
+import uuid
 
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
@@ -885,16 +887,20 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     return newcls
 
 
-def supported_upgrade_paths(version_metas):
+def jdk_compatible_steps(version_metas):
     metas = []
-    for version_meta in version_metas[:-1]:
-        for path in build_upgrade_pairs():
-            if version_meta.family == path.starting_meta.family and version_metas[-1].family == path.upgrade_meta.family:
-                metas.append(version_meta)
-                break
+    java_version = current_env_java_version()
+    for version_meta in version_metas:
+        if java_version in version_meta.java_versions:
+            metas.append(version_meta)
 
-    metas.append(version_metas[-1])
     return metas
+
+
+def current_env_java_version():
+    java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    output = subprocess.check_output([java_command, '-version'], stderr=subprocess.STDOUT).decode('utf-8')
+    return int(re.search('version "(?:1\.)?([0-9]*).*"', output).group(1))
 
 
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
@@ -941,19 +947,20 @@ MULTI_UPGRADES = (
 for upgrade in MULTI_UPGRADES:
     # if any version_metas are None, this means they are versions not to be tested currently
     if all(upgrade.version_metas):
-        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths compatible with the end "indev_" version
-        metas = supported_upgrade_paths(upgrade.version_metas)
+        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths jdk compatible with the end "indev_" version
+        metas = jdk_compatible_steps(upgrade.version_metas)
 
         if not RUN_STATIC_UPGRADE_MATRIX:
-            if metas[-1].matches_current_env_version_family:
-                # looks like this test should actually run in the current env, so let's set the final version to match the env exactly
-                oldmeta = metas[-1]
-                newmeta = oldmeta.clone_with_local_env_version()
-                logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(upgrade.name, oldmeta.version, newmeta.version))
-                metas[-1] = newmeta
-                create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
-        else:
-            create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
+            # replace matching meta with current version
+            for idx, meta in enumerate(metas):
+                if meta.matches_current_env_version_family:
+                    java_version = current_env_java_version()
+                    assert java_version in meta.java_versions, "Incompatible JDK {} for version {}".format(java_version, meta.family)
+                    newmeta = meta.clone_with_local_env_version()
+                    logger.debug("{} appears applicable to current env. Overriding version from {} to {}".format(upgrade.name, meta.version, newmeta.version))
+                    metas[idx] = newmeta
+
+        create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
 
 for pair in build_upgrade_pairs():
