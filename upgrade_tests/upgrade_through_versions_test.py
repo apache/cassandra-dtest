@@ -7,12 +7,11 @@ import pprint
 import pytest
 import psutil
 import random
-import re
 import signal
-import subprocess
 import time
 import uuid
 
+from ccmlib.common import get_jdk_version_int
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from queue import Empty, Full
@@ -889,19 +888,31 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
 
 def jdk_compatible_steps(version_metas):
     metas = []
-    java_version = current_env_java_version()
     for version_meta in version_metas:
-        if java_version in version_meta.java_versions:
+        # if you want multi-step upgrades to work with versions that require different jdks
+        #   then define the JAVA<jdk_version>_HOME vars (e.g. JAVA8_HOME)
+        #   ccm detects these variables and changes the jdk when starting/upgrading the node
+        # otherwise the default behaviour is to only do upgrade steps that work with the current jdk
+        javan_home_defined = False
+        for meta_java_version in version_meta.java_versions:
+            javan_home_defined |= 'JAVA{}_HOME'.format(meta_java_version) in os.environ
+        if CURRENT_JAVA_VERSION in version_meta.java_versions or javan_home_defined:
             metas.append(version_meta)
 
     return metas
 
 
 def current_env_java_version():
-    java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
-    output = subprocess.check_output([java_command, '-version'], stderr=subprocess.STDOUT).decode('utf-8')
-    return int(re.search('version "(?:1\.)?([0-9]*).*"', output).group(1))
+    # $JAVA_HOME/bin/java takes precedence over any java found in $PATH
+    if 'JAVA_HOME' in os.environ:
+        java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    else:
+        java_command = 'java'
 
+    return get_jdk_version_int(java_command)
+
+
+CURRENT_JAVA_VERSION = current_env_java_version()
 
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
@@ -947,20 +958,21 @@ MULTI_UPGRADES = (
 for upgrade in MULTI_UPGRADES:
     # if any version_metas are None, this means they are versions not to be tested currently
     if all(upgrade.version_metas):
-        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths jdk compatible with the end "indev_" version
+        # even for RUN_STATIC_UPGRADE_MATRIX we only test upgrade paths jdk compatible with the end "indev_" version (or any JAVA<jdk_version>_HOME defined)
         metas = jdk_compatible_steps(upgrade.version_metas)
 
-        if not RUN_STATIC_UPGRADE_MATRIX:
-            # replace matching meta with current version
-            for idx, meta in enumerate(metas):
-                if meta.matches_current_env_version_family:
-                    java_version = current_env_java_version()
-                    assert java_version in meta.java_versions, "Incompatible JDK {} for version {}".format(java_version, meta.family)
-                    newmeta = meta.clone_with_local_env_version()
-                    logger.debug("{} appears applicable to current env. Overriding version from {} to {}".format(upgrade.name, meta.version, newmeta.version))
-                    metas[idx] = newmeta
+        if len(metas) > 1:
+            if not RUN_STATIC_UPGRADE_MATRIX:
+                # replace matching meta with current version
+                for idx, meta in enumerate(metas):
+                    if meta.matches_current_env_version_family:
+                        assert CURRENT_JAVA_VERSION in meta.java_versions, "Incompatible JDK {} for version {}".format(java_version, meta.family)
+                        newmeta = meta.clone_with_local_env_version()
+                        logger.debug("{} appears applicable to current env. Overriding version from {} to {}".format(upgrade.name, meta.version, newmeta.version))
+                        metas[idx] = newmeta
+                        break
 
-        create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
+            create_upgrade_class(upgrade.name, [m for m in metas], protocol_version=upgrade.protocol_version, extra_config=upgrade.extra_config)
 
 
 for pair in build_upgrade_pairs():
