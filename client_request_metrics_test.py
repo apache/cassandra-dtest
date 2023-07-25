@@ -157,9 +157,9 @@ class TestClientRequestMetrics(Tester):
 
         global_diff = global_updated.diff(global_baseline)
         cl_diff = cl_updated.diff(cl_baseline)
-        for diff in [global_diff, cl_diff]:
-            assert diff['TotalLatency.Count'] > 0, diff.scope
-            assert diff['Latency.Count'] == query_count, diff.scope
+        for diff, scope in [(global_diff, global_scope), (cl_diff, cl_scope)]:
+            assert diff['TotalLatency.Count'] > 0, scope
+            assert diff['Latency.Count'] == query_count, scope
 
         other_updated = [metric_class(scope_for_cl(global_scope, c)) for c in other_cls]
         for updated, baseline in zip(other_updated, other_baselines):
