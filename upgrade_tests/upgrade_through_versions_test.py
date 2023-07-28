@@ -11,7 +11,6 @@ import signal
 import time
 import uuid
 
-from ccmlib.common import get_jdk_version_int
 from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from queue import Empty, Full
@@ -21,13 +20,12 @@ from cassandra.query import SimpleStatement
 
 from dtest import Tester
 from tools.misc import generate_ssl_stores, new_node
-from .upgrade_manifest import (build_upgrade_pairs,
-                               current_2_2_x,
+from .upgrade_manifest import (build_upgrade_pairs, jdk_compatible_steps, current_2_2_x,
                                current_3_0_x, current_3_11_x,
                                current_4_0_x, current_4_1_x,
                                indev_trunk,
                                CASSANDRA_4_0, CASSANDRA_5_0,
-                               RUN_STATIC_UPGRADE_MATRIX)
+                               RUN_STATIC_UPGRADE_MATRIX, CURRENT_JAVA_VERSION)
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +325,10 @@ class TestUpgrade(Tester):
     def prepare(self):
         if type(self).__name__ == "TestUpgrade":
             pytest.skip("Skip base class, only generated classes run the tests")
+
+        if len(self.test_version_metas) < 2: # need at least two versions to upgrade through - if it is less, it means that we cannot find needed JDKs for running all versions
+            pytest.skip("Skipping upgrade test, not enough versions to upgrade through: {} - see the previous messages for more information".format(metas))
+
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
         cluster = self.cluster
@@ -885,34 +887,6 @@ def create_upgrade_class(clsname, version_metas, protocol_version,
     globals()[clsname] = newcls
     return newcls
 
-
-def jdk_compatible_steps(version_metas):
-    metas = []
-    for version_meta in version_metas:
-        # if you want multi-step upgrades to work with versions that require different jdks
-        #   then define the JAVA<jdk_version>_HOME vars (e.g. JAVA8_HOME)
-        #   ccm detects these variables and changes the jdk when starting/upgrading the node
-        # otherwise the default behaviour is to only do upgrade steps that work with the current jdk
-        javan_home_defined = False
-        for meta_java_version in version_meta.java_versions:
-            javan_home_defined |= 'JAVA{}_HOME'.format(meta_java_version) in os.environ
-        if CURRENT_JAVA_VERSION in version_meta.java_versions or javan_home_defined:
-            metas.append(version_meta)
-
-    return metas
-
-
-def current_env_java_version():
-    # $JAVA_HOME/bin/java takes precedence over any java found in $PATH
-    if 'JAVA_HOME' in os.environ:
-        java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
-    else:
-        java_command = 'java'
-
-    return get_jdk_version_int(java_command)
-
-
-CURRENT_JAVA_VERSION = current_env_java_version()
 
 MultiUpgrade = namedtuple('MultiUpgrade', ('name', 'version_metas', 'protocol_version', 'extra_config'))
 
