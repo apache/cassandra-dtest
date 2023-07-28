@@ -5,7 +5,7 @@ import os
 from collections import namedtuple
 
 import ccmlib.repository
-from ccmlib.common import get_version_from_build
+from ccmlib.common import get_version_from_build, get_jdk_version_int
 
 from enum import Enum
 
@@ -206,6 +206,35 @@ def _have_common_proto(origin_meta, destination_meta):
     """
     return origin_meta.max_proto_v >= destination_meta.min_proto_v
 
+def current_env_java_version():
+    # $JAVA_HOME/bin/java takes precedence over any java found in $PATH
+    if 'JAVA_HOME' in os.environ:
+        java_command = os.path.join(os.environ['JAVA_HOME'], 'bin', 'java')
+    else:
+        java_command = 'java'
+
+    return get_jdk_version_int(java_command)
+
+CURRENT_JAVA_VERSION = current_env_java_version()
+
+def jdk_compatible_steps(version_metas):
+    metas = []
+    for version_meta in version_metas:
+        # if you want multi-step upgrades to work with versions that require different jdks
+        #   then define the JAVA<jdk_version>_HOME vars (e.g. JAVA8_HOME)
+        #   ccm detects these variables and changes the jdk when starting/upgrading the node
+        # otherwise the default behaviour is to only do upgrade steps that work with the current jdk
+        javan_home_defined = False
+        for meta_java_version in version_meta.java_versions:
+            javan_home_defined |= 'JAVA{}_HOME'.format(meta_java_version) in os.environ
+        if CURRENT_JAVA_VERSION in version_meta.java_versions or javan_home_defined:
+            metas.append(version_meta)
+        else:
+            logger.info("Skipping version {} because it requires JDK {}. Current JDK is {} and none of {} env variables are defined."
+                        .format(version_meta.version, version_meta.java_versions, CURRENT_JAVA_VERSION, ["JAVA{}_HOME".format(v) for v in version_meta.java_versions]))
+
+    return metas
+
 def build_upgrade_pairs():
     """
     Using the manifest (above), builds a set of valid upgrades, according to current testing practices.
@@ -248,14 +277,15 @@ def build_upgrade_pairs():
                     logger.debug("{} appears applicable to current env. Overriding final test version from {} to {}".format(path_name, oldmeta.version, newmeta.version))
                     destination_meta = newmeta
 
-            valid_upgrade_pairs.append(
-                UpgradePath(
-                    name=path_name,
-                    starting_version=origin_meta.version,
-                    upgrade_version=destination_meta.version,
-                    starting_meta=origin_meta,
-                    upgrade_meta=destination_meta
+            if len(jdk_compatible_steps([origin_meta, destination_meta])) > 1:
+                valid_upgrade_pairs.append(
+                    UpgradePath(
+                        name=path_name,
+                        starting_version=origin_meta.version,
+                        upgrade_version=destination_meta.version,
+                        starting_meta=origin_meta,
+                        upgrade_meta=destination_meta
+                    )
                 )
-            )
 
     return valid_upgrade_pairs
