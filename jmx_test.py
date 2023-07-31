@@ -197,11 +197,10 @@ class TestJMX(Tester):
         node.flush()
         # Run a major compaction. This will be the compaction whose
         # progress we track.
-        node.nodetool_process('compact')
+        node.nodetool_process('compact keyspace1')
         # We need to sleep here to give compaction time to start
-        # Why not do something smarter? Because if the bug regresses,
-        # we can't rely on jmx to tell us that compaction started.
-        time.sleep(5)
+        node.watch_log_for("Compacting")
+        time.sleep(2)
 
         compaction_manager = make_mbean('db', type='CompactionManager')
         with JolokiaAgent(node) as jmx:
@@ -215,8 +214,14 @@ class TestJMX(Tester):
             var = 'Compaction@{uuid}(keyspace1, standard1, {progress}/{total})bytes'
             if self.cluster.version() >= LooseVersion('4.0'): # CASSANDRA-15954
                 var = 'Compaction({taskUuid}, {progress} / {total} bytes)@{uuid}(keyspace1, standard1)'
-            progress = int(parse.search(var, progress_string).named['progress'])
-            updated_progress = int(parse.search(var, updated_progress_string).named['progress'])
+            parsed = parse.search(var, progress_string) 
+            if parsed is None:
+                raise Exception("{} did not match {}".format(var, progress_string))
+            progress = int(parsed.named['progress'])
+            parsed = parse.search(var, updated_progress_string)
+            if parsed is None:
+                raise Exception("{} did not match {}".format(var, updated_progress_string))
+            updated_progress = int(parsed.named['progress'])
 
             logger.debug(progress_string)
             logger.debug(updated_progress_string)
