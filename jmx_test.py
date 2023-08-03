@@ -200,11 +200,14 @@ class TestJMX(Tester):
         node.nodetool_process('compact keyspace1')
         # We need to sleep here to give compaction time to start
         node.watch_log_for("Compacting")
-        time.sleep(2)
 
         compaction_manager = make_mbean('db', type='CompactionManager')
         with JolokiaAgent(node) as jmx:
-            progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
+            summary = jmx.read_attribute(compaction_manager, 'CompactionSummary')
+            while (len(summary) < 1):
+                summary = jmx.read_attribute(compaction_manager, 'CompactionSummary')
+                time.sleep(1)
+            progress_string = summary[0]
 
             # Pause in between reads
             # to allow compaction to move forward
