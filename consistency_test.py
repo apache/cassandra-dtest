@@ -840,7 +840,7 @@ class TestConsistency(Tester):
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         # set column_index_size_in_kb to 1 for a slightly easier reproduction sequence
         cluster.set_configuration_options(values={'column_index_size_in_kb': 1, 'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -914,7 +914,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -964,7 +964,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1018,7 +1018,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1082,7 +1082,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1143,7 +1143,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1179,7 +1179,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1233,7 +1233,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
@@ -1297,7 +1297,7 @@ class TestConsistency(Tester):
 
         # disable hinted handoff and set batch commit log so this doesn't interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1370,7 +1370,7 @@ class TestConsistency(Tester):
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfer with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -1433,7 +1433,7 @@ class TestConsistency(Tester):
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
@@ -1474,7 +1474,7 @@ class TestConsistency(Tester):
         # Disable hinted handoff and set batch commit log so this doesn't
         # interfere with the test
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()

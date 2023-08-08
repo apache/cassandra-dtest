@@ -2558,7 +2558,7 @@ class TestMaterializedViews(Tester):
          @jira_ticket CASSANDRA-13069
         """
 
-        self.cluster.set_batch_commitlog(enabled=True)
+        self.cluster.set_batch_commitlog(enabled=True, use_batch_window = self.cluster.version() < '5.0')
         self.fixture_dtest_setup.ignore_log_patterns = [r'Dummy failure', r"Failed to force-recycle all segments"]
         self.prepare(rf=1, install_byteman=True)
         node1, node2, node3 = self.cluster.nodelist()

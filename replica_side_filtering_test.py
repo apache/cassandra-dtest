@@ -31,7 +31,7 @@ class ReplicaSideFiltering(Tester):
         # Disable hinted handoff and set batch commit log so this doesn't interfere with the test
         if only_node1 or only_node2:
             cluster.set_configuration_options(values={'hinted_handoff_enabled': False})
-            cluster.set_batch_commitlog(enabled=True)
+            cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()
@@ -523,7 +523,7 @@ class TestAllowFiltering(ReplicaSideFiltering):
                                                   'commitlog_sync_period_in_ms': 500,
                                                   'enable_transient_replication': True,
                                                   'partitioner': 'org.apache.cassandra.dht.OrderPreservingPartitioner'})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
         cluster.populate(2, tokens=[0, 1], debug=True, install_byteman=True)
         node1, node2 = cluster.nodelist()
         cluster.start()

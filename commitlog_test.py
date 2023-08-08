@@ -176,7 +176,7 @@ class TestCommitLog(Tester):
             pytest.skip("Fixed in 3.0.7 and 3.7")
 
         node1 = self.node1
-        node1.set_batch_commitlog(enabled=True)
+        node1.set_batch_commitlog(enabled=True, use_batch_window = self.cluster.version() < '5.0')
         node1.start()
         session = self.patient_cql_connection(node1)
 
@@ -235,7 +235,7 @@ class TestCommitLog(Tester):
         Test commit log replay
         """
         node1 = self.node1
-        node1.set_batch_commitlog(enabled=True)
+        node1.set_batch_commitlog(enabled=True, use_batch_window = self.cluster.version() < '5.0')
         node1.start()
 
         logger.debug("Insert data")

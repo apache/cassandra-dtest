@@ -18,7 +18,7 @@ class TestJson(Tester):
 
         logger.debug("Starting cluster...")
         cluster = self.cluster
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
         cluster.populate(1).start()
 
         logger.debug("Version: " + cluster.version().vstring)
