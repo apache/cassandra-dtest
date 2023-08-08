@@ -380,7 +380,10 @@ class TestUpgrade(Tester):
             self.prepare()
         self.row_values = set()
         cluster = self.cluster
-        if cluster.version() >= '3.0':
+        if cluster.version() >= '5.0':
+            cluster.set_configuration_options({'user_defined_functions_threads_enabled': 'true',
+                                               'scripted_user_defined_functions_enabled': 'false'})
+        elif cluster.version() >= '3.0':
             cluster.set_configuration_options({'enable_user_defined_functions': 'true',
                                                'enable_scripted_user_defined_functions': 'true'})
         elif cluster.version() >= '2.2':
@@ -526,6 +529,7 @@ class TestUpgrade(Tester):
             if internode_ssl and (LooseVersion(version_meta.family) >= CASSANDRA_4_0):
                 node.set_configuration_options({'server_encryption_options': {'enabled': True, 'enable_legacy_ssl_storage_port': True}})
             if LooseVersion(version_meta.family) >= CASSANDRA_5_0:
+                # only clusters starting from <5.0 will have enable_scripted_user_defined_functions=true
                 node.set_configuration_options({'enable_scripted_user_defined_functions': 'false'})
 
         # hacky? yes. We could probably extend ccm to allow this publicly.
@@ -810,7 +814,10 @@ class BootstrapMixin(object):
         self.prepare()
         cluster = self.cluster
 
-        if cluster.version() >= '3.0':
+        if cluster.version() >= '5.0':
+            cluster.set_configuration_options({'user_defined_functions_threads_enabled': 'true',
+                                               'scripted_user_defined_functions_enabled': 'false'})
+        elif cluster.version() >= '3.0':
             cluster.set_configuration_options({'enable_user_defined_functions': 'true',
                                                'enable_scripted_user_defined_functions': 'true'})
         elif cluster.version() >= '2.2':

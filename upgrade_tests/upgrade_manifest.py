@@ -27,7 +27,8 @@ CASSANDRA_3_11 = '3.11'
 CASSANDRA_4_0 = '4.0'
 CASSANDRA_4_1 = '4.1'
 CASSANDRA_5_0 = '5.0'
-TRUNK = CASSANDRA_5_0
+CASSANDRA_5_1 = '5.1'
+TRUNK = CASSANDRA_5_1
 
 RUN_STATIC_UPGRADE_MATRIX = os.environ.get('RUN_STATIC_UPGRADE_MATRIX', '').lower() in ('yes', 'true')
 
@@ -105,6 +106,8 @@ def set_version_family():
         version_family = CASSANDRA_4_1
     elif current_version.vstring.startswith('5.0'):
         version_family = CASSANDRA_5_0
+    elif current_version.vstring.startswith('5.1'):
+        version_family = CASSANDRA_5_1
     else:
         # when this occurs, it's time to update this manifest a bit!
         raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
@@ -171,8 +174,12 @@ current_4_0_x = VersionMeta(name='current_4_0_x', family=CASSANDRA_4_0, variant=
 indev_4_1_x = VersionMeta(name='indev_4_1_x', family=CASSANDRA_4_1, variant='indev', version='github:apache/cassandra-4.1', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 current_4_1_x = VersionMeta(name='current_4_1_x', family=CASSANDRA_4_1, variant='current', version='4.1.3', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 
+indev_5_0_x = VersionMeta(name='indev_5_0_x', family=CASSANDRA_5_0, variant='indev', version='github:apache/cassandra-5.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+# uncomment when 5.0-alpha1 is released
+#current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
-# current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,))
+# current_5_1_x = VersionMeta(name='current_5_1_x', family=CASSANDRA_5_1, variant='current', version='5.1-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
 
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
@@ -188,15 +195,18 @@ MANIFEST = {
     current_2_2_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_4_0_x, indev_4_1_x],
     current_3_11_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
-    current_4_0_x: [indev_4_0_x, indev_4_1_x, indev_trunk],
-    current_4_1_x: [indev_4_1_x, indev_trunk],
+    current_4_0_x:  [indev_4_0_x, indev_4_1_x, indev_5_0_x, indev_trunk],
+    current_4_1_x:  [indev_4_1_x, indev_5_0_x, indev_trunk],
+    # uncomment when 5.0-alpha1 is released
+    #current_5_0_x:  [indev_5_0_x, indev_trunk],
 
     indev_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
     indev_3_0_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
     indev_3_11_x: [indev_4_0_x, indev_4_1_x],
-    indev_4_0_x: [indev_4_1_x, indev_trunk],
-    indev_4_1_x: [indev_trunk]
+    indev_4_0_x:  [indev_4_1_x, indev_5_0_x, indev_trunk],
+    indev_4_1_x:  [indev_5_0_x, indev_trunk],
+    indev_5_0_x:  [indev_trunk]
 }
 
 def _have_common_proto(origin_meta, destination_meta):
