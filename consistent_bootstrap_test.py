@@ -20,7 +20,7 @@ class TestBootstrapConsistency(Tester):
                                                   'write_request_timeout_in_ms': 60000,
                                                   'read_request_timeout_in_ms': 60000,
                                                   'dynamic_snitch_badness_threshold': 0.0})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(3, tokens=[0, 2**48, 2**62]).start()
         node1, node2, node3 = cluster.nodelist()
@@ -61,7 +61,7 @@ class TestBootstrapConsistency(Tester):
                                                   'write_request_timeout_in_ms': 60000,
                                                   'read_request_timeout_in_ms': 60000,
                                                   'dynamic_snitch_badness_threshold': 0.0})
-        cluster.set_batch_commitlog(enabled=True)
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
 
         cluster.populate(2)
         node1, node2 = cluster.nodelist()

@@ -49,7 +49,7 @@ class BaseReplaceAddressTest(Tester):
             logger.debug("Setting cluster options: {}".format(opts))
             self.cluster.set_configuration_options(opts)
 
-        self.cluster.set_batch_commitlog(enabled=True)
+        self.cluster.set_batch_commitlog(enabled=True, use_batch_window = self.cluster.version() < '5.0')
         self.query_node = self.cluster.nodelist()[0]
         self.replaced_node = self.cluster.nodelist()[-1]
 

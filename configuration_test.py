@@ -70,7 +70,7 @@ class TestConfiguration(Tester):
             # writes should block on commitlog fsync
             self.fixture_dtest_setup.cluster.populate(1)
             node = self.fixture_dtest_setup.cluster.nodelist()[0]
-            self.fixture_dtest_setup.cluster.set_batch_commitlog(enabled=True)
+            self.fixture_dtest_setup.cluster.set_batch_commitlog(enabled=True, use_batch_window = self.fixture_dtest_setup.cluster.version() < '5.0')
 
             self.fixture_dtest_setup.cluster.start()
             return node
