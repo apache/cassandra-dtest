@@ -173,7 +173,8 @@ class BaseReplaceAddressTest(Tester):
                 node.watch_log_for("Node {} will complete replacement of {} for tokens"
                                    .format(self.replacement_node.address_for_current_version_slashy(),
                                            self.replaced_node.address_for_current_version_slashy()), timeout=10)
-                node.watch_log_for("removing endpoint {}".format(self.replaced_node.address_for_current_version_slashy()),
+                gossip_action = "removing endpoint" if self.cluster.cassandra_version() < '5.1' else "evicting"
+                node.watch_log_for("{} {}".format(gossip_action, self.replaced_node.address_for_current_version_slashy()),
                                    timeout=60, filename='debug.log')
             else:
                 node.watch_log_for("between /{} and /{}; /{} is the new owner"
