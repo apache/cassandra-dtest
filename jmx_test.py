@@ -198,8 +198,13 @@ class TestJMX(Tester):
         # Run a major compaction. This will be the compaction whose
         # progress we track.
         node.nodetool_process('compact keyspace1')
-        # We need to sleep here to give compaction time to start
-        node.watch_log_for("Compacting")
+        if self.cluster.version() >= LooseVersion('4.0'):
+            node.watch_log_for("Compacting")
+        elif self.cluster.version() >= LooseVersion('3.11'):
+            node.watch_log_for("Major compaction")
+        else:
+            node.watch_log_for("Compacting", filename="debug.log")
+
 
         compaction_manager = make_mbean('db', type='CompactionManager')
         with JolokiaAgent(node) as jmx:
