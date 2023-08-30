@@ -448,31 +448,31 @@ class TestTopology(Tester):
         self.fixture_dtest_setup.ignore_log_patterns = [r'Streaming error occurred', 'Stream failed']
         cluster.populate(3).start()
 
-        node1, node2 = cluster.nodelist()[0:2]
+        node1, node2, node3 = cluster.nodelist()[0:3]
         session = self.patient_cql_connection(node1)
         session.execute("ALTER KEYSPACE system_distributed WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'2'};")
 
-        t = DecommissionInParallel(node1)
+        t = DecommissionInParallel(node2)
         t.start()
 
-        node1.watch_log_for("DECOMMISSIONING", filename='debug.log')
+        node2.watch_log_for("DECOMMISSIONING", filename='debug.log')
         null_status_pattern = re.compile(r".N(?:\s*)127\.0\.0\.1(?:.*)null(?:\s*)rack1")
         while t.is_alive():
-            out = self.show_status(node2)
+            out = self.show_status(node3)
             if null_status_pattern.search(out):
                 logger.debug("Matched null status entry")
                 break
-            logger.debug("Restarting node2")
-            node2.stop(gently=False)
-            node2.start(wait_for_binary_proto=True, wait_other_notice=False)
+            logger.debug("Restarting node3")
+            node3.stop(gently=False)
+            node3.start(wait_for_binary_proto=True, wait_other_notice=False)
 
         logger.debug("Waiting for decommission to complete")
         t.join()
-        self.show_status(node2)
+        self.show_status(node3)
 
         logger.debug("Sleeping for 30 seconds to allow gossip updates")
         time.sleep(30)
-        out = self.show_status(node2)
+        out = self.show_status(node3)
         assert not null_status_pattern.search(out)
 
     @since('3.12')
