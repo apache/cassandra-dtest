@@ -39,7 +39,9 @@ class BaseReplaceAddressTest(Tester):
             # ignore streaming error during bootstrap
             r'Streaming error occurred',
             r'failed stream session',
-            r'Failed to properly handshake with peer'
+            r'Failed to properly handshake with peer',
+            # ignore streaming error during resumable tests
+            r'peer 127.0.0.1:7000 is probably down'
         )
 
     def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False):

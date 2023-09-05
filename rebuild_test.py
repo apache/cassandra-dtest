@@ -27,7 +27,9 @@ class TestRebuild(Tester):
             r'Can\'t send migration request: node.*is down',
             # ignore streaming error during bootstrap
             r'Exception encountered during startup',
-            r'Streaming error occurred'
+            r'Streaming error occurred',
+            # ignore streaming error during resumable tests
+            r'peer 127.0.0.3:7000 is probably down'
         )
 
     def test_simple_rebuild(self):
