@@ -1998,7 +1998,7 @@ CREATE TABLE datetime_checks.values (
 
         assert 0 == len(stderr), "Failed to execute cqlsh: {}".format(stderr)
 
-        self.verify_output("use tracing_checks; tracing on; select * from test", node1, """Now Tracing is enabled
+        self.verify_output("use tracing_checks; tracing on; select * from test", node1, """TRACING set to on
 
  id | val
 ----+-------

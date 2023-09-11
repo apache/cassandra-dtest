@@ -68,7 +68,7 @@ class TestCqlTracing(Tester):
         """)
 
         out, err, _ = node1.run_cqlsh('TRACING ON')
-        assert 'Tracing is enabled' in out
+        assert 'TRACING set to ON' in out
 
         out, err, _ = node1.run_cqlsh('TRACING ON; SELECT * from system.peers')
         assert 'Tracing session: ' in out
