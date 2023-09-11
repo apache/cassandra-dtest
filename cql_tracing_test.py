@@ -68,7 +68,11 @@ class TestCqlTracing(Tester):
         """)
 
         out, err, _ = node1.run_cqlsh('TRACING ON')
-        assert 'Tracing is enabled' in out
+        if self.cluster.version() >= LooseVersion('5.0'):
+            # See CASSANDRA-18547
+            assert 'TRACING set to ON' in out
+        else:
+            assert 'Tracing is enabled' in out
 
         out, err, _ = node1.run_cqlsh('TRACING ON; SELECT * from system.peers')
         assert 'Tracing session: ' in out
