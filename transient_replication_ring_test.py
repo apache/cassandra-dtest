@@ -1,5 +1,6 @@
 import logging
 import types
+import time
 
 from cassandra import ConsistencyLevel
 from cassandra.query import SimpleStatement
@@ -19,7 +20,8 @@ from tools.misc import new_node
 
 since = pytest.mark.since
 
-logging.getLogger('cassandra').setLevel(logging.CRITICAL)
+logger = logging.getLogger(__name__)
+
 
 NODELOCAL = 11
 
@@ -40,6 +42,7 @@ def repair_nodes(nodes):
 
 def cleanup_nodes(nodes):
     for node in nodes:
+        logger.debug("cleaning up %s" % node)
         node.nodetool('cleanup')
 
 
@@ -77,8 +80,8 @@ class TestTransientReplicationRing(Tester):
         if node is None:
             node = list(range(1000))
         for idx, session, expect, node in zip(range(0, 1000), sessions, expected, node):
-            print("Checking idx " + str(idx))
-            print(str([row for row in session.execute(self.select_statement())]))
+            logger.debug("Checking idx " + str(idx))
+            logger.debug(str([row for row in session.execute(self.select_statement())]))
             if cleanup:
                 node.nodetool('cleanup')
             assert_all(session,
@@ -114,8 +117,8 @@ class TestTransientReplicationRing(Tester):
                                                        'commitlog_sync_period_in_ms': 500,
                                                        'enable_transient_replication': True,
                                                        'partitioner': 'org.apache.cassandra.dht.OrderPreservingPartitioner'})
-        print("CLUSTER INSTALL DIR: ")
-        print(self.cluster.get_install_dir())
+        logger.debug("CLUSTER INSTALL DIR: ")
+        logger.debug(self.cluster.get_install_dir())
         self.cluster.populate(3, tokens=self.tokens, debug=True, install_byteman=True)
         # self.cluster.populate(3, debug=True, install_byteman=True)
         self.cluster.start(jvm_args=['-Dcassandra.enable_nodelocal_queries=true'],
@@ -124,7 +127,7 @@ class TestTransientReplicationRing(Tester):
         # enable shared memory
         for node in self.cluster.nodelist():
             patch_start(node)
-            print(node.logfilename())
+            logger.debug(node.logfilename())
 
         self.nodes = self.cluster.nodelist()
         self.node1, self.node2, self.node3 = self.nodes
@@ -136,7 +139,7 @@ class TestTransientReplicationRing(Tester):
         replication_params = ', '.join("'%s': '%s'" % (k, v) for k, v in replication_params.items())
 
         session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
-        print("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
+        logger.debug("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         session.execute(
             "CREATE TABLE %s.%s (pk varchar, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND additional_write_policy = 'NEVER' AND read_repair = 'NONE'" % (
                 self.keyspace, self.table))
@@ -240,7 +243,7 @@ class TestTransientReplicationRing(Tester):
         nodes = [self.node1, self.node2, self.node3, node4]
 
         for i in range(0, 40, 2):
-            print("Inserting " + str(i))
+            logger.debug("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
         # Make sure at least a little data is repaired
@@ -251,7 +254,7 @@ class TestTransientReplicationRing(Tester):
         nodes[1].stop(wait_other_notice=True)
 
         for i in range(1, 40, 2):
-            print("Inserting " + str(i))
+            logger.debug("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
         nodes[1].start(wait_for_binary_proto=True)
@@ -264,7 +267,9 @@ class TestTransientReplicationRing(Tester):
         self.check_expected(sessions, expected)
         self.check_replication(sessions, exactly=2)
 
-        nodes[0].nodetool('move %s' % move_token)
+        nodes[0].move(move_token)
+        # we need a small sleep for the remote side to finish closing the session, see CASSANDRA-18792
+        time.sleep(1)
         cleanup_nodes(nodes)
 
         self.check_replication(sessions, gte=2, lte=3)
@@ -346,7 +351,7 @@ class TestTransientReplicationRing(Tester):
         nodes = [self.node1, self.node2, self.node3, node4]
 
         for i in range(0, 40, 2):
-            print("Inserting " + str(i))
+            logger.debug("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
         # Make sure at least a little data is repaired
@@ -357,7 +362,7 @@ class TestTransientReplicationRing(Tester):
         nodes[1].stop(wait_other_notice=True)
 
         for i in range(1, 40, 2):
-            print("Inserting " + str(i))
+            logger.debug("Inserting " + str(i))
             self.insert_row(i, i, i, main_session)
 
         nodes[1].start(wait_for_binary_proto=True)
