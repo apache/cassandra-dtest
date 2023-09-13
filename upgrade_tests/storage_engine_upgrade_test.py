@@ -74,7 +74,7 @@ class TestStorageEngineUpgrade(Tester):
             cluster.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
             self.install_nodetool_legacy_parsing()
             # Add a new node, bootstrap=True ensures that it is not a seed
-            node2 = new_node(cluster, bootstrap=True)
+            node2 = new_node(cluster, bootstrap=True, data_center=node1.data_center)
             node2.start(wait_for_binary_proto=True, jvm_args=self.fixture_dtest_setup.jvm_args)
 
             temp_files = self.glob_data_dirs(os.path.join('*', "tmp", "*.dat"))

@@ -811,7 +811,7 @@ class BootstrapMixin(object):
     def _bootstrap_new_node(self):
         # Check we can bootstrap a new node on the upgraded cluster:
         logger.debug("Adding a node to the cluster")
-        nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)))
+        nnode = new_node(self.cluster, remote_debug_port=str(2000 + len(self.cluster.nodes)), data_center=self.cluster.nodelist()[0].data_center)
 
         if nnode.get_cassandra_version() >= '4.2':
             nnode.set_configuration_options({'enable_scripted_user_defined_functions': 'false'})

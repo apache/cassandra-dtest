@@ -303,6 +303,7 @@ class TestCQL(UpgradeTester):
                 [24, 'Something something', 'Frodo Baggins'],
                 [30, 'Yet one more message', None]])
 
+    @pytest.mark.no_vnodes
     def test_limit_ranges(self):
         """ Validate LIMIT option for 'range queries' in SELECT statements """
         cursor = self.prepare(ordered=True)
@@ -1137,6 +1138,7 @@ class TestCQL(UpgradeTester):
 
             assert_all(cursor, "SELECT * FROM users WHERE KEY='user1'", [])
 
+    @pytest.mark.no_vnodes
     def test_undefined_column_handling(self):
         cursor = self.prepare(ordered=True)
 
@@ -1663,6 +1665,7 @@ class TestCQL(UpgradeTester):
             cursor.execute("INSERT INTO test (k, c) VALUES (2, 2)")
             assert_one(cursor, "SELECT * FROM test", [2, 2, None, None])
 
+    @pytest.mark.no_vnodes
     def test_only_pk(self):
         """
         Check table with only a PK (part of #4361)
@@ -1763,6 +1766,7 @@ class TestCQL(UpgradeTester):
 
             assert_row_count(cursor, 'test', 2)
 
+    @pytest.mark.no_vnodes
     def test_composite_index_with_pk(self):
 
         cursor = self.prepare(ordered=True)
@@ -1826,6 +1830,7 @@ class TestCQL(UpgradeTester):
                 assert_invalid(cursor, "SELECT content FROM blogs WHERE time1 = 1 AND time2 = 1 AND author='foo'")
                 assert_invalid(cursor, "SELECT content FROM blogs WHERE time1 = 1 AND time2 > 0 AND author='foo'")
 
+    @pytest.mark.no_vnodes
     def test_limit_bugs(self):
         """
         Test for LIMIT bugs from #4579
@@ -1914,6 +1919,7 @@ class TestCQL(UpgradeTester):
             assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime>=12345679 AND key='key3' AND ctime<=12345680 LIMIT 3;")
             assert_invalid(cursor, "SELECT * FROM compositetest WHERE ctime=12345679  AND key='key3' AND ctime<=12345680 LIMIT 3;")
 
+    @pytest.mark.no_vnodes
     def test_order_by_multikey(self):
         """
         Test for #4612 bug and more generally order by when multiple C* rows are queried
@@ -2341,6 +2347,7 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT l1, l2 FROM test WHERE k = 0", [[1, 24, 3], [4, 42, 6]])
 
+    @pytest.mark.no_vnodes
     def test_composite_index_collections(self):
         cursor = self.prepare(ordered=True)
         cursor.execute("""
@@ -2370,6 +2377,7 @@ class TestCQL(UpgradeTester):
             assert_all(cursor, query, [[1, set(['bar1', 'bar2'])], [1, set(['bar2', 'bar3'])], [2, set(['baz'])]])
 
     @pytest.mark.skip("https://issues.apache.org/jira/browse/CASSANDRA-14961")
+    @pytest.mark.no_vnodes
     def test_truncate_clean_cache(self):
         cursor = self.prepare(ordered=True, use_cache=True)
 
@@ -3212,6 +3220,7 @@ class TestCQL(UpgradeTester):
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF EXISTS")
                 assert_invalid(cursor, "DELETE FROM test2 WHERE k = 0 AND i > 0 IF v = 'foo'")
 
+    @pytest.mark.no_vnodes
     def test_range_key_ordered(self):
         cursor = self.prepare(ordered=True)
 
@@ -3358,6 +3367,7 @@ class TestCQL(UpgradeTester):
 
             assert_one(cursor, "SELECT * FROM test", [1, set([2])])
 
+    @pytest.mark.no_vnodes
     def test_select_distinct(self):
         cursor = self.prepare(ordered=True)
 
