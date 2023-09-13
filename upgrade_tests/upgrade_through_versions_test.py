@@ -15,7 +15,7 @@ from collections import defaultdict, namedtuple
 from multiprocessing import Process, Queue
 from queue import Empty, Full
 
-from cassandra import ConsistencyLevel, WriteTimeout, DriverException
+from cassandra import ConsistencyLevel, WriteTimeout, DriverException, OperationTimedOut
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
@@ -60,6 +60,7 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
+    timeout_retries = 0
     while running:
         try:
             key = None
@@ -86,6 +87,13 @@ def data_writer(tester, to_verify_queue, verification_done_queue, rewrite_probab
                 logger.error("Error in data writer process!", dex)
                 shutdown_gently()
                 raise
+        except OperationTimedOut:
+            if timeout_retries > 2:
+                shutdown_gently()
+                raise
+            timeout_retries += 1
+            time.sleep(1)
+            continue
         except Exception as ex:
             logger.error("Error in data writer process!", ex)
             shutdown_gently()
@@ -124,6 +132,7 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
+    timeout_retries = 0
     while running:
         try:
             # here we could block, but if the writer process terminates early with an empty queue
@@ -143,6 +152,13 @@ def data_checker(tester, to_verify_queue, verification_done_queue):
                 logger.error("Error in data checker process!", dex)
                 shutdown_gently()
                 raise
+        except OperationTimedOut:
+            if timeout_retries > 2:
+                shutdown_gently()
+                raise
+            timeout_retries += 1
+            time.sleep(1)
+            continue
         except Exception as ex:
             logger.error("Error in data checker process!", ex)
             shutdown_gently()
@@ -194,6 +210,7 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
+    timeout_retries = 0
     while running:
         try:
             key = None
@@ -219,6 +236,13 @@ def counter_incrementer(tester, to_verify_queue, verification_done_queue, rewrit
                 logger.error("Error in counter incrementer process!", dex)
                 shutdown_gently()
                 raise
+        except OperationTimedOut:
+            if timeout_retries > 2:
+                shutdown_gently()
+                raise
+            timeout_retries += 1
+            time.sleep(1)
+            continue
         except Exception as ex:
             logger.error("Error in counter incrementer process!", ex)
             shutdown_gently()
@@ -257,6 +281,7 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
 
     signal.signal(signal.SIGTERM, handle_sigterm)
 
+    timeout_retries = 0
     while running:
         try:
             # here we could block, but if the writer process terminates early with an empty queue
@@ -275,6 +300,13 @@ def counter_checker(tester, to_verify_queue, verification_done_queue):
                 logger.error("Error in counter verifier process!", dex)
                 shutdown_gently()
                 raise
+        except OperationTimedOut:
+            if timeout_retries > 2:
+                shutdown_gently()
+                raise
+            timeout_retries += 1
+            time.sleep(1)
+            continue
         except Exception as ex:
             logger.error("Error in counter verifier process!", ex)
             shutdown_gently()
