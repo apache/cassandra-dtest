@@ -335,7 +335,7 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
         query = '%s AND CLUSTERING ORDER BY (%s)' % (query, clustering)
 
     if compression is not None:
-        query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        query = '%s AND compression = { \'class\': \'%sCompressor\' }' % (query, compression)
     else:
         # if a compression option is omitted, C* will default to lz4 compression
         query += ' AND compression = {}'
