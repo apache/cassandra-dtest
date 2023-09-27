@@ -165,6 +165,9 @@ class TransientReplicationBase(Tester):
 
     keyspace = "ks"
     table = "tbl"
+    tokens = [0, 1, 2]
+    stream_entire_sstables = True
+    replication_factor = '3/1'
 
     @pytest.fixture
     def cheap_quorums(self):
@@ -179,15 +182,6 @@ class TransientReplicationBase(Tester):
         # Make sure digest is not attempted against the transient node
         self.node3.byteman_submit([mk_bman_path('throw_on_digest.btm')])
 
-    def stream_entire_sstables(self):
-        return True
-
-    def replication_factor(self):
-        return '3/1'
-
-    def tokens(self):
-        return [0, 1, 2]
-
     def use_lcs(self):
         session = self.exclusive_cql_connection(self.node1)
         session.execute("ALTER TABLE %s.%s with compaction={'class': 'LeveledCompactionStrategy'};" % (self.keyspace, self.table))
@@ -196,19 +190,18 @@ class TransientReplicationBase(Tester):
         session = self.exclusive_cql_connection(self.node1)
         replication_params = OrderedDict()
         replication_params['class'] = 'NetworkTopologyStrategy'
-        replication_params['datacenter1'] = self.replication_factor()
+        replication_params['datacenter1'] = self.replication_factor
         replication_params = ', '.join("'%s': '%s'" % (k, v) for k, v in replication_params.items())
         session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         session.execute("CREATE TABLE %s.%s (pk int, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND read_repair = 'NONE'" % (self.keyspace, self.table))
 
     @pytest.fixture(scope='function', autouse=True)
     def setup_cluster(self, fixture_dtest_setup):
-        self.tokens = self.tokens()
 
         patch_start(self.cluster)
         self.cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
                                                        'num_tokens': 1,
-                                                       'stream_entire_sstables': self.stream_entire_sstables(),
+                                                       'stream_entire_sstables': self.stream_entire_sstables,
                                                        'commitlog_sync_period_in_ms': 500,
                                                        'enable_transient_replication': True,
                                                        'dynamic_snitch': False})
@@ -445,7 +438,7 @@ class TestTransientReplication(TransientReplicationBase):
         session = self.exclusive_cql_connection(self.node1)
         replication_params = OrderedDict()
         replication_params['class'] = 'NetworkTopologyStrategy'
-        assert self.replication_factor() == '3/1'
+        assert self.replication_factor == '3/1'
         replication_params['datacenter1'] = '5/2'
         replication_params = ', '.join("'%s': '%s'" % (k, v) for k, v in replication_params.items())
         with pytest.raises(ConfigurationException):
@@ -454,8 +447,7 @@ class TestTransientReplication(TransientReplicationBase):
 @since('4.0')
 class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase):
 
-    def stream_entire_sstables(self):
-        return True
+    stream_entire_sstables = True
 
     def _test_speculative_write_repair_cycle(self, primary_range, optimized_repair, repair_coordinator, expect_node3_data, use_lcs=False):
         """
@@ -495,7 +487,7 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
         else:
             self.assert_has_no_sstables(self.node3, compact=True)
 
-        entire_sstable = "true" if self.stream_entire_sstables() else "false"
+        entire_sstable = "true" if self.stream_entire_sstables else "false"
         assert self.node2.grep_log('Incoming stream entireSSTable={}'.format(entire_sstable), filename='debug.log')
 
     @pytest.mark.no_vnodes
@@ -580,8 +572,7 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
 @since('4.0')
 class TestTransientReplicationRepairLegacyStreaming(TestTransientReplicationRepairStreamEntireSSTable):
 
-    def stream_entire_sstables(self):
-        return False
+    stream_entire_sstables = False
 
 @since('4.0')
 class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
@@ -589,7 +580,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
         session = self.exclusive_cql_connection(self.node1)
         replication_params = OrderedDict()
         replication_params['class'] = 'NetworkTopologyStrategy'
-        replication_params['datacenter1'] = self.replication_factor()
+        replication_params['datacenter1'] = self.replication_factor
         replication_params = ', '.join("'%s': '%s'" % (k, v) for k, v in replication_params.items())
         session.execute("CREATE KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
         session.execute("CREATE TABLE %s.%s (pk int, ck int, value int, PRIMARY KEY (pk, ck)) WITH speculative_retry = 'NEVER' AND read_repair = 'NONE';" % (self.keyspace, self.table))
@@ -630,17 +621,17 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
 
 @since('4.0')
 class TestMultipleTransientNodes(TransientReplicationBase):
+
+    replication_factor = '5/2'
+    tokens = [0, 1, 2, 3, 4]
+
     def populate(self):
         self.cluster.populate(5, tokens=self.tokens, debug=True, install_byteman=True)
 
     def set_nodes(self):
         self.node1, self.node2, self.node3, self.node4, self.node5 = self.nodes
 
-    def replication_factor(self):
-        return '5/2'
 
-    def tokens(self):
-        return [0, 1, 2, 3, 4]
 
     @pytest.mark.resource_intensive
     @pytest.mark.no_vnodes
