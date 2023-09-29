@@ -378,7 +378,10 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         @jira_ticket CASSANDRA-14463
         """
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
-            r'Exception encountered during startup']
+            r'Couldn\'t find table with id 5bc52802-de25-35ed-aeab-188eecebb090', # system_auth
+            r'Exception encountered during startup',
+            r'Unknown endpoint'
+        ]
 
         # see CASSANDRA-17611
         if self.cluster.version() < '4.0':
