@@ -446,7 +446,6 @@ class TestTransientReplicationRing(Tester):
             self.insert_row(i, i, i, main_session)
 
         replacement_address = self.node2.address()
-        self.node2.stop(wait_other_notice=True)
         self.cluster.remove(self.node2)
         self.node2 = Node('replacement', cluster=self.cluster, auto_bootstrap=True,
                           thrift_interface=None, storage_interface=(replacement_address, 7000),
