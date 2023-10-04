@@ -1,6 +1,8 @@
 import os
 import re
 import time
+from distutils.version import LooseVersion
+
 import pytest
 import logging
 
@@ -359,6 +361,7 @@ class TestSnitchConfigurationUpdate(Tester):
             else:
                 raise RuntimeError("Ran out of time waiting for topology to change on node {}".format(i))
 
+    @since('2.1', max_version='5.0.x')
     def test_rf_collapse_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -375,6 +378,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                        final_racks=["rack1", "rack1", "rack1"],
                                        nodes_to_shutdown=[0, 2])
 
+    @since('2.1', max_version='5.0.x')
     def test_rf_expand_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -392,6 +396,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                        nodes_to_shutdown=[0, 2])
 
     @pytest.mark.resource_intensive
+    @since('2.1', max_version='5.0.x')
     def test_rf_collapse_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -409,6 +414,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
     @pytest.mark.resource_intensive
+    @since('2.1', max_version='5.0.x')
     def test_rf_expand_gossiping_property_file_snitch_multi_dc(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -425,6 +431,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                        final_racks=["rack0", "rack1", "rack2", "rack0", "rack1", "rack2"],
                                        nodes_to_shutdown=[0, 2, 3, 5])
 
+    @since('2.1', max_version='5.0.x')
     def test_rf_collapse_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -441,6 +448,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                        final_racks=["rack0", "rack0", "rack0"],
                                        nodes_to_shutdown=[1, 2])
 
+    @since('2.1', max_version='5.0.x')
     def test_rf_expand_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10238
@@ -627,6 +635,8 @@ class TestSnitchConfigurationUpdate(Tester):
         else:
             node1.watch_log_for("Fatal exception during initialization", from_mark=mark)
 
+
+    @since('2.1', max_version='5.0.x')
     def test_failed_snitch_update_gossiping_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
@@ -641,6 +651,7 @@ class TestSnitchConfigurationUpdate(Tester):
                                         racks=["rack1", "rack1", "rack1"],
                                         error='')
 
+    @since('2.1', max_version='5.0.x')
     def test_failed_snitch_update_property_file_snitch(self):
         """
         @jira_ticket CASSANDRA-10243
@@ -730,7 +741,9 @@ class TestSnitchConfigurationUpdate(Tester):
         Confirm that switching data centers fails to bring up the node.
         """
         expected_error = (r"Cannot start node if snitch's data center (.*) differs from previous data center (.*)\. "
-                          "Please fix the snitch configuration, decommission and rebootstrap this node or use the flag -Dcassandra.ignore_dc=true.")
+                          "Please fix the snitch configuration, decommission and rebootstrap this node")
+        if self.cluster.version() < LooseVersion('5.1'):
+            expected_error += " or use the flag -Dcassandra.ignore_dc=true."
         self.fixture_dtest_setup.ignore_log_patterns = [expected_error]
 
         cluster = self.cluster
