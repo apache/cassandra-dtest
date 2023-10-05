@@ -36,6 +36,12 @@ class TestSecondaryIndexes(Tester):
             files.extend(os.listdir(index_sstables_dir))
         return set(files)
 
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            r'index_build_failure.btm expected exception',
+        )
+
     def test_data_created_before_index_not_returned_in_where_query(self):
         """
         @jira_ticket CASSANDRA-3367
