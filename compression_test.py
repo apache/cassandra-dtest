@@ -3,6 +3,7 @@ import pytest
 import logging
 
 from dtest import create_ks
+from distutils.version import LooseVersion
 from scrub_test import TestHelper
 from tools.assertions import assert_crc_check_chance_equal
 
@@ -80,25 +81,26 @@ class TestCompression(TestHelper):
         assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "compression_opts_table", 0.25)
 
-        warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
-        assert len(warn) == 0
-        session.execute("""
-            alter table compression_opts_table
-                WITH compression = {
-                    'class': 'DeflateCompressor',
-                    'chunk_length_in_kb': 256,
-                    'crc_check_chance': 0.6
-                }
-            """)
-        warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
-        assert len(warn) == 1
+        if self.cluster.version() < LooseVersion('5.0'):
+          warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
+          assert len(warn) == 0
+          session.execute("""
+              alter table compression_opts_table
+                  WITH compression = {
+                      'class': 'DeflateCompressor',
+                      'chunk_length_in_kb': 256,
+                      'crc_check_chance': 0.6
+                  }
+              """)
+          warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
+          assert len(warn) == 1
 
-        # check metadata again after crc_check_chance_update
-        session.cluster.refresh_schema_metadata()
-        meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
-        assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
-        assert '256' == meta.options['compression']['chunk_length_in_kb']
-        assert_crc_check_chance_equal(session, "compression_opts_table", 0.6)
+          # check metadata again after crc_check_chance_update
+          session.cluster.refresh_schema_metadata()
+          meta = session.cluster.metadata.keyspaces['ks'].tables['compression_opts_table']
+          assert 'org.apache.cassandra.io.compress.DeflateCompressor' == meta.options['compression']['class']
+          assert '256' == meta.options['compression']['chunk_length_in_kb']
+          assert_crc_check_chance_equal(session, "compression_opts_table", 0.6)
 
         for n in range(0, 100):
             session.execute("insert into compression_opts_table (id) values (uuid());")
