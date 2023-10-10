@@ -1174,7 +1174,8 @@ class TestPreJoinCallback(Tester):
             r'\[Stream.*\] Streaming error occurred',
             r'\[Stream.*\] Remote peer 127.0.0.\d failed stream session',
             r'\[Stream.*\] Remote peer /127.0.0.\d:7000 failed stream session',
-            r'Error while waiting on bootstrap to complete. Bootstrap will have to be restarted.'
+            r'Error while waiting on bootstrap to complete. Bootstrap will have to be restarted.',
+            r'peer 127.0.0.1:7000 is probably down'
         ]
 
     def _base_test(self, joinFn):
