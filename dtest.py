@@ -307,7 +307,7 @@ def get_eager_protocol_version(cassandra_version):
 # We default to UTF8Type because it's simpler to use in tests
 def create_cf(session, name, key_type="varchar", speculative_retry=None, read_repair=None, compression=None,
               gc_grace=None, columns=None, validation="UTF8Type", compact_storage=False, compaction_strategy='SizeTieredCompactionStrategy',
-              primary_key=None, clustering=None):
+              primary_key=None, clustering=None, legacy_compression_class = False):
 
     compaction_fragment = "compaction = {'class': '%s', 'enabled': 'true'}"
     if compaction_strategy == '':
@@ -335,7 +335,10 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
         query = '%s AND CLUSTERING ORDER BY (%s)' % (query, clustering)
 
     if compression is not None:
-        query = '%s AND compression = { \'class\': \'%sCompressor\' }' % (query, compression)
+        if legacy_compression_class:
+            query = '%s AND compression = { \'sstable_compression\': \'%sCompressor\' }' % (query, compression)
+        else:
+            query = '%s AND compression = { \'class\': \'%sCompressor\' }' % (query, compression)
     else:
         # if a compression option is omitted, C* will default to lz4 compression
         query += ' AND compression = {}'

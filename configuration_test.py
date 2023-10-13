@@ -10,6 +10,7 @@ from tools.misc import ImmutableMapping
 from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean)
+from distutils.version import LooseVersion
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,16 @@ class TestConfiguration(Tester):
         create_ks(session, 'ks', 1)
 
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
-        alter_chunk_len_query = "ALTER TABLE test_table WITH " \
-                                "compression = {{'class' : 'SnappyCompressor', " \
-                                "'chunk_length_in_kb' : {chunk_length}}};"
+
+
+        if self.cluster.version() >= LooseVersion('5.0'):
+            alter_chunk_len_query = "ALTER TABLE test_table WITH " \
+                                    "compression = {{'class' : 'SnappyCompressor', " \
+                                    "'chunk_length_in_kb' : {chunk_length}}};"
+        else:
+            alter_chunk_len_query = "ALTER TABLE test_table WITH " \
+                                    "compression = {{'sstable_compression' : 'SnappyCompressor', " \
+                                    "'chunk_length_kb' : {chunk_length}}};" 
 
         session.execute(create_table_query)
 
