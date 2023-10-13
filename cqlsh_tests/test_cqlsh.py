@@ -605,8 +605,10 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
 
         node1, = self.cluster.nodelist()
 
-        cmds = """create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;
+        cmds = "create keyspace  CASSANDRA_7196 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} ;"
 
+        if self.cluster.version() >= LooseVersion('5.0'):
+            cmds = cmds + """
 use CASSANDRA_7196;
 
 CREATE TABLE has_all_types (
@@ -625,7 +627,30 @@ CREATE TABLE has_all_types (
     varcharcol varchar,
     varintcol varint
 ) WITH compression = {'class':'LZ4Compressor'};
+"""
+        else:
+            cmds = cmds + """
+use CASSANDRA_7196;
 
+CREATE TABLE has_all_types (
+    num int PRIMARY KEY,
+    intcol int,
+    asciicol ascii,
+    bigintcol bigint,
+    blobcol blob,
+    booleancol boolean,
+    decimalcol decimal,
+    doublecol double,
+    floatcol float,
+    textcol text,
+    timestampcol timestamp,
+    uuidcol uuid,
+    varcharcol varchar,
+    varintcol varint
+) WITH compression = {'sstable_compression':'LZ4Compressor'};
+"""
+
+        cmds = cmds + """
 INSERT INTO has_all_types (num, intcol, asciicol, bigintcol, blobcol, booleancol,
                            decimalcol, doublecol, floatcol, textcol,
                            timestampcol, uuidcol, varcharcol, varintcol)

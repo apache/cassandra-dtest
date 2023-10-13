@@ -10,7 +10,7 @@ import logging
 from ccmlib import common as ccmcommon
 from ccmlib.node import ToolError
 
-from dtest import Tester, create_ks, create_cf, mk_bman_path, MAJOR_VERSION_4
+from dtest import Tester, create_ks, create_cf, mk_bman_path, MAJOR_VERSION_4, MAJOR_VERSION_5
 from tools.assertions import assert_all, assert_none, assert_one
 
 since = pytest.mark.since
@@ -35,10 +35,10 @@ class BaseSStableLoaderTester(Tester):
         return self.fixture_dtest_setup.cluster.version() < MAJOR_VERSION_4 and self.test_compact
 
     def create_schema(self, session, ks, compression):
+        legacy_compression_class = self.fixture_dtest_setup.cluster.version() < MAJOR_VERSION_5
         create_ks(session, ks, rf=2)
-        create_cf(session, "standard1", compression=compression, compact_storage=self.compact())
-        create_cf(session, "counter1", compression=compression, columns={'v': 'counter'},
-                  compact_storage=self.compact())
+        create_cf(session, "standard1", compression=compression, compact_storage=self.compact(), legacy_compression_class = legacy_compression_class)
+        create_cf(session, "counter1", compression=compression, columns={'v': 'counter'}, compact_storage=self.compact(), legacy_compression_class = legacy_compression_class)
 
     def skip_base_class_test(self):
         if self.__class__.__name__ != 'TestBasedSSTableLoader' and self.upgrade_from is None:
