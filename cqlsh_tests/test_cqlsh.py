@@ -2148,10 +2148,13 @@ Tracing session:""")
                 r'.*Invalid or unsupported protocol version \(4\).*',
                 )
         self.cluster.populate(1)
-        self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
+        node1, = self.cluster.nodelist()
+
+        if node1.get_cassandra_version() < '5.0':
+            self.cluster.set_configuration_options({ 'native_transport_max_negotiable_protocol_version': str(3)})
+    
         self.cluster.start()
 
-        node1, = self.cluster.nodelist()
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--tty'])
         # yaml property is deprecated from 4.0 and has no effect
         if node1.get_cassandra_version() < '4.0':
