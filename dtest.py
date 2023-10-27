@@ -407,8 +407,8 @@ def make_auth(user, password):
 def data_size(node, ks, cf):
     """
     Return the size in bytes for given table in a node.
-    This gets the size from nodetool cfstats output.
-    This might brake if the format of nodetool cfstats change
+    This gets the size from nodetool tablestats output.
+    This might brake if the format of nodetool tablestats change
     as it is looking for specific text "Space used (total)" in output.
     @param node: Node in which table size to be checked for
     @param ks: Keyspace name for the table
@@ -416,20 +416,20 @@ def data_size(node, ks, cf):
     @return: data size in bytes
     """
     hack_legacy_parsing(node)
-    cfstats = node.nodetool("cfstats {}.{}".format(ks,cf))[0]
+    tablestats = node.nodetool("tablestats {}.{}".format(ks,cf))[0]
     regex = re.compile(r'[\t]')
-    stats_lines = [regex.sub("", s) for s in cfstats.split('\n')
+    stats_lines = [regex.sub("", s) for s in tablestats.split('\n')
                   if regex.sub("", s).startswith('Space used (total)')]
     if not len(stats_lines) == 1:
-        msg = ('Expected output from `nodetool cfstats` to contain exactly 1 '
-               'line starting with "Space used (total)". Found:\n') + cfstats
+        msg = ('Expected output from `nodetool tablestats` to contain exactly 1 '
+               'line starting with "Space used (total)". Found:\n') + tablestats
         raise RuntimeError(msg)
     space_used_line = stats_lines[0].split()
 
     if len(space_used_line) == 4:
         return float(space_used_line[3])
     else:
-        msg = ('Expected format for `Space used (total)` in nodetool cfstats is `Space used (total): <number>`.'
+        msg = ('Expected format for `Space used (total)` in nodetool tablestats is `Space used (total): <number>`.'
                'Found:\n') + stats_lines[0]
         raise RuntimeError(msg)
 
