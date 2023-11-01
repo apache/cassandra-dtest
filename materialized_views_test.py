@@ -2607,7 +2607,7 @@ class TestMaterializedViews(Tester):
         logger.debug('Restarting node1 to ensure commit log is replayed')
         node1.stop(wait_other_notice=True)
         # Set batchlog.replay_timeout_seconds=1 so we can ensure batchlog will be replayed below
-        node1.start(jvm_args=["-Dcassandra.batchlog.replay_timeout_in_ms=1"])
+        node1.start(jvm_args=["-Dcassandra.batchlog.replay_timeout_in_ms=1"], wait_for_binary_proto=True)
 
         logger.debug('Replay batchlogs')
         time.sleep(0.001)  # Wait batchlog.replay_timeout_in_ms=1 (ms)
