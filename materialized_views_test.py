@@ -2038,7 +2038,8 @@ class TestMaterializedViews(Tester):
         logger.debug('Shutdown node1')
         node1.stop(wait_other_notice=True)
         logger.debug('Delete node1 data')
-        node1.clear(clear_all=True)
+        clear_data_only = True if self.cluster.version() >= LooseVersion('5.1') else False
+        node1.clear(clear_all=True, only_data=clear_data_only)
 
         jvm_args = []
         if fail_mv_lock:
