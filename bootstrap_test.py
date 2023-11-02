@@ -133,7 +133,10 @@ class BootstrapTester(Tester):
             node2.start(jvm_args=["-Dcassandra.write_survey=true"], wait_for_binary_proto=True)
 
             assert len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.'))
-            assert_bootstrap_state(self, node2, 'IN_PROGRESS')
+            # bootstrapping is considered complete if streaming is successful. Post CEP-21 this is distinct from
+            # fully joining the ring or leaving write survey mode
+            bootstrap_state = 'COMPLETED' if self.cluster.version() >= LooseVersion('5.1') else 'IN_PROGRESS'
+            assert_bootstrap_state(self, node2, bootstrap_state)
 
             node2.nodetool("join")
             assert len(node2.grep_log('Leaving write survey mode and joining ring at operator request'))
