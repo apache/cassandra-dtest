@@ -987,7 +987,8 @@ class TestMaterializedViews(Tester):
 
         # Rename a column with an injected byteman rule to kill the node after the first schema update
         self.fixture_dtest_setup.allow_log_errors = True
-        script_version = '4x' if self.cluster.version() >= '4' else '3x'
+
+        script_version = '5_1' if self.cluster.version() >= LooseVersion('5.1') else '4x' if self.cluster.version() >= '4' else '3x'
         node.byteman_submit([mk_bman_path('merge_schema_failure_{}.btm'.format(script_version))])
         with pytest.raises(NoHostAvailable):
             session.execute("ALTER TABLE users RENAME username TO user")
