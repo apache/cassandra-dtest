@@ -1,0 +1,8 @@
+# block remote read repair mutation messages
+RULE disable read repair mutations
+CLASS org.apache.cassandra.db.AbstractMutationVerbHandler
+METHOD doVerb
+AT ENTRY
+IF true
+DO return;
+ENDRULE
