@@ -1,5 +1,7 @@
 import os
 import tempfile
+from distutils.version import LooseVersion
+
 import pytest
 import logging
 import time
@@ -301,9 +303,12 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self.replacement_node.stop(gently=False)
         self.replacement_node.start(wait_for_binary_proto=True, wait_other_notice=False)
 
-        # we redo this check because restarting node should not result
-        # in tokens being moved again, ie number should be same
-        if not same_address:
+        # Before CEP-21, we redo this check because restarting node should not result
+        # in tokens being moved again, ie number should be same. Post CEP-21, however,
+        # the metadata log is replayed at startup, so the message will be logged
+        # repeatedly (although the movement only actually happens once). We can address
+        # this with smarter logging in Cassandra.
+        if not same_address and self.cluster.version() < LooseVersion('5.1'):
             self._verify_tokens_migrated_successfully(previous_log_size)
 
         self._verify_data(initial_data)
@@ -505,7 +510,8 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
     def _test_restart_failed_replace(self, mode):
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
-            r'Error while waiting on bootstrap to complete']
+            r'Error while waiting on bootstrap to complete',
+            r'Cannot send the message .* as messaging service is shutting down']
 
         self._setup(n=3, enable_byteman=True)
         self._insert_data(n="1k")
@@ -557,7 +563,11 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             logger.debug("Waiting other nodes to detect node stopped")
             node_log_str = self.replacement_node.address_for_current_version_slashy()
             self.query_node.watch_log_for("FatClient {} has been silent for 30000ms, removing from gossip".format(node_log_str), timeout=120)
-            self.query_node.watch_log_for("Node {} failed during replace.".format(node_log_str), timeout=120, filename='debug.log')
+            if self.cluster.version() < LooseVersion('5.1'):
+                self.query_node.watch_log_for("Node {} failed during replace.".format(node_log_str), timeout=120, filename='debug.log')
+            else:
+                logger.debug("Calling nodetool abortbootstrap --ip {}".format(self.replacement_node.address()))
+                self.query_node.nodetool("abortbootstrap --ip {}".format(self.replacement_node.address()))
 
             logger.debug("Restarting node after wiping data")
             self._cleanup(self.replacement_node)
