@@ -338,8 +338,10 @@ class TestReplaceAddress(BaseReplaceAddressTest):
 
         logger.debug("Waiting for replace to fail")
         node_log_str = "/127.0.0.5" if self.cluster.version() < '4.0' else "/127.0.0.5:7000"
-        self.replacement_node.watch_log_for("java.lang.RuntimeException: Cannot replace_address "
-                                            + node_log_str + " because it doesn't exist in gossip")
+        log_message = "java.lang.RuntimeException: Cannot replace_address {} because it doesn't exist in gossip" \
+            if self.cluster.version() < LooseVersion('5.1') \
+            else "Cannot replace node {} which is not currently joined"
+        self.replacement_node.watch_log_for(log_message.format(node_log_str))
         assert_not_running(self.replacement_node)
 
     @since('3.6')
