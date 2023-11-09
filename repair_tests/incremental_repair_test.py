@@ -325,20 +325,26 @@ class TestIncRepair(Tester):
         * Issue an incremental repair
         * Run sstablemetadata on both nodes again, pipe to a new file
         * Verify repairs occurred and repairedAt was updated
+        *
+        * Note: in this 2 node cluster, post CEP-21 node1 is the only CMS member so if is shutdown operations
+        * which modify cluster metadata will not be possible. Stress write optimistically attempts to create
+        * keyspaces/tables with idempotent DDL statement using IF NOT EXISTS. These will still fail if the CMS
+        * is not available, so in this test scenario it is important that node1 remains up while writes are taking
+        * place
         """
         self.fixture_dtest_setup.setup_overrides.cluster_options = ImmutableMapping({'hinted_handoff_enabled': 'false'})
         self.init_default_config()
         self.cluster.populate(2).start()
         node1, node2 = self.cluster.nodelist()
-        node1.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', '-rate', 'threads=50'])
+        node2.stress(['write', 'n=10K', 'no-warmup', '-schema', 'replication(factor=2)', 'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)', '-rate', 'threads=50'])
 
         node1.flush()
         node2.flush()
 
-        node2.stop(gently=False)
+        node1.stop(gently=False)
 
-        node2.run_sstablerepairedset(keyspace='keyspace1')
-        node2.start(wait_for_binary_proto=True)
+        node1.run_sstablerepairedset(keyspace='keyspace1')
+        node1.start(wait_for_binary_proto=True)
 
         initialOut1 = node1.run_sstablemetadata(keyspace='keyspace1').stdout
         initialOut2 = node2.run_sstablemetadata(keyspace='keyspace1').stdout
@@ -355,15 +361,15 @@ class TestIncRepair(Tester):
 
         assert re.search('Repaired at: 0', '\n'.join([initialOut1, initialOut2]))
 
-        node1.stop()
-        node2.stress(['write', 'n=15K', 'no-warmup', '-schema', 'replication(factor=2)'])
-        node2.flush()
-        node1.start(wait_for_binary_proto=True)
+        node2.stop()
+        node1.stress(['write', 'n=15K', 'no-warmup', '-schema', 'replication(factor=2)'])
+        node1.flush()
+        node2.start(wait_for_binary_proto=True)
 
         if self.cluster.version() >= "2.2":
-            node1.repair()
+            node2.repair()
         else:
-            node1.nodetool("repair -par -inc")
+            node2.nodetool("repair -par -inc")
 
         if self.cluster.version() >= '4.0':
             # sstables are compacted out of pending repair by a compaction
