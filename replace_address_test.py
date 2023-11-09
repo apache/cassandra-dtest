@@ -316,7 +316,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
     @pytest.mark.resource_intensive
     def test_replace_active_node(self):
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
-            r'Exception encountered during startup', r'Unable to replace node for token']
+            r'Exception encountered during startup', r'Unable to replace node for token', r'Unable to replace live node /127.0.0.3:7000']
 
         self._setup(n=3)
         self._do_replace(wait_for_binary_proto=False)
