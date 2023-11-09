@@ -1278,7 +1278,8 @@ class TestMaterializedViews(Tester):
         session = self.prepare(options={'concurrent_materialized_view_builders': 4}, install_byteman=True)
         session.execute("CREATE TABLE t (id int PRIMARY KEY, v int, v2 text, v3 decimal)")
         nodes = self.cluster.nodelist()
-        self.fixture_dtest_setup.ignore_log_patterns = [r'Compaction interrupted: View build']
+        self.fixture_dtest_setup.ignore_log_patterns = [r'Compaction interrupted: View build',
+                                                        r'Cannot send the message .* as messaging service is shutting down']
 
         logger.debug("Inserting initial data")
         for i in range(5000):
@@ -2190,6 +2191,7 @@ class TestMaterializedViews(Tester):
 
         session = self.prepare(rf=5, options={'hinted_handoff_enabled': False}, nodes=5)
         node1, node2, node3, node4, node5 = self.cluster.nodelist()
+        self.fixture_dtest_setup.ignore_log_patterns = [r'Cannot send the message .* as messaging service is shutting down']
 
         for node in self.cluster.nodelist():
             node.nodetool("disableautocompaction")
@@ -2262,6 +2264,7 @@ class TestMaterializedViews(Tester):
         self._replay_batchlogs()
 
         logger.debug('stop cluster')
+        session.shutdown()
         self.cluster.stop()
 
         logger.debug('rolling restart to check repaired data on each node')
@@ -2294,7 +2297,8 @@ class TestMaterializedViews(Tester):
             assert_none(session, "SELECT pk,ck1,ck2,v1,v2 FROM ks.t WHERE pk=2000")
             assert_none(session, "SELECT pk,ck1,ck2,v1,v2 FROM ks.t_by_v WHERE pk=2000")
             logger.debug('stopping {}'.format(node.name))
-            node.stop(wait_other_notice=True, wait_for_binary_proto=True)
+            session.shutdown()
+            node.stop(gently=False)
 
     @pytest.mark.resource_intensive
     def test_really_complex_repair(self):
