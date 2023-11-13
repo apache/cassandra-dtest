@@ -186,6 +186,9 @@ def setup_test(obj):
 
     cluster.start()
 
+    # wait for auth setup so we don't have to compensate for the reads/writes it may trigger
+    node.watch_log_for("Created default superuser role 'cassandra'", timeout=60)
+
     session = obj.patient_exclusive_cql_connection(node)
     obj.patient_exclusive_cql_connection(node2)
 
