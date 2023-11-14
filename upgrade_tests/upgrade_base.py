@@ -73,7 +73,9 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
 
     @pytest.fixture(autouse=True)
     def cleanup_connections(self):
+        logger.info('Not cleaning up, this should be BEFORE tests run')
         yield None
+        logger.warn('Cleaning up CQL Connections...')
         self.fixture_dtest_setup.cleanup_connections()
 
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, use_thrift=False,
