@@ -71,6 +71,11 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         if is_win() and self.cluster.version() <= '2.2':
             self.cluster.nodelist()[1].mark_log_for_errors()
 
+    @pytest.fixture(autouse=True)
+    def cleanup_connections(self):
+        yield None
+        self.fixture_dtest_setup.cleanup_connections()
+
     def prepare(self, ordered=False, create_keyspace=True, use_cache=False, use_thrift=False,
                 nodes=None, rf=None, protocol_version=None, cl=None, extra_config_options=None, **kwargs):
         nodes = self.NODES if nodes is None else nodes
