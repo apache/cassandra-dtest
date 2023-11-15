@@ -252,7 +252,7 @@ class Tester(object):
     @pytest.fixture(autouse=True)
     def cleanup_connections(self):
         yield None
-        logger.warn('Cleaning up CQL Connections...')
+        logger.info('Cleaning up CQL Connections...')
         self.fixture_dtest_setup.cleanup_connections()
 
     def assert_supported_upgrade_path(self, from_version, to_version):
