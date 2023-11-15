@@ -249,6 +249,12 @@ class Tester(object):
         self.dtest_config = fixture_dtest_setup.dtest_config
         return None
 
+    @pytest.fixture(autouse=True)
+    def cleanup_connections(self):
+        yield None
+        logger.info('Cleaning up CQL Connections...')
+        self.fixture_dtest_setup.cleanup_connections()
+
     def assert_supported_upgrade_path(self, from_version, to_version):
         for path in build_upgrade_pairs():
             if from_version.startswith(path.starting_meta.family) and to_version.startswith(path.upgrade_meta.family):

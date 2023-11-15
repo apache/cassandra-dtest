@@ -417,10 +417,13 @@ class DTestSetup(object):
                     os.rmdir(self.test_path)
                     self.cleanup_last_test_dir()
 
-    def cleanup_and_replace_cluster(self):
+    def cleanup_connections(self):
         for con in self.connections:
             con.cluster.shutdown()
         self.connections = []
+
+    def cleanup_and_replace_cluster(self):
+        self.cleanup_connections()
 
         self.cleanup_cluster()
         self.test_path = self.get_test_path()
