@@ -598,12 +598,22 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self._insert_data(rf=2)
 
         self._stop_node_to_replace()
-
-        # stop other replica
+        # stop other replica. For CEP-21 purposes, we need to ensure this is not
+        # the cluster's only CMS member
         logger.debug("Stopping other replica")
-        self.query_node.stop(wait_other_notice=True)
+        self.cluster.nodelist()[1].stop(wait_other_notice=True)
 
-        self._do_replace(wait_for_binary_proto=False, wait_other_notice=False)
+        options = {}
+        # CEP-21: availability is intentionally degraded, so we lower the required number of
+        # acks required for the replacement node to progress to a point where it attempts to
+        # perform streaming
+        if self.cluster.version() >= LooseVersion('5.1'):
+            options = {'progress_barrier_min_consistency_level': 'ONE',
+                       'progress_barrier_default_consistency_level': 'ONE'}
+
+        self._do_replace(wait_for_binary_proto=False,
+                         wait_other_notice=False,
+                         opts=options)
 
         # replace should fail due to insufficient replicas
         self.replacement_node.watch_log_for("Unable to find sufficient sources for streaming range")
