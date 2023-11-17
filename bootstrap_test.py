@@ -317,12 +317,16 @@ class BootstrapTester(Tester):
         session = self.patient_exclusive_cql_connection(node1)
         session.execute("CREATE KEYSPACE k WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : '3'}")
 
+        # Since CEP-21, this warning is logged twice on the coordinator (node1) as it is a CMS member so it applies the
+        # schema transformation once as a dry run for validation, then again when committing to the metadata log. With
+        # TCM, node2 also logs the warning as it applies the transform when it gets replicated to it by the CMS.
         if cluster.version() >= '4.0':
             warning = 'Your replication factor 3 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
-            assert len(node1.grep_log(warning)) == 1
-            if cluster.version() >= LooseVersion('5.1'):
-                assert len(node2.grep_log(warning)) == 1  # we now log this on all nodes
+            if cluster.version() >= LooseVersion('5.1'):   # we now log this on all nodes
+                assert len(node1.grep_log(warning)) == 2
+                assert len(node2.grep_log(warning)) == 1
             else:
+                assert len(node1.grep_log(warning)) == 1
                 assert len(node2.grep_log(warning)) == 0
 
         session.execute("ALTER KEYSPACE k WITH REPLICATION = {'class' : 'NetworkTopologyStrategy', 'dc1' : '2'}")
@@ -331,10 +335,11 @@ class BootstrapTester(Tester):
 
         if cluster.version() >= '4.0':
             warning = 'Your replication factor 2 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
-            assert len(node1.grep_log(warning)) == 1
             if cluster.version() >= LooseVersion('5.1'):
-                assert len(node2.grep_log(warning)) == 1  # we now log this on all nodes
+                assert len(node1.grep_log(warning)) == 2  # we now log this on all nodes
+                assert len(node2.grep_log(warning)) == 1
             else:
+                assert len(node1.grep_log(warning)) == 1
                 assert len(node2.grep_log(warning)) == 0
 
         marks = map(lambda n: n.mark_log(), cluster.nodelist())
