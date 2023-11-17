@@ -54,6 +54,11 @@ def default_ignore_log_patterns():
             r'Invalid or unsupported protocol version \(65\)',  # DSE_V1
             r'Invalid or unsupported protocol version \(66\)',  # DSE_V2
             'Beta version of the protocol used',
+            # at startup, nodes may attempt to run the auth setup while peers are still joining. This can cause the
+            # queries which probe for the default superuser role to be directed to the wrong node, _if_ they are sent
+            # while peers are performing UnsafeJoins. This behaviour is safe, but it can cause flaky tests if the
+            # ERROR unexpectedly appears in the log
+            r'Received a read request from .* for a token .* that is not owned by the current replica .* key=cassandra .*'
             ]
 
 
