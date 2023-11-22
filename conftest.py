@@ -50,6 +50,8 @@ def pytest_addoption(parser):
                      help="Determines wither or not to setup clusters using vnodes for tests")
     parser.addoption("--use-off-heap-memtables", action="store_true", default=False,
                      help="Enable Off Heap Memtables when creating test clusters for tests")
+    parser.addoption("--configuration-yaml", action="store", default=None,
+                     help="The name of the cassandra configuration YAML (e.g. cassandra_latest.yaml)")
     parser.addoption("--num-tokens", action="store", default=256,
                      help="Number of tokens to set num_tokens yaml setting to when creating instances "
                           "with vnodes enabled")

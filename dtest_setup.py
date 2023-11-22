@@ -474,6 +474,8 @@ class DTestSetup(object):
 
         if self.dtest_config.use_off_heap_memtables:
             self.cluster.set_configuration_options(values={'memtable_allocation_type': 'offheap_objects'})
+        if self.dtest_config.configuration_yaml is not None:
+            self.cluster.set_configuration_yaml(self.dtest_config.configuration_yaml)
 
         self.cluster.set_configuration_options(values)
         logger.debug("Done setting configuration options:\n" + pprint.pformat(self.cluster._config_options, indent=4))

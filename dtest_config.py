@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 class DTestConfig:
     def __init__(self):
         self.use_vnodes = True
+        self.configuration_yaml = None
         self.use_off_heap_memtables = False
         self.num_tokens = -1
         self.data_dir_count = -1
@@ -42,6 +43,7 @@ class DTestConfig:
             return
 
         self.use_vnodes = config.getoption("--use-vnodes")
+        self.configuration_yaml = config.getoption("--configuration-yaml")
         self.use_off_heap_memtables = config.getoption("--use-off-heap-memtables")
         self.num_tokens = config.getoption("--num-tokens")
         self.data_dir_count = config.getoption("--data-dir-count-per-instance")

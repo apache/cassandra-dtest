@@ -28,6 +28,7 @@ optional arguments:
   --dtest-print-tests-output=DTEST_PRINT_TESTS_OUTPUT        Path to file where the output of --dtest-print-tests-only should be written to (default: False)
   --pytest-options=PYTEST_OPTIONS                            Additional command line arguments to proxy directly thru when invoking pytest. (default: None)
   --dtest-tests=DTEST_TESTS                                  Comma separated list of test files, test classes, or test methods to execute. (default: None)
+  --configuration-yaml=CONFIG_FILE                           The name of the cassandra configuration YAML (e.g. cassandra_latest.yaml) (default: None)
 """
 import subprocess
 import sys
