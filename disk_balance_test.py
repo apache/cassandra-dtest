@@ -43,6 +43,7 @@ class TestDiskBalance(Tester):
         node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=3)',
                       'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
+        cluster.stop()
         # make sure the data directories are balanced:
         for node in cluster.nodelist():
             self.assert_balanced(node)
