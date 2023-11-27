@@ -98,21 +98,20 @@ class TestPushedNotifications(Tester):
         waiters = [NotificationWaiter(self, node, ["TOPOLOGY_CHANGE"])
                    for node in list(self.cluster.nodes.values())]
 
-        # The first node sends NEW_NODE for the other 2 nodes during startup, in case they are
-        # late due to network delays let's block a bit longer
-        logger.debug("Waiting for unwanted notifications....")
-        waiters[0].wait_for_notifications(timeout=30, num_notifications=2)
-        waiters[0].clear_notifications()
-
         logger.debug("Issuing move command....")
         node1 = list(self.cluster.nodes.values())[0]
         node1.move("123")
-
         for waiter in waiters:
-            logger.debug("Waiting for notification from {}".format(waiter.address,))
-            notifications = waiter.wait_for_notifications(60.0)
-            assert 1 == len(notifications), notifications
-            notification = notifications[0]
+            # poll each waiter in turn, they should all receive a MOVED_NODE notification for node3
+            # and at most one NEW_NODE for each node in the cluster, which we don't care about here.
+            # Whether nodes send the NEW_NODE depends on whether that node learns of the new node
+            # (either through gossip or TCM) before or after the listener is established.
+            logger.debug("Checking notifications from {}".format(waiter.address))
+            notifications = waiter.wait_for_notifications(10.0, 4)
+            logger.debug("Received {}".format(notifications))
+            count = len(notifications)
+            assert 1 <= count <= 4
+            notification = notifications[count - 1]
             change_type = notification["change_type"]
             address, port = notification["address"]
             assert "MOVED_NODE" == change_type
