@@ -1,11 +1,15 @@
 import logging
+import time
+
 import pytest
 import re
 import threading
 
 from cassandra.query import SimpleStatement
 
-from dtest import Tester, create_ks
+from dtest import Tester, create_ks, mk_bman_path
+
+from distutils.version import LooseVersion
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +29,8 @@ class TestPendingRangeMovements(Tester):
 
         # Create 5 node cluster
         ring_delay_ms = 3_600_000  # 1 hour
-        cluster.populate(5).start(jvm_args=['-Dcassandra.ring_delay_ms={}'.format(ring_delay_ms)])
+        install_byteman = cluster.version() >= '5.1'
+        cluster.populate(5, install_byteman=install_byteman).start(jvm_args=['-Dcassandra.ring_delay_ms={}'.format(ring_delay_ms)])
         node1, node2 = cluster.nodelist()[0:2]
 
         # Set up RF=3 keyspace
@@ -46,15 +51,18 @@ class TestPendingRangeMovements(Tester):
 
         token = '-634023222112864484'
 
-        mark = node1.mark_log()
+        # delay progress of the move operation to give a chance to kill the moving node
+        if self.cluster.version() >= LooseVersion('5.1'):
+            node1.byteman_submit([mk_bman_path('post5.1/delay_streaming_for_move.btm')])
 
+        mark = node1.mark_log()
         # Move a node without waiting for the response of nodetool, so we don't have to wait for ring_delay
         threading.Thread(target=(lambda: node1.nodetool('move {}'.format(token)))).start()
-
         # Watch the log so we know when the node is moving
-        node1.watch_log_for('Moving .* to {}'.format(token), timeout=10, from_mark=mark)
-        node1.watch_log_for('Sleeping {} ms before start streaming/fetching ranges'.format(ring_delay_ms),
-                            timeout=10, from_mark=mark)
+        node1.watch_log_for('Moving .* to \[?{}\]?'.format(token), timeout=10, from_mark=mark)
+        if self.cluster.version() < LooseVersion('5.1'):
+            node1.watch_log_for('Sleeping {} ms before start streaming/fetching ranges'.format(ring_delay_ms),
+                                timeout=10, from_mark=mark)
 
         # Watch the logs so we know when all the nodes see the status update to MOVING
         for node in cluster.nodelist():

@@ -1,0 +1,11 @@
+#
+# Make progress barrier block for 60s
+#
+RULE delay streaming for move
+CLASS org.apache.cassandra.tcm.sequences.Move
+METHOD movementMap
+AT ENTRY
+IF TRUE
+DO
+    Thread.sleep(60000);
+ENDRULE
