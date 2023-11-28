@@ -185,7 +185,7 @@ class BaseReplaceAddressTest(Tester):
                                            self.replacement_node.address()),
                                    timeout=60)
 
-    def _verify_tokens_migrated_successfully(self, previous_log_size=None):
+    def _verify_tokens_migrated_successfully(self, expected_match_count=None):
         if not self.dtest_config.use_vnodes:
             num_tokens = 1
         else:
@@ -197,16 +197,33 @@ class BaseReplaceAddressTest(Tester):
         repled_address = self.replaced_node.address_for_current_version_slashy()
         token_ownership_log = r"Token (.*?) changing ownership from {} to {}".format(repled_address,
                                                                                      replmnt_address)
-        logs = self.replacement_node.grep_log(token_ownership_log)
+        # watch log until we see a matching log line
+        logger.debug("Waiting for any matching log message")
+        self.replacement_node.watch_log_for(token_ownership_log)
+        # now grep until we find the expected number of lines
+        logger.debug("Found log message, now getting others")
+        moved_tokens = {}
+        timeout_seconds = 10
+        start = time.time()
+        while len(moved_tokens) < num_tokens:
+            logs = self.replacement_node.grep_log(token_ownership_log)
+            moved_tokens = set([l[1].group(1) for l in logs])
+            logger.debug("Found {} matching messages in log".format(len(moved_tokens)))
+            if len(moved_tokens) < num_tokens:
+                assert start + timeout_seconds >= time.time(), (
+                    "Found only {} of expected {} log messages before timeout".format(len(moved_tokens), num_tokens))
+                time.sleep(1)
 
-        if (previous_log_size is not None):
-            assert len(logs) == previous_log_size
-
-        moved_tokens = set([l[1].group(1) for l in logs])
         logger.debug("number of moved tokens: {}".format(len(moved_tokens)))
-        assert len(moved_tokens) == num_tokens
 
-        return len(logs)
+        # pre 5.1 we expect notifications to only be logged once, so in that case check
+        # that there are no additional matching lines in the replacement node log
+        total_match_count = len(self.replacement_node.grep_log(token_ownership_log))
+        if expected_match_count is not None:
+            assert total_match_count == expected_match_count
+
+        assert len(moved_tokens) == num_tokens
+        return total_match_count
 
     def _test_insert_data_during_replace(self, same_address, mixed_versions=False):
         """
