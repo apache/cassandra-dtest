@@ -1124,10 +1124,10 @@ class TestMaterializedViews(Tester):
         self.cluster.stop()
 
         logger.debug("Checking logs to verify that the view build tasks have been created")
+        marks = {}
         for node in self.cluster.nodelist():
             assert node.grep_log('Starting new view build', filename='debug.log')
-            assert not node.grep_log('Resuming view build', filename='debug.log')
-            node.mark_log(filename='debug.log')
+            marks[node] = node.mark_log(filename='debug.log')
 
         logger.debug("Restart the cluster")
         self.cluster.start()
@@ -1152,7 +1152,7 @@ class TestMaterializedViews(Tester):
 
         logger.debug("Checking logs to verify that some view build tasks have been resumed")
         for node in self.cluster.nodelist():
-            assert node.grep_log('Resuming view build', filename='debug.log')
+            assert node.grep_log('Resuming view build', filename='debug.log', from_mark=marks[node])
 
     @pytest.mark.skip(reason="Frequently fails in CI. Skipping until fixed as tracked by CASSANDRA-14148")
     @since('4.0')
