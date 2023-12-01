@@ -17,6 +17,8 @@ from cassandra.protocol import ConfigurationException
 from cassandra.query import BatchStatement, SimpleStatement
 
 from bootstrap_test import BootstrapTester
+from tools.misc import ImmutableMapping
+from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.assertions import assert_bootstrap_state, assert_invalid, assert_none, assert_one, assert_row_count, \
     assert_length_equal, assert_all
@@ -25,6 +27,16 @@ from tools.misc import new_node
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
+
+"""
+This test is only valid for legacy secondary indexes.
+"""
+@pytest.fixture()
+def fixture_dtest_setup_overrides(request, dtest_config):
+    dtest_setup_overrides = DTestSetupOverrides()
+    if dtest_config.cassandra_version_from_build >= '5.0':
+        dtest_setup_overrides.cluster_options = ImmutableMapping({'default_secondary_index': 'legacy_local_table'})
+    return dtest_setup_overrides
 
 class TestSecondaryIndexes(Tester):
 

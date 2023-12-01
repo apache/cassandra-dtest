@@ -10,6 +10,8 @@ import logging
 from ccmlib import common as ccmcommon
 from ccmlib.node import ToolError
 
+from tools.misc import ImmutableMapping
+from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks, create_cf, mk_bman_path, MAJOR_VERSION_4, MAJOR_VERSION_5
 from tools.assertions import assert_all, assert_none, assert_one
 
@@ -370,6 +372,44 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
 
         self.load_sstable_with_configuration(ks='"Keyspace1"', create_schema=create_schema_with_mv)
 
+    @since("3.0")
+    def test_sstableloader_empty_stream(self):
+        """
+        @jira_ticket CASSANDRA-16349
+
+        Tests that sstableloader does not throw if SSTables it attempts to load do not
+        intersect with the node's ranges.
+        """
+        cluster = self.cluster
+        cluster.populate(2).start()
+        node1, node2 = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        create_ks(session, 'k', 1)
+        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
+        for i in range(10):
+            session.execute("INSERT INTO k.t (k, v) VALUES ({0}, {0})".format(i))
+        node1.nodetool('flush')
+
+        ret = self.load_sstables_from_another_node(cluster, node1, node2, "k")
+        assert len(ret) > 0, "Expected to stream at least 1 table"
+        for exit_status, _, stderr in ret:
+            assert exit_status == 0, "Expected exit code 0, got {}".format(exit_status)
+            # Below warning is emitted in trunk/4.1 because of CASSANDRA-15234. We exploit the backward compatibility
+            # framework with DTests instead of changing config in all old tests.
+            if len(stderr) > 0 and stderr is not "parameters have been deprecated. They have new names and/or value format":
+                "Expected empty stderr, got {}".format(stderr)
+
+class TestSSTableGenerationAndLoadingLegacyIndex(BaseSStableLoaderTester):
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_dtest_setup_overrides(self, dtest_config):
+        dtest_setup_overrides = DTestSetupOverrides()
+
+        if dtest_config.cassandra_version_from_build >= '5.0':
+            dtest_setup_overrides.cluster_options = ImmutableMapping({'default_secondary_index': 'legacy_local_table'})
+        return dtest_setup_overrides
+
     @since('4.0')
     def test_sstableloader_with_failing_2i(self):
         """
@@ -434,31 +474,3 @@ class TestSSTableGenerationAndLoading(BaseSStableLoaderTester):
         assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
         assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
         assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])
-
-    @since("3.0")
-    def test_sstableloader_empty_stream(self):
-        """
-        @jira_ticket CASSANDRA-16349
-
-        Tests that sstableloader does not throw if SSTables it attempts to load do not
-        intersect with the node's ranges.
-        """
-        cluster = self.cluster
-        cluster.populate(2).start()
-        node1, node2 = cluster.nodelist()
-        session = self.patient_cql_connection(node1)
-
-        create_ks(session, 'k', 1)
-        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
-        for i in range(10):
-            session.execute("INSERT INTO k.t (k, v) VALUES ({0}, {0})".format(i))
-        node1.nodetool('flush')
-
-        ret = self.load_sstables_from_another_node(cluster, node1, node2, "k")
-        assert len(ret) > 0, "Expected to stream at least 1 table"
-        for exit_status, _, stderr in ret:
-            assert exit_status == 0, "Expected exit code 0, got {}".format(exit_status)
-            # Below warning is emitted in trunk/4.1 because of CASSANDRA-15234. We exploit the backward compatibility
-            # framework with DTests instead of changing config in all old tests.
-            if len(stderr) > 0 and stderr is not "parameters have been deprecated. They have new names and/or value format":
-                "Expected empty stderr, got {}".format(stderr)

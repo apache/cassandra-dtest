@@ -73,7 +73,11 @@ def verify_indexes_table(created_on_version, current_version, keyspace, session,
 
     assert 1 == len(meta.indexes)
 
-    assert {'target': 'd'} == meta.indexes[index_name].index_options
+    opts = dict(meta.indexes[index_name].index_options)
+    # we do not want the class name (set when SAI is the default index class) to break this
+    opts = { k : opts[k] for k in set(opts) - {'class_name'} }
+
+    assert {'target': 'd'} == opts
     assert 3 == len(meta.primary_key)
     assert 'a' == meta.primary_key[0].name
     assert 'b' == meta.primary_key[1].name
@@ -558,8 +562,15 @@ class TestSchemaMetadata(Tester):
         ix_meta = self._keyspace_meta().indexes['ix_born_to_die_name']
         assert 'ix_born_to_die_name' == ix_meta.name
 
-        assert {'target': 'name'} == ix_meta.index_options
-        assert 'COMPOSITES' == ix_meta.kind
+        opts = dict(ix_meta.index_options)
+        # When SAI is the default index class, we get a somewhat different configuration.
+        if 'class_name' in opts:
+            opts = { k : opts[k] for k in set(opts) - {'class_name'} }
+            assert 'CUSTOM' == ix_meta.kind
+        else:
+            assert 'COMPOSITES' == ix_meta.kind
+
+        assert {'target': 'name'} == opts
 
         self.session.execute("drop table born_to_die")
         assert self._keyspace_meta().tables.get('born_to_die') is None

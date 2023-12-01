@@ -10,6 +10,8 @@ import logging
 
 from ccmlib import common
 
+from tools.misc import ImmutableMapping
+from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks, create_cf
 from tools.assertions import assert_length_equal, assert_stderr_clean
 
@@ -190,7 +192,16 @@ class TestHelper(Tester):
 class TestScrubIndexes(TestHelper):
     """
     Test that we scrub indexes as well as their parent tables
+    Only valid for legacy secondary indexes
     """
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_dtest_setup_overrides(self, dtest_config):
+        dtest_setup_overrides = DTestSetupOverrides()
+
+        if dtest_config.cassandra_version_from_build >= '5.0':
+            dtest_setup_overrides.cluster_options = ImmutableMapping({'default_secondary_index': 'legacy_local_table'})
+        return dtest_setup_overrides
 
     def create_users(self, session):
         columns = {"password": "varchar", "gender": "varchar", "session_token": "varchar", "state": "varchar", "birth_year": "bigint"}
