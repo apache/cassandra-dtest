@@ -55,8 +55,8 @@ def _assert_exception(fun, *args, **kwargs):
             fun(*args)
     except expected as e:
         if matching is not None:
-            regex = re.compile(matching)
-            assert regex.match(repr(e)) is None
+            msg = str(e)
+            assert re.search(matching, msg), f"Raised exception '{msg}' failed to match with '{matching}'"
     except Exception as e:
         raise e
     else:
