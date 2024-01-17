@@ -11,6 +11,7 @@ from distutils.version import LooseVersion
 
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
+from cassandra.query import SimpleStatement
 from ccmlib.node import NodeError, TimeoutError, ToolError, Node
 
 import pytest
@@ -257,13 +258,14 @@ class BootstrapTester(Tester):
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
-        original_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
+        query = SimpleStatement("SELECT * FROM %s" % (stress_table), consistency_level=ConsistencyLevel.ALL)
+        original_rows = list(session.execute(query))
 
         node4 = new_node(cluster)
         node4.start(wait_for_binary_proto=True)
 
         session = self.patient_exclusive_cql_connection(node4)
-        new_rows = list(session.execute("SELECT * FROM %s" % (stress_table,)))
+        new_rows = list(session.execute(query))
         assert original_rows == new_rows
 
     @since('3.0')
@@ -525,7 +527,8 @@ class BootstrapTester(Tester):
         session = self.patient_exclusive_cql_connection(node2)
         stress_table = 'keyspace1.standard1'
 
-        original_rows = list(session.execute("SELECT * FROM %s" % stress_table))
+        query = SimpleStatement("SELECT * FROM %s" % stress_table, consistency_level=ConsistencyLevel.ALL)
+        original_rows = list(session.execute(query))
 
         # Add a new node
         node3 = new_node(cluster, bootstrap=False)
@@ -533,7 +536,7 @@ class BootstrapTester(Tester):
         node3.repair()
         node1.cleanup()
 
-        current_rows = list(session.execute("SELECT * FROM %s" % stress_table))
+        current_rows = list(session.execute(query))
         assert original_rows == current_rows
 
     def test_local_quorum_bootstrap(self):
@@ -626,14 +629,15 @@ class BootstrapTester(Tester):
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+        query = SimpleStatement("SELECT * FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
+        original_rows = list(session.execute(query))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node4 = new_node(cluster, bootstrap=True)
         node4.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node4)
-        assert original_rows == list(session.execute("SELECT * FROM {}".format(stress_table,)))
+        assert original_rows == list(session.execute(query))
 
         # Stop the new node and wipe its data
         node4.stop(gently=gently)
@@ -660,14 +664,15 @@ class BootstrapTester(Tester):
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+        query = SimpleStatement("SELECT * FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
+        original_rows = list(session.execute(query))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node4 = new_node(cluster, bootstrap=True)
         node4.start(wait_for_binary_proto=True)
 
         session = self.patient_cql_connection(node4)
-        assert original_rows == list(session.execute("SELECT * FROM {}".format(stress_table,)))
+        assert original_rows == list(session.execute(query))
 
         # Decommission the new node and wipe its data
         node4.decommission()
@@ -742,7 +747,7 @@ class BootstrapTester(Tester):
         node1.flush()
 
         session = self.patient_cql_connection(node1)
-        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table,)))
+        original_rows = list(session.execute("SELECT * FROM {}".format(stress_table)))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node2 = new_node(cluster, bootstrap=True)
