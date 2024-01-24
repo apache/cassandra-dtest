@@ -251,6 +251,11 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
+        if cluster.version() <= '5.0':
+            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
+            cluster.nodelist()[0].start(wait_for_binary_proto=True)
+            cluster.nodelist()[1].start(wait_for_binary_proto=True)
+            cluster.nodelist()[2].start(wait_for_binary_proto=True)
         cluster.start()
 
         node1 = cluster.nodes['node1']
@@ -258,7 +263,7 @@ class BootstrapTester(Tester):
 
         session = self.patient_cql_connection(node1)
         stress_table = 'keyspace1.standard1'
-        query = SimpleStatement("SELECT * FROM %s" % (stress_table), consistency_level=ConsistencyLevel.ALL)
+        query = SimpleStatement("SELECT * FROM %s" % (stress_table))
         original_rows = list(session.execute(query))
 
         node4 = new_node(cluster)
@@ -518,7 +523,12 @@ class BootstrapTester(Tester):
         """
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
-        cluster.populate(2).start()
+        cluster.populate(2)
+        if cluster.version() <= '5.0':
+            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
+            cluster.nodelist()[0].start(wait_for_binary_proto=True)
+            cluster.nodelist()[1].start(wait_for_binary_proto=True)
+        cluster.start()
         (node1, node2) = cluster.nodelist()
 
         node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=2)',
@@ -527,7 +537,7 @@ class BootstrapTester(Tester):
         session = self.patient_exclusive_cql_connection(node2)
         stress_table = 'keyspace1.standard1'
 
-        query = SimpleStatement("SELECT * FROM %s" % stress_table, consistency_level=ConsistencyLevel.ALL)
+        query = SimpleStatement("SELECT * FROM %s" % stress_table)
         original_rows = list(session.execute(query))
 
         # Add a new node
@@ -620,6 +630,11 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
+        if cluster.version() <= '5.0':
+            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
+            cluster.nodelist()[0].start(wait_for_binary_proto=True)
+            cluster.nodelist()[1].start(wait_for_binary_proto=True)
+            cluster.nodelist()[2].start(wait_for_binary_proto=True)
         cluster.start()
 
         stress_table = 'keyspace1.standard1'
@@ -629,7 +644,7 @@ class BootstrapTester(Tester):
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        query = SimpleStatement("SELECT * FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
+        query = SimpleStatement("SELECT * FROM {}".format(stress_table))
         original_rows = list(session.execute(query))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
@@ -655,6 +670,11 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
+        if cluster.version() <= '5.0':
+            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
+            cluster.nodelist()[0].start(wait_for_binary_proto=True)
+            cluster.nodelist()[1].start(wait_for_binary_proto=True)
+            cluster.nodelist()[2].start(wait_for_binary_proto=True)
         cluster.start()
 
         stress_table = 'keyspace1.standard1'
@@ -664,7 +684,7 @@ class BootstrapTester(Tester):
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8'])
 
         session = self.patient_cql_connection(node1)
-        query = SimpleStatement("SELECT * FROM {}".format(stress_table), consistency_level=ConsistencyLevel.ALL)
+        query = SimpleStatement("SELECT * FROM {}".format(stress_table))
         original_rows = list(session.execute(query))
 
         # Add a new node, bootstrap=True ensures that it is not a seed
