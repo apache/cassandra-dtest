@@ -31,7 +31,7 @@ class TestSchemaChanges(Tester):
         elif original_version.vstring.startswith('2.1'):
             upgraded_version = 'github:apache/cassandra-2.2'
         else:
-            pytest.skip(msg="This test is only designed to work with 2.0 and 2.1 right now")
+            pytest.skip("This test is only designed to work with 2.0 and 2.1 right now")
 
         # start out with a major behind the previous version
 

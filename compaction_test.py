@@ -588,11 +588,11 @@ class TestCompaction(Tester):
 
     def skip_if_no_major_compaction(self, strategy):
         if self.cluster.version() < '2.2' and strategy == 'LeveledCompactionStrategy':
-            pytest.skip(msg='major compaction not implemented for LCS in this version of Cassandra')
+            pytest.skip('major compaction not implemented for LCS in this version of Cassandra')
 
     def skip_if_not_supported(self, strategy):
         if self.cluster.version() >= '5.0' and strategy == 'DateTieredCompactionStrategy':
-            pytest.skip(msg='DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
+            pytest.skip('DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
 
 def grep_sstables_in_each_level(node, table_name):
     output = node.nodetool('tablestats').stdout
