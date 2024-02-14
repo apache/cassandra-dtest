@@ -91,13 +91,20 @@ class TestNativeTransportSSL(Tester):
         Connect to additional ssl enabled native transport port
         @jira_ticket CASSANDRA-9590
         """
-        cluster = self._populateCluster(enableSSL=True, nativePortSSL=9666)
+
+        # native_transport_port_ssl was removed in CASSANDRA-19397
+        if self.cluster.version() > '5.0':
+            cluster = self._populateCluster(enableSSL=True, nativePort=9666)
+        else:
+            cluster = self._populateCluster(enableSSL=True, nativePortSSL=9666)
+
         node1 = cluster.nodelist()[0]
         cluster.start()
 
-        # we should be able to connect to default non-ssl port
-        session = self.patient_cql_connection(node1)
-        self._putget(cluster, session)
+        if self.cluster.version() <= '5.0':
+          # we should be able to connect to default non-ssl port
+          session = self.patient_cql_connection(node1)
+          self._putget(cluster, session)
 
         # connect to additional dedicated ssl port
         session = self.patient_cql_connection(node1, port=9666, ssl_opts={'ca_certs': os.path.join(self.fixture_dtest_setup.test_path, 'ccm_node.cer')})
