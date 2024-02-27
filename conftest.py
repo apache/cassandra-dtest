@@ -370,7 +370,7 @@ def fixture_dtest_setup(request,
             if failed or not dtest_config.delete_logs:
                 copy_logs(request, dtest_setup.cluster)
         except Exception as e:
-            logger.error("Error saving log:", str(e))
+            logger.error("Error saving log: %s", str(e))
         finally:
             dtest_setup.cleanup_cluster(request, failed)
 
