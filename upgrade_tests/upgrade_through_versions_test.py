@@ -380,6 +380,7 @@ class TestUpgrade(Tester):
                 values=dict(self.extra_config)
             )
 
+    @pytest.mark.timeout(3000)
     def test_parallel_upgrade(self):
         """
         Test upgrading cluster all at once (requires cluster downtime).
@@ -393,6 +394,7 @@ class TestUpgrade(Tester):
         """
         self.upgrade_scenario(rolling=True)
 
+    @pytest.mark.timeout(3000)
     def test_parallel_upgrade_with_internode_ssl(self):
         """
         Test upgrading cluster all at once (requires cluster downtime), with internode ssl.
