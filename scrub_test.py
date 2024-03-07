@@ -187,6 +187,9 @@ class TestHelper(Tester):
 
         logger.debug('sstables after increment {}'.format(str(sstables)))
 
+    def uuid_sstable_identifiers_enabled(self, session):
+        return 'true' == session.execute("select value from system_views.settings where name = 'uuid_sstable_identifiers_enabled'")[0][0]
+
 
 @since('2.2')
 class TestScrubIndexes(TestHelper):
@@ -239,6 +242,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
@@ -248,16 +252,19 @@ class TestScrubIndexes(TestHelper):
         initial_sstables = self.flush('users', 'gender_idx', 'state_idx', 'birth_year_idx')
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
 
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         users = self.query_users(session)
         assert initial_users == users
 
         # Scrub and check sstables and data again
         scrubbed_sstables = self.scrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         users = self.query_users(session)
         assert initial_users == users
@@ -278,6 +285,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
@@ -289,8 +297,10 @@ class TestScrubIndexes(TestHelper):
         cluster.stop()
 
         scrubbed_sstables = self.standalonescrub('users', 'gender_idx', 'state_idx', 'birth_year_idx')
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         cluster.start()
         session = self.patient_cql_connection(node1)
@@ -305,6 +315,7 @@ class TestScrubIndexes(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         session.execute("CREATE TABLE users (user_id uuid PRIMARY KEY, email text, uuids list<uuid>)")
@@ -323,16 +334,18 @@ class TestScrubIndexes(TestHelper):
         initial_sstables = self.flush('users', 'user_uuids_idx')
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         users = list(session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id)))
         assert initial_users == users
 
         scrubbed_sstables = self.scrub('users', 'user_uuids_idx')
 
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         users = list(session.execute(("SELECT * from users where uuids contains {some_uuid}").format(some_uuid=_id)))
 
@@ -376,6 +389,7 @@ class TestScrub(TestHelper):
         node1.nodetool('disableautocompaction')
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
@@ -385,16 +399,19 @@ class TestScrub(TestHelper):
         initial_sstables = self.flush('users')
         scrubbed_sstables = self.scrub('users')
 
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         users = self.query_users(session)
         assert initial_users == users
 
         # Scrub and check sstables and data again
         scrubbed_sstables = self.scrub('users')
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+
+        if should_assert_sstables:
+           self.increase_sstable_generations(initial_sstables)
+           assert initial_sstables == scrubbed_sstables
 
         users = self.query_users(session)
         assert initial_users == users
@@ -415,6 +432,7 @@ class TestScrub(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
@@ -426,8 +444,10 @@ class TestScrub(TestHelper):
         cluster.stop()
 
         scrubbed_sstables = self.standalonescrub('users')
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         cluster.start()
         session = self.patient_cql_connection(node1)
@@ -442,6 +462,7 @@ class TestScrub(TestHelper):
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1)
+        should_assert_sstables = cluster.version() < '5.0' or (cluster.version() >= '5.0' and not self.uuid_sstable_identifiers_enabled(session))
         create_ks(session, KEYSPACE, 1)
 
         self.create_users(session)
@@ -455,8 +476,10 @@ class TestScrub(TestHelper):
         self.delete_non_essential_sstable_files('users')
 
         scrubbed_sstables = self.standalonescrub('users')
-        self.increase_sstable_generations(initial_sstables)
-        assert initial_sstables == scrubbed_sstables
+
+        if should_assert_sstables:
+            self.increase_sstable_generations(initial_sstables)
+            assert initial_sstables == scrubbed_sstables
 
         cluster.start()
         session = self.patient_cql_connection(node1)
