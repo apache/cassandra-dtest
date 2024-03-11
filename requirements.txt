@@ -15,7 +15,7 @@ docopt
 enum34
 flaky
 mock
-pytest>=6.5.0
+pytest>=6.5.0,<=8.0.2
 pytest-timeout==1.4.2
 pytest-repeat
 py
