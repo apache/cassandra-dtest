@@ -6,21 +6,11 @@ import tempfile
 
 from cassandra.concurrent import execute_concurrent_with_args
 
-from tools.misc import ImmutableMapping
-from dtest_setup_overrides import DTestSetupOverrides
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean)
 from distutils.version import LooseVersion
 
 logger = logging.getLogger(__name__)
-
-
-@pytest.fixture()
-def fixture_dtest_setup_overrides(request, dtest_config):
-    dtest_setup_overrides = DTestSetupOverrides()
-    if request.node.name == "test_change_durable_writes":
-        dtest_setup_overrides.cluster_options = ImmutableMapping({'commitlog_segment_size_in_mb': 1})
-    return dtest_setup_overrides
 
 
 class TestConfiguration(Tester):
@@ -74,16 +64,13 @@ class TestConfiguration(Tester):
         - writing a dataset to this keyspace that is known to trigger a commitlog fsync,
         - asserting that the commitlog has grown in size since the data was written.
         """
-        def new_commitlog_cluster_node():
-            # writes should block on commitlog fsync
-            self.fixture_dtest_setup.cluster.populate(1)
-            node = self.fixture_dtest_setup.cluster.nodelist()[0]
-            self.fixture_dtest_setup.cluster.set_batch_commitlog(enabled=True, use_batch_window = self.fixture_dtest_setup.cluster.version() < '5.0')
+        cluster = self.cluster
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
+        cluster.set_configuration_options(values={'commitlog_segment_size_in_mb': 1})
 
-            self.fixture_dtest_setup.cluster.start()
-            return node
+        cluster.populate(1).start()
+        durable_node = cluster.nodelist()[0]
 
-        durable_node = new_commitlog_cluster_node()
         durable_init_size = commitlog_size(durable_node)
         durable_session = self.patient_exclusive_cql_connection(durable_node)
 
@@ -93,15 +80,17 @@ class TestConfiguration(Tester):
         durable_session.execute('CREATE TABLE ks.tab (key int PRIMARY KEY, a int, b int, c int)')
         logger.debug('commitlog size diff = ' + str(commitlog_size(durable_node) - durable_init_size))
         write_to_trigger_fsync(durable_session, 'ks', 'tab')
+        logger.debug('commitlog size diff = ' + str(commitlog_size(durable_node) - durable_init_size))
 
         assert commitlog_size(durable_node) > durable_init_size, \
             "This test will not work in this environment; write_to_trigger_fsync does not trigger fsync."
 
-        # get a fresh cluster to work on
         durable_session.shutdown()
-        self.fixture_dtest_setup.cleanup_and_replace_cluster()
+        cluster.stop()
+        cluster.clear()
 
-        node = new_commitlog_cluster_node()
+        cluster.start()
+        node = cluster.nodelist()[0]
         init_size = commitlog_size(node)
         session = self.patient_exclusive_cql_connection(node)
 
@@ -109,9 +98,8 @@ class TestConfiguration(Tester):
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1} "
                         "AND DURABLE_WRITES = false")
         session.execute('CREATE TABLE ks.tab (key int PRIMARY KEY, a int, b int, c int)')
-        session.execute('ALTER KEYSPACE ks WITH DURABLE_WRITES=true')
         write_to_trigger_fsync(session, 'ks', 'tab')
-        assert commitlog_size(node) > init_size, "ALTER KEYSPACE was not respected"
+        assert commitlog_size(node) == init_size, "Commitlog was written with durable writes disabled"
 
     def test_relative_paths(self):
         """
@@ -194,3 +182,16 @@ def commitlog_size(node):
     commitlog_size_mbean = make_mbean('metrics', type='CommitLog', name='TotalCommitLogSize')
     with JolokiaAgent(node) as jmx:
         return jmx.read_attribute(commitlog_size_mbean, 'Value')
+
+# not used but left for debugging
+def commitlog_size_nojmx(node):
+    total = 0
+    path = os.path.join(node.get_path(), 'commitlogs')
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += get_dir_size(entry.path)
+            logger.debug("added {}, {}".format(entry, entry.stat()))
+    return total
