@@ -2,7 +2,7 @@ import uuid
 import pytest
 import logging
 
-from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout
+from cassandra import ConsistencyLevel, WriteFailure, WriteTimeout, InvalidRequest
 from cassandra.query import SimpleStatement
 
 from dtest import Tester
@@ -234,11 +234,11 @@ class TestWriteFailures(Tester):
 
 def assert_write_failure(session, query, consistency_level):
     statement = SimpleStatement(query, consistency_level=consistency_level)
-    with pytest.raises(WriteFailure):
+    with pytest.raises((WriteFailure, InvalidRequest)):
         session.execute(statement)
 
 
-@since('3.0', max_version='4.0.x')
+@since('3.0')
 class TestMultiDCWriteFailures(Tester):
     @pytest.fixture(autouse=True)
     def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
