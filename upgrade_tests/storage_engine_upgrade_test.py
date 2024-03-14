@@ -70,7 +70,7 @@ class TestStorageEngineUpgrade(Tester):
         self.install_legacy_parsing(node1)
         node1.start(wait_for_binary_proto=True)
         if node1.get_cassandra_version() >= '5.1':
-            node1.nodetool("initializecms")
+            node1.nodetool("cms initialize")
         if self.fixture_dtest_setup.bootstrap:
             cluster.set_install_dir(install_dir=self.fixture_dtest_setup.default_install_dir)
             self.install_nodetool_legacy_parsing()

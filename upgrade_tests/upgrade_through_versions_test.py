@@ -500,7 +500,7 @@ class TestUpgrade(Tester):
                 self._check_select_count()
 
         if self.cluster.version() >= '5.1':
-            self.cluster.nodelist()[0].nodetool("initializecms")
+            self.cluster.nodelist()[0].nodetool("cms initialize")
         # run custom post-upgrade callables
         for call in after_upgrade_call:
             call()
