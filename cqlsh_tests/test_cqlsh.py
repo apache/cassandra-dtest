@@ -127,6 +127,13 @@ class TestCqlsh(Tester, CqlshMixin):
             os.unlink(self.tempfile.name)
         super(TestCqlsh, self).tearDown()
 
+
+    def get_compaction(self):
+        stcs = "AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}"
+        ucs = "AND compaction = {'class': 'org.apache.cassandra.db.compaction.UnifiedCompactionStrategy', 'max_sstables_to_compact': '64', 'min_sstable_size': '100MiB', 'scaling_parameters': 'T4', 'sstable_growth': '0.3333333333333333', 'target_sstable_size': '1GiB'}"
+        return ucs if self.dtest_config.latest_config else stcs
+
+
     @pytest.mark.depends_cqlshlib
     @since('2.1.9')
     def test_pycodestyle_compliance(self):
@@ -1147,6 +1154,7 @@ CREATE TYPE test.address_type (
         self.execute(cql='USE test; DESCRIBE MATERIALIZED VIEW "users_by_state"', expected_output=self.get_users_by_state_mv_output())
         self.execute(cql='USE test; DESCRIBE "users_by_state"', expected_output=self.get_users_by_state_mv_output())
 
+
     def get_keyspace_output(self):
         return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
                 self.get_test_table_output(),
@@ -1179,7 +1187,7 @@ CREATE TYPE test.address_type (
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
             AND cdc = false
             AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            %s
             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND memtable = 'default'
             AND crc_check_chance = 1.0
@@ -1192,7 +1200,7 @@ CREATE TYPE test.address_type (
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
             AND speculative_retry = '99p';
-        """
+        """ % self.get_compaction()
         elif self.cluster.version() >= LooseVersion('4.1'):
             create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
@@ -1312,7 +1320,7 @@ CREATE TYPE test.address_type (
             AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
             AND cdc = false
             AND comment = ''
-            AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+            %s
             AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
             AND memtable = 'default'
             AND crc_check_chance = 1.0
@@ -1325,7 +1333,7 @@ CREATE TYPE test.address_type (
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
             AND speculative_retry = '99p';
-        """
+        """ % self.get_compaction()
         elif self.cluster.version() >= LooseVersion('4.1'):
             create_table = """
         CREATE TABLE test.users (
@@ -1453,7 +1461,11 @@ CREATE TYPE test.address_type (
                 pass
             else:
                 index = index[1:-1]
-        return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+
+        if self.dtest_config.latest_config:
+            return "CREATE CUSTOM INDEX {} ON {}.{} ({}) USING 'sai';".format(index, ks, table, col)
+        else:
+            return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
 
 
     def get_users_by_state_mv_output(self):
@@ -1471,7 +1483,7 @@ CREATE TYPE test.address_type (
                 AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
                 AND cdc = false
                 AND comment = ''
-                AND compaction = {'class': 'org.apache.cassandra.db.compaction.SizeTieredCompactionStrategy', 'max_threshold': '32', 'min_threshold': '4'}
+                %s
                 AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
                 AND memtable = 'default'
                 AND crc_check_chance = 1.0
@@ -1483,7 +1495,7 @@ CREATE TYPE test.address_type (
                 AND min_index_interval = 128
                 AND read_repair = 'BLOCKING'
                 AND speculative_retry = '99p';
-               """
+               """ % self.get_compaction() 
         elif self.cluster.version() >= LooseVersion('4.1'):
             return """
                 CREATE MATERIALIZED VIEW test.users_by_state AS
