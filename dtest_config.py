@@ -31,6 +31,7 @@ class DTestConfig:
         self.enable_jacoco_code_coverage = False
         self.jemalloc_path = find_libjemalloc()
         self.metatests = False
+        self.latest_config = False
 
     def setup(self, config):
         """
@@ -91,6 +92,9 @@ class DTestConfig:
             raise UsageError("The selected Cassandra version %s doesn't support the provided option "
                              "--use-off-heap-memtables, see https://issues.apache.org/jira/browse/CASSANDRA-9472 "
                              "for details" % version)
+
+        self.latest_config = False if self.configuration_yaml is None else self.configuration_yaml.endswith("cassandra_latest.yaml")
+
 
     def get_version_from_build(self):
         # There are times when we want to know the C* version we're testing against
