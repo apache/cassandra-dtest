@@ -1238,10 +1238,10 @@ class TestJsonFullRowInsertSelect(Tester):
         """
         run_func_docstring(tester=self, test_func=self.test_simple_schema)
 
+    @since("2.0", max_version="5.0")
     def test_pkey_requirement(self):
         """
         Create schema:
-
             >>> cqlsh('''
             ... CREATE TABLE primitive_type_test (
             ...   key1 text PRIMARY KEY,
@@ -1261,9 +1261,7 @@ class TestJsonFullRowInsertSelect(Tester):
             ...   col14 varint,
             ...   col15 boolean)
             ... ''')
-
         Try to create a JSON row with the pkey omitted from the column list, and omitted from the JSON data:
-
             >>> cqlsh_err_print('''INSERT INTO primitive_type_test JSON '{"col1": "bar"}' ''')
             <stdin>:2:InvalidRequest: Error from server: code=2200 [Invalid query] message="Invalid null value in condition for column key1"
             <BLANKLINE>
