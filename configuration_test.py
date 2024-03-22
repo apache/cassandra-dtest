@@ -89,15 +89,17 @@ class TestConfiguration(Tester):
         cluster.stop()
         cluster.clear()
 
+        cluster.set_batch_commitlog(enabled=True, use_batch_window = cluster.version() < '5.0')
+        cluster.set_configuration_options(values={'commitlog_segment_size_in_mb': 1})
         cluster.start()
         node = cluster.nodelist()[0]
-        init_size = commitlog_size(node)
         session = self.patient_exclusive_cql_connection(node)
 
         # set up a keyspace without durable writes, then alter it to use them
         session.execute("CREATE KEYSPACE ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1} "
                         "AND DURABLE_WRITES = false")
         session.execute('CREATE TABLE ks.tab (key int PRIMARY KEY, a int, b int, c int)')
+        init_size = commitlog_size(node)
         write_to_trigger_fsync(session, 'ks', 'tab')
         assert commitlog_size(node) == init_size, "Commitlog was written with durable writes disabled"
 
