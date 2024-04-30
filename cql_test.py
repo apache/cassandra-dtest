@@ -1219,14 +1219,23 @@ class TestCQLSlowQuery(CQLTester):
         TestCQLSlowQuery._assert_logs(node, session, table,
                                       query="SELECT * FROM {} WHERE k >= 0 AND k < 100 ALLOW FILTERING",
                                       logged_query="SELECT \* FROM ks.{} WHERE k >= 0 AND k < 100")
-        TestCQLSlowQuery._assert_logs(node, session, table,
-                                      query="SELECT * FROM {} WHERE k <= 100 AND k > 0 ALLOW FILTERING",
-                                      logged_query="SELECT \* FROM ks.{} WHERE k > 0 AND k <= 100")
-        TestCQLSlowQuery._assert_logs(node, session, table,
-                                      query="SELECT * FROM {} WHERE k < 100 AND k >= 0 ALLOW FILTERING",
-                                      logged_query="SELECT \* FROM ks.{} WHERE k >= 0 AND k < 100")
 
-        # test logging of slow queries with restriciton on regular column
+        if node.cluster.version() >= '5.1':
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT * FROM {} WHERE k <= 100 AND k > 0 ALLOW FILTERING",
+                                          logged_query="SELECT \* FROM ks.{} WHERE k <= 100 AND k > 0")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT * FROM {} WHERE k < 100 AND k >= 0 ALLOW FILTERING",
+                                          logged_query="SELECT \* FROM ks.{} WHERE k < 100 AND k >= 0")
+        else:
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT * FROM {} WHERE k <= 100 AND k > 0 ALLOW FILTERING",
+                                          logged_query="SELECT \* FROM ks.{} WHERE k > 0 AND k <= 100")
+            TestCQLSlowQuery._assert_logs(node, session, table,
+                                          query="SELECT * FROM {} WHERE k < 100 AND k >= 0 ALLOW FILTERING",
+                                          logged_query="SELECT \* FROM ks.{} WHERE k >= 0 AND k < 100")
+
+        # test logging of slow queries with restriction on regular column
         TestCQLSlowQuery._assert_logs(node, session, table,
                                       query="SELECT * FROM {} WHERE v = 1 ALLOW FILTERING",
                                       logged_query="SELECT \* FROM ks.{} WHERE v = 1")
