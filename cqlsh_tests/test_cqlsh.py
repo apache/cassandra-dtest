@@ -1455,8 +1455,8 @@ CREATE TYPE test.address_type (
     def get_index_output(self, index, ks, table, col):
         # a quoted index name (e.g. "FooIndex") is only correctly echoed by DESCRIBE
         # from 3.0.14 & 3.11
+        version = self.cluster.version()
         if index[0] == '"' and index[-1] == '"':
-            version = self.cluster.version()
             if version >= LooseVersion('3.11'):
                 pass
             elif LooseVersion('3.1') > version >= LooseVersion('3.0.14'):
@@ -1467,7 +1467,8 @@ CREATE TYPE test.address_type (
         if self.dtest_config.latest_config:
             return "CREATE CUSTOM INDEX {} ON {}.{} ({}) USING 'sai';".format(index, ks, table, col)
         else:
-            return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+            suffix = " USING 'legacy_local_table'" if version >= LooseVersion('5.1') else ""
+            return "CREATE INDEX {} ON {}.{} ({}){};".format(index, ks, table, col, suffix)
 
 
     def get_users_by_state_mv_output(self):
