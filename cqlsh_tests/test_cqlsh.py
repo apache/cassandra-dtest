@@ -1467,7 +1467,7 @@ CREATE TYPE test.address_type (
         if self.dtest_config.latest_config:
             return "CREATE CUSTOM INDEX {} ON {}.{} ({}) USING 'sai';".format(index, ks, table, col)
         else:
-            return "CREATE INDEX {} ON {}.{} ({});".format(index, ks, table, col)
+            return "CREATE INDEX {} ON {}.{} ({}) USING 'legacy_local_table';".format(index, ks, table, col)
 
 
     def get_users_by_state_mv_output(self):
