@@ -85,6 +85,8 @@ class TestGossip(Tester):
                                         binary_interface=(address, 9042))
 
     def _start_nodes_in_parallel(self, nodelist):
+        self.fixture_dtest_setup.ignore_log_patterns = [r'java.nio.channels.ClosedChannelException']
+
         for node in nodelist:
             node.start(no_wait=True)
 
