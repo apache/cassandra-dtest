@@ -172,7 +172,7 @@ indev_4_0_x = VersionMeta(name='indev_4_0_x', family=CASSANDRA_4_0, variant='ind
 current_4_0_x = VersionMeta(name='current_4_0_x', family=CASSANDRA_4_0, variant='current', version='4.0.12', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 
 indev_4_1_x = VersionMeta(name='indev_4_1_x', family=CASSANDRA_4_1, variant='indev', version='github:apache/cassandra-4.1', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
-current_4_1_x = VersionMeta(name='current_4_1_x', family=CASSANDRA_4_1, variant='current', version='4.1.4', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
+current_4_1_x = VersionMeta(name='current_4_1_x', family=CASSANDRA_4_1, variant='current', version='4.1.5', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 
 indev_5_0_x = VersionMeta(name='indev_5_0_x', family=CASSANDRA_5_0, variant='indev', version='github:apache/cassandra-5.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
 current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0-beta1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
