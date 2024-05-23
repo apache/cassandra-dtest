@@ -69,8 +69,11 @@ class BaseReplaceAddressTest(Tester):
             self.cluster.set_install_dir(version="2.2.4")
             self.install_nodetool_legacy_parsing()
 
+        jvm_args = []
+        if self.cluster.cassandra_version() >= '4.0':
+            jvm_args.append("-Dcassandra.failed_bootstrap_timeout_ms=30000")
 
-        self.cluster.start()
+        self.cluster.start(jvm_args=jvm_args)
 
         if self.cluster.cassandra_version() >= '2.2.0':
             session = self.patient_cql_connection(self.query_node)
