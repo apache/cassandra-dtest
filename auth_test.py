@@ -2792,6 +2792,19 @@ class TestAuthUnavailable(AbstractTestAuth):
     * release regimes.
     """
 
+    @pytest.fixture(autouse=True)
+    def fixture_add_additional_log_patterns(self, fixture_dtest_setup):
+        fixture_dtest_setup.ignore_log_patterns = (
+            # This occurs if a client interaction which results in a specific type of query on system_auth, happens to
+            # run concurrently with changing the rf from 1 to 2. For example, a query to read the default `cassandra`
+            # superuser will execute at CL.QUORUM. If this query is issued before the rf change, the replica plan will
+            # contain only 1 node. Should the rf change be enacted before the response is processed by the coordinator,
+            # that original replica plan will no longer be sufficient to satisfy the consistency level, as now QUORUM is
+            # (2/2 + 1) = 2. This does not affect the actual test as the client will retry in this case and as the
+            # placements remain stable after the initial rf change, subsequent reads will succeed.
+            r'.* for keyspace system_auth at QUORUM the ring has changed .* in a way that would make responses violate the consistency level',
+        )
+
     def test_authentication_handle_unavailable(self):
         """
         * Launch a two node cluster with role/permissions cache disabled
