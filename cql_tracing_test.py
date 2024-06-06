@@ -26,8 +26,10 @@ class TestCqlTracing(Tester):
         jvm_args.append('-Dcassandra.wait_for_tracing_events_timeout_secs=15')
 
         cluster = self.cluster
-        cluster.set_configuration_options(values={'write_request_timeout_in_ms': 30000,
-                                          'read_request_timeout_in_ms': 30000})
+        opts = {'write_request_timeout_in_ms': 30000, 'read_request_timeout_in_ms': 30000}
+        if self.cluster.version() >= LooseVersion('4.1'):
+            opts['native_transport_timeout'] = '30s'
+        cluster.set_configuration_options(values=opts);
 
         if random_partitioner:
             cluster.set_partitioner("org.apache.cassandra.dht.RandomPartitioner")
