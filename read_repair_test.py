@@ -393,8 +393,10 @@ class TestReadRepair(Tester):
         """
         cluster = self.cluster
         cluster.populate(3)
-        cluster.set_configuration_options(values={'write_request_timeout_in_ms': 30000,
-                                                  'read_request_timeout_in_ms': 30000})
+        opts = {'write_request_timeout_in_ms': 30000, 'read_request_timeout_in_ms': 30000}
+        if cluster.version() >= LooseVersion('4.1'):
+            opts['native_transport_timeout'] = '30s'
+        cluster.set_configuration_options(values=opts)
         cluster.set_partitioner("org.apache.cassandra.dht.RandomPartitioner")
         cluster.start(jvm_args=['-Dcassandra.wait_for_tracing_events_timeout_secs=15'])
 

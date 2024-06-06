@@ -387,13 +387,14 @@ class TestVariousNotifications(Tester):
         have_v5_protocol = self.supports_v5_protocol(self.cluster.version())
 
         self.fixture_dtest_setup.allow_log_errors = True
-        self.cluster.set_configuration_options(
-            values={
-                'tombstone_failure_threshold': 500,
-                'read_request_timeout_in_ms': 30000,  # 30 seconds
-                'range_request_timeout_in_ms': 40000
-            }
-        )
+        opts={
+            'tombstone_failure_threshold': 500,
+            'read_request_timeout_in_ms': 30000,  # 30 seconds
+            'range_request_timeout_in_ms': 40000
+        }
+        if self.cluster.version() >= LooseVersion('4.1'):
+            opts['native_transport_timeout'] = '30s'
+        self.cluster.set_configuration_options(values=opts)
         self.cluster.populate(3).start()
         node1, node2, node3 = self.cluster.nodelist()
         proto_version = 5 if have_v5_protocol else None
