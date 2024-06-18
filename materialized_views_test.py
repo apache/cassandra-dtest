@@ -53,7 +53,7 @@ class TestMaterializedViews(Tester):
 
     def prepare(self, user_table=False, rf=1, options=None, nodes=3, install_byteman=False, **kwargs):
         cluster = self.cluster
-        cluster.set_configuration_options({'enable_materialized_views': 'true'})
+        cluster.set_configuration_options({'enable_materialized_views': 'true', 'commitlog_sync_period_in_ms': 1000})
         cluster.populate([nodes, 0], install_byteman=install_byteman)
         if options:
             cluster.set_configuration_options(values=options)
@@ -978,7 +978,7 @@ class TestMaterializedViews(Tester):
         node = self.cluster.nodelist()[0]
 
         self._insert_data(session)
-
+        time.sleep(1)
         assert_one(
             session,
             "SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'",

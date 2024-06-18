@@ -8,5 +8,5 @@ AT EXIT
 # set flag to only run this rule once.
 IF TRUE
 DO
-   System.exit(0)
+   Runtime.getRuntime().halt(0);
 ENDRULE
