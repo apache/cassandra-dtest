@@ -31,7 +31,8 @@ class TestRebuild(Tester):
             # ignore streaming error during resumable tests
             r'peer 127.0.0.3:7000 is probably down',
             r'Error while reading sstable from stream',
-            r'failed to send a stream message/data to peer /127.0.0.2:7000'
+            r'failed to send a stream message/data to peer /127.0.0.2:7000',
+            r'java.lang.InterruptedException'
         )
 
     def test_simple_rebuild(self):
