@@ -320,6 +320,7 @@ class TestCommitLog(Tester):
         self.prepare()
 
         self._provoke_commitlog_failure()
+        time.sleep(2)
         failure = self.node1.grep_log("Failed .+ commit log segments. Commit disk failure policy is stop; terminating thread")
         logger.debug(failure)
         assert failure, "Cannot find the commitlog failure message in logs"
