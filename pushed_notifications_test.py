@@ -3,7 +3,8 @@ import pytest
 import logging
 
 from datetime import datetime
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 from threading import Event
 
 from cassandra import ConsistencyLevel as CL
@@ -35,7 +36,7 @@ class NotificationWaiter(object):
         self.keyspace = keyspace
 
         # get a single, new connection
-        version = 5 if node.get_cassandra_version() >= LooseVersion('4.0') else None
+        version = 5 if node.get_cassandra_version() >= parse('4.0') else None
         session = tester.patient_exclusive_cql_connection(node, protocol_version=version)
         connection = session.cluster.connection_factory(self.address, is_control_connection=True)
 
@@ -392,7 +393,7 @@ class TestVariousNotifications(Tester):
             'read_request_timeout_in_ms': 30000,  # 30 seconds
             'range_request_timeout_in_ms': 40000
         }
-        if self.cluster.version() >= LooseVersion('4.1'):
+        if self.cluster.version() >= parse('4.1'):
             opts['native_transport_timeout'] = '30s'
         self.cluster.set_configuration_options(values=opts)
         self.cluster.populate(3).start()

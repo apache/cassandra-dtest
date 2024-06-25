@@ -1,14 +1,16 @@
+import os
+import sys
+
 import configparser
 import copy
 import logging
-import os
 import re
 import subprocess
-import sys
+
 import threading
 import time
 import traceback
-from distutils.version import LooseVersion
+from packaging import version
 
 import pytest
 import cassandra
@@ -21,12 +23,9 @@ from cassandra import ConsistencyLevel, OperationTimedOut
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import ExecutionProfile
 from cassandra.policies import RetryPolicy, RoundRobinPolicy
-from ccmlib.common import get_version_from_build
-from ccmlib.node import ToolError, TimeoutError
 from tools.misc import retry_till_success
 
 from upgrade_tests.upgrade_manifest import build_upgrade_pairs
-
 
 LOG_SAVED_DIR = "logs"
 try:
@@ -46,8 +45,8 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
     if config.has_option('main', 'default_dir'):
         DEFAULT_DIR = os.path.expanduser(config.get('main', 'default_dir'))
 
-MAJOR_VERSION_4 = LooseVersion('4.0')
-MAJOR_VERSION_5 = LooseVersion('5.0')
+MAJOR_VERSION_4 = version.Version('4.0')
+MAJOR_VERSION_5 = version.Version('5.0')
 
 logger = logging.getLogger(__name__)
 
@@ -297,13 +296,13 @@ def get_eager_protocol_version(cassandra_version):
     Returns the highest protocol version accepted
     by the given C* version
     """
-    if LooseVersion('4.0') <= cassandra_version:
+    if version.parse('4.0') <= version.parse(cassandra_version):
         protocol_version = 5
-    elif LooseVersion('3.0') <= cassandra_version:
+    elif version.parse('3.0') <= version.parse(cassandra_version):
         protocol_version = 4
-    elif LooseVersion('2.1') <= cassandra_version:
+    elif version.parse('2.1') <= version.parse(cassandra_version):
         protocol_version = 3
-    elif LooseVersion('2.0') <= cassandra_version:
+    elif version.parse('2.0') <= version.parse(cassandra_version):
         protocol_version = 2
     else:
         protocol_version = 1
@@ -362,7 +361,7 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
     #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
     session.execute('SELECT * FROM %s LIMIT 1' % name);
@@ -372,7 +371,7 @@ def create_cf_simple(session, name, query):
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
     #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
     session.execute('SELECT * FROM %s LIMIT 1' % name)
@@ -392,11 +391,11 @@ def create_ks(session, name, rf):
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create ks query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create ks query \'%s\'' % query)
 
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
-    #Also validates it was indeed created even though we ignored OperationTimedOut
-    #Might happen some of the time because CircleCI disk IO is unreliable and hangs randomly
+    # Also validates it was indeed created even though we ignored OperationTimedOut
+    # Might happen some of the time because CircleCI disk IO is unreliable and hangs randomly
     session.execute('USE {}'.format(name))
 
 

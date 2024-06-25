@@ -13,7 +13,8 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks, mk_bman_path
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn,
@@ -651,7 +652,7 @@ class TestMiscellaneousCQL(CQLTester):
         result = session.execute(wildcard_prepared.bind(None))
         assert result, [(0, 0, 0 == None)]
 
-        if self.cluster.version() < LooseVersion('3.0'):
+        if self.cluster.version() < parse('3.0'):
             explicit_prepared = session.prepare("SELECT k, a, b, d FROM test")
 
             # when the type is altered, both statements will need to be re-prepared
@@ -1596,7 +1597,7 @@ class TestLWTWithCQL(Tester):
         assert_one(session, "SELECT a, s, d FROM {} WHERE a = 4".format(table_name), [4, 4, None])
 
     def _is_new_lwt_format_version(self, version):
-        return version > LooseVersion('3.9') or (version > LooseVersion('3.0.9') and version < LooseVersion('3.1'))
+        return version > parse('3.9') or (version > parse('3.0.9') and version < parse('3.1'))
 
     @flaky
     def test_conditional_updates_on_static_columns_with_null_values(self):

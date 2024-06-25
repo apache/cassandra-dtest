@@ -1,6 +1,7 @@
 import re
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
@@ -141,7 +142,7 @@ class TestTopology(Tester):
         node3_id = node3.nodetool('info').stdout[25:61]
         node3.stop(wait_other_notice=True)
         cmd = 'removenode ' + node3_id
-        if cluster.version() >= LooseVersion('5.1'):
+        if cluster.version() >= parse('5.1'):
             cmd = cmd + ' --force'
         node1.nodetool(cmd)
 
