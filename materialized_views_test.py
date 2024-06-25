@@ -979,6 +979,7 @@ class TestMaterializedViews(Tester):
         node = self.cluster.nodelist()[0]
 
         self._insert_data(session)
+        time.sleep(1)
 
         assert_one(
             session,
