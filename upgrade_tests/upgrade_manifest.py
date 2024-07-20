@@ -175,9 +175,11 @@ indev_4_1_x = VersionMeta(name='indev_4_1_x', family=CASSANDRA_4_1, variant='ind
 current_4_1_x = VersionMeta(name='current_4_1_x', family=CASSANDRA_4_1, variant='current', version='4.1.5', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 
 indev_5_0_x = VersionMeta(name='indev_5_0_x', family=CASSANDRA_5_0, variant='indev', version='github:apache/cassandra-5.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
-current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0-rc1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+# TODO – uncomment current_5_0_x further down when 5.0.0 is released
+current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
 
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+# TODO – add current_5_1_x when this gets uncommented (when 5.1-alpha1 is released)
 # current_5_1_x = VersionMeta(name='current_5_1_x', family=CASSANDRA_5_1, variant='current', version='5.1-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
 
 
@@ -196,7 +198,9 @@ MANIFEST = {
     current_3_11_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
     current_4_0_x:  [indev_4_0_x, indev_4_1_x, indev_5_0_x, indev_trunk],
     current_4_1_x:  [indev_4_1_x, indev_5_0_x, indev_trunk],
-    current_5_0_x:  [indev_5_0_x, indev_trunk],
+# TODO – uncomment when 5.0.0 is released
+# LooseVersion cant do 5.0-rc1 comparisons
+#    current_5_0_x:  [indev_5_0_x, indev_trunk],
 
     indev_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
