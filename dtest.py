@@ -24,6 +24,8 @@ from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import ExecutionProfile
 from cassandra.policies import RetryPolicy, RoundRobinPolicy
 from tools.misc import retry_till_success
+from ccmlib.common import get_version_from_build
+from ccmlib.node import ToolError, TimeoutError
 
 from upgrade_tests.upgrade_manifest import build_upgrade_pairs
 

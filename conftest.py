@@ -10,7 +10,6 @@ import re
 import shutil
 import time
 from datetime import datetime
-from distutils.version import LooseVersion
 from packaging.version import parse
 # Python 3 imports
 from itertools import zip_longest
@@ -500,7 +499,7 @@ def fixture_ported_to_in_jvm(request, fixture_dtest_setup):
 
             upgrade_path = request.cls.UPGRADE_PATH
             if hasattr(upgrade_path, 'upgrade_meta'):
-                skip_msg = _skip_ported_msg(LooseVersion(upgrade_path.upgrade_meta.family), ported_from_version)
+                skip_msg = _skip_ported_msg(parse(upgrade_path.upgrade_meta.family), ported_from_version)
                 if skip_msg:
                     pytest.skip(skip_msg)
             ccm_repo_cache_dir, _ = ccmlib.repository.setup(upgrade_path.starting_meta.version)
