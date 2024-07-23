@@ -3,7 +3,7 @@ import time
 import pytest
 import logging
 
-from distutils.version import LooseVersion
+from packaging.version import parse
 
 from cassandra import FunctionFailure
 
@@ -147,7 +147,7 @@ class TestUserFunctions(Tester):
         session.execute("CREATE OR REPLACE FUNCTION overloaded(v ascii) called on null input RETURNS text LANGUAGE java AS 'return \"f1\";'")
 
         # ensure that works with correct specificity
-        if self.cluster.version() < LooseVersion('4.1'):
+        if self.cluster.version() < parse('4.1'):
             assert_invalid(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
         else:
             assert_none(session, "SELECT v FROM tab WHERE k = overloaded('foo')")
@@ -211,7 +211,7 @@ class TestUserFunctions(Tester):
         assert_one(session, "SELECT avg(val) FROM nums", [5.0])
         assert_one(session, "SELECT count(*) FROM nums", [9])
 
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             session.execute("create function test(a int, b double) called on null input returns int language javascript as 'a + b;'")
         else:
             session.execute("create function test(a int, b double) called on null input returns int language java as 'return a + Integer.valueOf(b.intValue());'")
@@ -243,7 +243,7 @@ class TestUserFunctions(Tester):
         session.execute("create type test (a text, b int);")
         session.execute("create function funk(udt test) called on null input returns int language java as 'return Integer.valueOf(udt.getInt(\"b\"));';")
 
-        if self.cluster.version() >= LooseVersion('3.6'):
+        if self.cluster.version() >= parse('3.6'):
             frozen_vals = (False, True)
         else:
             frozen_vals = (True,)

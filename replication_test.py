@@ -1,7 +1,8 @@
 import os
 import re
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
@@ -742,7 +743,7 @@ class TestSnitchConfigurationUpdate(Tester):
         """
         expected_error = (r"Cannot start node if snitch's data center (.*) differs from previous data center (.*)\. "
                           "Please fix the snitch configuration, decommission and rebootstrap this node")
-        if self.cluster.version() < LooseVersion('5.1'):
+        if self.cluster.version() < parse('5.1'):
             expected_error += " or use the flag -Dcassandra.ignore_dc=true."
         self.fixture_dtest_setup.ignore_log_patterns = [expected_error]
 

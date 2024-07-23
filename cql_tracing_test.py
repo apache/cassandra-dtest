@@ -1,7 +1,8 @@
 import pytest
 import logging
 
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from dtest import Tester, create_ks
 
@@ -27,7 +28,7 @@ class TestCqlTracing(Tester):
 
         cluster = self.cluster
         opts = {'write_request_timeout_in_ms': 30000, 'read_request_timeout_in_ms': 30000}
-        if self.cluster.version() >= LooseVersion('4.1'):
+        if self.cluster.version() >= parse('4.1'):
             opts['native_transport_timeout'] = '30s'
         cluster.set_configuration_options(values=opts);
 
@@ -70,7 +71,7 @@ class TestCqlTracing(Tester):
         """)
 
         out, err, _ = node1.run_cqlsh('TRACING ON')
-        if self.cluster.version() >= LooseVersion('5.0'):
+        if self.cluster.version() >= parse('5.0'):
             # See CASSANDRA-18547
             assert 'TRACING set to ON' in out
         else:
@@ -144,7 +145,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         logger.debug('Errors after attempted trace with unknown tracing class: {errs}'.format(errs=errs))
         assert len(errs) == 1
-        if self.cluster.version() >= LooseVersion('3.10'):
+        if self.cluster.version() >= parse('3.10'):
             # See CASSANDRA-11706 and PR #1281
             assert len(errs[0]) > 0
         else:
@@ -177,7 +178,7 @@ class TestCqlTracing(Tester):
         errs = self.cluster.nodelist()[0].grep_log_for_errors()
         logger.debug('Errors after attempted trace with default tracing class: {errs}'.format(errs=errs))
         assert len(errs) == 1
-        if self.cluster.version() >= LooseVersion('3.10'):
+        if self.cluster.version() >= parse('3.10'):
             # See CASSANDRA-11706 and PR #1281
             assert len(errs[0]) > 0
         else:
@@ -188,7 +189,7 @@ class TestCqlTracing(Tester):
         # part of the expected error to avoid having to escape parens and
         # periods for regexes.
 
-        if self.cluster.version() >= LooseVersion('3.10'):
+        if self.cluster.version() >= parse('3.10'):
             # See CASSANDRA-11706 and PR #1281
             check_for_errs_in = errs[0][1]
         else:

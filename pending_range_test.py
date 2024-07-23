@@ -1,5 +1,4 @@
 import logging
-import time
 
 import pytest
 import re
@@ -9,10 +8,9 @@ from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks, mk_bman_path
 
-from distutils.version import LooseVersion
+from packaging.version import parse
 
 logger = logging.getLogger(__name__)
-
 
 @pytest.mark.no_vnodes
 class TestPendingRangeMovements(Tester):
@@ -52,7 +50,7 @@ class TestPendingRangeMovements(Tester):
         token = '-634023222112864484'
 
         # delay progress of the move operation to give a chance to kill the moving node
-        if self.cluster.version() >= LooseVersion('5.1'):
+        if self.cluster.version() >= parse('5.1'):
             node1.byteman_submit([mk_bman_path('post5.1/delay_streaming_for_move.btm')])
 
         mark = node1.mark_log()
@@ -60,7 +58,7 @@ class TestPendingRangeMovements(Tester):
         threading.Thread(target=(lambda: node1.nodetool('move {}'.format(token)))).start()
         # Watch the log so we know when the node is moving
         node1.watch_log_for('Moving .* to \[?{}\]?'.format(token), timeout=10, from_mark=mark)
-        if self.cluster.version() < LooseVersion('5.1'):
+        if self.cluster.version() < parse('5.1'):
             node1.watch_log_for('Sleeping {} ms before start streaming/fetching ranges'.format(ring_delay_ms),
                                 timeout=10, from_mark=mark)
 

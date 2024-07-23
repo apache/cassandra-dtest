@@ -3,7 +3,7 @@ import string
 import time
 from collections import namedtuple
 from datetime import datetime, timedelta
-from distutils.version import LooseVersion
+from packaging.version import parse
 import re
 import pytest
 import logging
@@ -35,7 +35,7 @@ class AbstractTestAuth(Tester):
         return [(creator, role, perm) for perm in permissions]
 
     def cluster_version_has_masking_permissions(self):
-        return self.cluster.version() >= LooseVersion('5.0')
+        return self.cluster.version() >= parse('5.0')
 
     def data_resource_creator_permissions(self, creator, resource):
         """
@@ -1371,7 +1371,7 @@ class TestAuthRoles(AbstractTestAuth):
         as_mike.execute("CREATE KEYSPACE ks WITH replication = {'class':'SimpleStrategy', 'replication_factor':1}")
         as_mike.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         as_mike.execute("CREATE ROLE role1 WITH PASSWORD = '11111' AND SUPERUSER = false AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             as_mike.execute("""CREATE FUNCTION ks.state_function_1(a int, b int)
                             CALLED ON NULL INPUT
                             RETURNS int
@@ -1668,7 +1668,7 @@ class TestAuthRoles(AbstractTestAuth):
         self.superuser.execute("CREATE TABLE ks.cf (id int primary key, val int)")
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND SUPERUSER = false AND LOGIN = true")
         self.superuser.execute("CREATE ROLE role1 WITH SUPERUSER = false AND LOGIN = false")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.state_func(a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'a+b'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.state_func(a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS ' return a+b;'")
@@ -2150,7 +2150,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
             self.superuser.execute("CREATE FUNCTION ks.\"plusOne\" ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
@@ -2199,7 +2199,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2230,7 +2230,7 @@ class TestAuthRoles(AbstractTestAuth):
         self.superuser.execute("INSERT INTO ks.t1 (k,v) values (1,1)")
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
         self.superuser.execute("GRANT SELECT ON ks.t1 TO mike")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.func_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
             self.superuser.execute("CREATE FUNCTION ks.func_two ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
@@ -2289,7 +2289,7 @@ class TestAuthRoles(AbstractTestAuth):
         * Verify mike can create a new UDF iff he has the CREATE permission
         """
         self.setup_table()
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2297,7 +2297,7 @@ class TestAuthRoles(AbstractTestAuth):
         as_mike = self.get_session(user='mike', password='12345')
 
         # can't replace an existing function without ALTER permission on the parent ks
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript as '1 + input'"
         else:
             cql = "CREATE OR REPLACE FUNCTION ks.plus_one( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java as 'return 1 + input;'"
@@ -2340,7 +2340,7 @@ class TestAuthRoles(AbstractTestAuth):
                        InvalidRequest)
 
         # can't create a new function without CREATE on the parent keyspace's collection of functions
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             cql = "CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'"
         else:
             cql = "CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'"
@@ -2360,7 +2360,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2391,7 +2391,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else: 
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2422,7 +2422,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input double ) CALLED ON NULL INPUT RETURNS double LANGUAGE javascript AS 'input + 1'")
         else:
@@ -2469,7 +2469,7 @@ class TestAuthRoles(AbstractTestAuth):
         """
         self.setup_table()
         self.superuser.execute("CREATE ROLE mike WITH PASSWORD = '12345' AND LOGIN = true")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.state_func (a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'a + b'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.state_func (a int, b int) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return a + b;'")
@@ -2525,7 +2525,7 @@ class TestAuthRoles(AbstractTestAuth):
         @param cql The statement to verify. Should contain the UDF ks.plus_one
         """
         self.setup_table()
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2549,7 +2549,7 @@ class TestAuthRoles(AbstractTestAuth):
         self.setup_table()
         self.superuser.execute("CREATE ROLE function_user")
         self.superuser.execute("GRANT EXECUTE ON ALL FUNCTIONS IN KEYSPACE ks TO function_user")
-        if self.cluster.version() < LooseVersion('4.2'):
+        if self.cluster.version() < parse('4.2'):
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE javascript AS 'input + 1'")
         else:
             self.superuser.execute("CREATE FUNCTION ks.plus_one ( input int ) CALLED ON NULL INPUT RETURNS int LANGUAGE java AS 'return input + 1;'")
@@ -2721,7 +2721,7 @@ class TestAuthRoles(AbstractTestAuth):
         host, error = response._excinfo[1].errors.popitem()
 
         message = "Provided username {user} and/or password are incorrect".format(user=user)\
-            if node.cluster.version() >= LooseVersion('3.10') \
+            if node.cluster.version() >= parse('3.10') \
             else "Username and/or password are incorrect"
         pattern = 'Failed to authenticate to {host}: Error from server: code=0100 ' \
                   '[Bad credentials] message="{message}"'.format(host=host, message=message)

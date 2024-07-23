@@ -10,7 +10,8 @@ from cassandra.query import SimpleStatement
 from tools.assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.data import rows_to_list
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
@@ -178,7 +179,7 @@ class TestCounters(Tester):
                 c counter
             )
         """
-        if self.cluster.version() >= LooseVersion('5.0'):
+        if self.cluster.version() >= parse('5.0'):
             query = query + "WITH compression = { 'class' : 'SnappyCompressor' }"
         else:
             query = query + "WITH compression = { 'sstable_compression' : 'SnappyCompressor' }"

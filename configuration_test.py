@@ -8,7 +8,8 @@ from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean)
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class TestConfiguration(Tester):
         create_table_query = "CREATE TABLE test_table (row varchar, name varchar, value int, PRIMARY KEY (row, name));"
 
 
-        if self.cluster.version() >= LooseVersion('5.0'):
+        if self.cluster.version() >= parse('5.0'):
             alter_chunk_len_query = "ALTER TABLE test_table WITH " \
                                     "compression = {{'class' : 'SnappyCompressor', " \
                                     "'chunk_length_in_kb' : {chunk_length}}};"

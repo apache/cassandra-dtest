@@ -7,7 +7,8 @@ import threading
 import time
 import logging
 import signal
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args
@@ -136,7 +137,7 @@ class BootstrapTester(Tester):
             assert len(node2.grep_log('Startup complete, but write survey mode is active, not becoming an active ring member.'))
             # bootstrapping is considered complete if streaming is successful. Post CEP-21 this is distinct from
             # fully joining the ring or leaving write survey mode
-            bootstrap_state = 'COMPLETED' if self.cluster.version() >= LooseVersion('5.1') else 'IN_PROGRESS'
+            bootstrap_state = 'COMPLETED' if self.cluster.version() >= parse('5.1') else 'IN_PROGRESS'
             assert_bootstrap_state(self, node2, bootstrap_state)
 
             node2.nodetool("join")
@@ -329,7 +330,7 @@ class BootstrapTester(Tester):
         # TCM, node2 also logs the warning as it applies the transform when it gets replicated to it by the CMS.
         if cluster.version() >= '4.0':
             warning = 'Your replication factor 3 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
-            if cluster.version() >= LooseVersion('5.1'):   # we now log this on all nodes
+            if cluster.version() >= parse('5.1'):   # we now log this on all nodes
                 assert len(node1.grep_log(warning)) == 2
                 assert len(node2.grep_log(warning)) == 1
             else:
@@ -342,7 +343,7 @@ class BootstrapTester(Tester):
 
         if cluster.version() >= '4.0':
             warning = 'Your replication factor 2 for keyspace k is higher than the number of nodes 1 for datacenter dc1'
-            if cluster.version() >= LooseVersion('5.1'):
+            if cluster.version() >= parse('5.1'):
                 assert len(node1.grep_log(warning)) == 2  # we now log this on all nodes
                 assert len(node2.grep_log(warning)) == 1
             else:
@@ -411,7 +412,7 @@ class BootstrapTester(Tester):
         node3 = new_node(cluster, token=node3_token)
 
         jvmargs = ["-Dcassandra.consistent.rangemovement={}".format(consistent_range_movement)]
-        if cluster.version() >= LooseVersion('5.1'):
+        if cluster.version() >= parse('5.1'):
             node3.set_configuration_options(values={'progress_barrier_min_consistency_level': 'NODE_LOCAL', 'progress_barrier_default_consistency_level': 'NODE_LOCAL', 'progress_barrier_timeout': '2000ms'})
         node3.start(wait_for_binary_proto=successful_bootstrap_expected,
                     wait_other_notice=successful_bootstrap_expected,
@@ -782,7 +783,7 @@ class BootstrapTester(Tester):
 
         # wipe any data for node2
         self._cleanup(node2)
-        if cluster.version() >= LooseVersion('5.1'):
+        if cluster.version() >= parse('5.1'):
             node1.watch_log_for("127.0.0.2:7000 is now DOWN", from_mark=mark)
             res = node1.nodetool('abortbootstrap --ip 127.0.0.2')
         # Now start it again, it should be allowed to join

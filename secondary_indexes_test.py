@@ -3,7 +3,8 @@ import random
 import re
 import time
 import uuid
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
@@ -342,7 +343,7 @@ class TestSecondaryIndexes(Tester):
         assert before_files != after_files
         assert 1 == len(list(session.execute(stmt, [lookup_value])))
         expected = 1
-        if self.cluster.version() >= LooseVersion('5.1'):
+        if self.cluster.version() >= parse('5.1'):
             expected = 2 # in tcm PaxosUncommittedIndex is is IndexInfo table
 
         # verify that only the expected row is present in the build indexes table
