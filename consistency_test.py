@@ -10,6 +10,7 @@ from copy import deepcopy
 from cassandra import ConsistencyLevel, consistency_value_to_name
 from cassandra.query import BatchStatement, BatchType, SimpleStatement
 
+from tools.jmxutils import JolokiaAgent, make_mbean
 from tools.assertions import (assert_all, assert_length_equal, assert_none,
                               assert_unavailable)
 from dtest import MultiError, Tester, create_ks, create_cf
@@ -766,6 +767,25 @@ class TestAccuracy(TestHelper):
 
 
 class TestConsistency(Tester):
+
+    @since('4.0')
+    def test_18766_sr(self):
+        """
+        @jira_ticket CASSANDRA-18766
+        """
+        cluster = self.cluster
+        self.cluster.populate(3).start()
+        node1 = cluster.nodelist()[0]
+        node1.stress(['write', 'n=100000', '-rate', 'threads=8', '-schema', 'replication(strategy=SimpleStrategy,replication_factor=2)'])
+        node1.stress(['read no-warmup duration=1m', '-rate', 'threads=8', '-errors', 'skip-read-validation'])
+        speculative_reads_mbean = make_mbean("metrics", type="Table", name="SpeculativeRetries", keyspace='keyspace1', scope='standard1')
+        coordinator_reads_mbean = make_mbean("metrics", type="Table", name="CoordinatorReadLatency", keyspace='keyspace1', scope='standard1')
+        for node in cluster.nodelist():
+            with JolokiaAgent(node) as jmx:
+                sr = jmx.read_attribute(speculative_reads_mbean, "Count")
+                cr = jmx.read_attribute(coordinator_reads_mbean, "Count")
+                pcent = sr / cr * 100
+                assert pcent < 10, "Speculative retry percentage %.2f%% too high on %s" % (pcent, node.address_and_port())
 
     @since('3.0')
     def test_14513_transient(self):
