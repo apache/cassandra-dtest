@@ -422,7 +422,7 @@ def data_size(node, ks, cf):
     @return: data size in bytes
     """
     hack_legacy_parsing(node)
-    tablestats = node.nodetool("tablestats {}.{}".format(ks,cf))[0]
+    tablestats = node.nodetool("tablestats -r {}.{}".format(ks,cf))[0]
     regex = re.compile(r'[\t]')
     stats_lines = [regex.sub("", s) for s in tablestats.split('\n')
                   if regex.sub("", s).startswith('Space used (total)')]

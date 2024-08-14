@@ -79,7 +79,7 @@ class TestCompaction(Tester):
         node1.flush()
 
         table_name = 'standard1'
-        output = node1.nodetool('tablestats').stdout
+        output = node1.nodetool('tablestats -r').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -92,7 +92,7 @@ class TestCompaction(Tester):
         node1.compact()
         node1.wait_for_compactions()
 
-        output = node1.nodetool('tablestats').stdout
+        output = node1.nodetool('tablestats -r').stdout
         if output.find(table_name) != -1:
             output = output[output.find(table_name):]
             output = output[output.find("Space used (live)"):]
@@ -136,7 +136,7 @@ class TestCompaction(Tester):
         node1.wait_for_compactions()
 
         table_name = 'standard1'
-        output = node1.nodetool('tablestats').stdout
+        output = node1.nodetool('tablestats -r').stdout
         output = output[output.find(table_name):]
         output = output[output.find("Bloom filter space used"):]
         bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())
@@ -595,7 +595,7 @@ class TestCompaction(Tester):
             pytest.skip('DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
 
 def grep_sstables_in_each_level(node, table_name):
-    output = node.nodetool('tablestats').stdout
+    output = node.nodetool('tablestats -r').stdout
     output = output[output.find(table_name):]
     output = output[output.find("SSTables in each level"):]
     return output[output.find(":") + 1:output.find("\n")].strip()
