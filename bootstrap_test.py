@@ -649,7 +649,8 @@ class BootstrapTester(Tester):
 
         # Add a new node, bootstrap=True ensures that it is not a seed
         node4 = new_node(cluster, bootstrap=True)
-        node4.start(wait_for_binary_proto=True)
+        # we skip reconfiguration after this bootstrap since with vnodes node4 might end up taking over the CMS, and then get wiped below
+        node4.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.test.skip_cms_reconfig_after_topology_change=true"])
 
         session = self.patient_cql_connection(node4)
         assert original_rows == list(session.execute(query))
