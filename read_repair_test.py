@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 import glob
 import os
+import re
+import tempfile
 import time
 from distutils.version import LooseVersion
 
@@ -18,7 +20,7 @@ from dtest import Tester, create_ks, mk_bman_path
 from tools.assertions import assert_one
 from tools.data import rows_to_list
 from tools.jmxutils import JolokiaAgent, make_mbean
-from tools.misc import retry_till_success
+from tools.misc import new_node, retry_till_success
 
 since = pytest.mark.since
 ported_to_in_jvm = pytest.mark.ported_to_in_jvm
@@ -769,6 +771,126 @@ class TestSpeculativeReadRepair(Tester):
             assert storage_proxy.blocking_read_repair == 1
             assert storage_proxy.speculated_rr_read == 0  # there shouldn't be any replicas to speculate on
             assert storage_proxy.speculated_rr_write == 1
+
+
+class TestMultiDatacentersReadRepairWithPendingNode(Tester):
+
+    @pytest.fixture(scope='function', autouse=True)
+    def fixture_set_cluster_settings(self, fixture_dtest_setup):
+        cluster = fixture_dtest_setup.cluster
+        cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
+                                                  'dynamic_snitch': False,
+                                                  'endpoint_snitch': 'GossipingPropertyFileSnitch',
+                                                  'write_request_timeout_in_ms': 1000,
+                                                  'read_request_timeout_in_ms': 1000})
+
+    def _start_cluster(self, num_nodes_per_dc):
+        # initialize with 2 datacenters
+        cluster = self.cluster
+        cluster.populate([num_nodes_per_dc, num_nodes_per_dc], install_byteman=True, debug=True)
+
+        for node in cluster.nodelist():
+            with open(os.path.join(node.get_conf_dir(), 'cassandra-rackdc.properties'), 'w') as snitch_file:
+                snitch_file.write("dc=" + node.data_center + os.linesep)
+                snitch_file.write("rack=rack1" + os.linesep)
+                snitch_file.write("prefer_local=true" + os.linesep)
+
+        cluster.start(jvm_args=['-XX:-PerfDisableSharedMem'])
+        session = self.get_cql_connection(cluster.nodelist()[0], timeout=2)
+
+        session.execute("CREATE KEYSPACE ks WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': '%d', 'dc2': '%d'}" % (num_nodes_per_dc, num_nodes_per_dc))
+        # set speculative_retry to a large value so we don't have speculative retry
+        session.execute("CREATE TABLE ks.tbl (k int, c int, v int, primary key (k, c)) WITH speculative_retry = '40000ms';")
+
+    def get_cql_connection(self, node, **kwargs):
+        return self.patient_exclusive_cql_connection(node, retry_policy=None, **kwargs)
+
+
+    def test_normal_read_repair_no_timeout_with_pending_node(self):
+        """ test the normal case """
+        num_nodes_per_dc = 2
+        self._start_cluster(num_nodes_per_dc)
+        node1, node2, node3, node4 = self.cluster.nodelist()
+        # dc1 nodes
+        assert isinstance(node1, Node) and node1.data_center == 'dc1'
+        assert isinstance(node2, Node) and node2.data_center == 'dc1'
+        assert isinstance(node3, Node) and node3.data_center == 'dc2'
+        assert isinstance(node4, Node) and node4.data_center == 'dc2'
+
+        # use node3(dc1) as coordinator
+        session = self.get_cql_connection(node3, timeout=2)
+
+        # insert to 1000 partition keys, at least one of them will be affected by the pending node
+        for i in range(1000):
+            session.execute(SimpleStatement("INSERT INTO ks.tbl (k, c, v) VALUES (%d, 0, 1)" % i, consistency_level=ConsistencyLevel.ALL))
+
+        node4.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
+
+         # node 4 won't have the latest data while other 3 nodes should have latest data
+        for i in range(1000):
+            session.execute(SimpleStatement("INSERT INTO ks.tbl (k, c, v) VALUES (%d, 0, 2)" % i, consistency_level=ConsistencyLevel.LOCAL_ONE))
+
+        # add a pending node to dc2
+        pending_node = self._add_pending_node_to_cluster(self.cluster, 'dc2', num_nodes_per_dc)
+
+        # use node4 as coordinator node so we always get digest mismatch to trigger blocking read repair
+        coordinator = node4
+        session = self.get_cql_connection(coordinator)
+        for i in range(1000):
+            expected = (i, 0, 2)
+            # LOCAL_QUORUM should query the two local nodes(node3 and node4) which will trigger blocking read repair
+            rows = list(session.execute(SimpleStatement("SELECT * FROM ks.tbl WHERE k=%d" % i, consistency_level=ConsistencyLevel.LOCAL_QUORUM)))
+            assert len(rows) == 1
+            assert (rows[0].k, rows[0].c, rows[0].v) == expected
+
+        # pending node is still joining
+        ntout = node1.nodetool('status').stdout
+        assert re.search(r'UJ\s+' + pending_node.ip_addr, ntout), ntout
+
+    def _add_pending_node_to_cluster(self, cluster, data_center, num_nodes_per_dc):
+        # add a new node to data center, load some data first so streaming will take some time for the new node
+        node1 = cluster.nodes['node1']
+        yaml_config = """
+        # Create the keyspace and table
+        keyspace: keyspace1
+        keyspace_definition: |
+          CREATE KEYSPACE keyspace1 WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': %d, 'dc2': %d};
+        table: users
+        table_definition:
+          CREATE TABLE users (
+            username text,
+            first_name text,
+            last_name text,
+            email text,
+            PRIMARY KEY(username)
+          ) WITH compaction = {'class':'SizeTieredCompactionStrategy'};
+        insert:
+          partitions: fixed(1)
+          batchtype: UNLOGGED
+        queries:
+          read:
+            cql: select * from users where username = ?
+            fields: samerow
+        """ % (num_nodes_per_dc, num_nodes_per_dc)
+        with tempfile.NamedTemporaryFile(mode='w+') as stress_config:
+            stress_config.write(yaml_config)
+            stress_config.flush()
+            node1.stress(['user', 'profile=' + stress_config.name, 'n=200K', 'no-warmup',
+                          'ops(insert=1)', '-rate', 'threads=10'])
+
+            pending_node = new_node(self.cluster, data_center='dc2')
+            pending_node.start(no_wait=True)
+
+            new_node_seen = False
+            for _ in range(30):  # give new node up to 30 seconds to start
+                ntout = node1.nodetool('status').stdout
+                if re.search(r'UJ\s+' + pending_node.ip_addr, ntout):
+                    new_node_seen = True
+                    break
+                time.sleep(1)
+
+            assert new_node_seen, "expected {} in status:\n{}".format(pending_node.ip_addr, ntout)
+        return pending_node
 
 
 @contextmanager
