@@ -414,7 +414,7 @@ def data_size(node, ks, cf):
     """
     Return the size in bytes for given table in a node.
     This gets the size from nodetool tablestats output.
-    This might brake if the format of nodetool tablestats change
+    This might break if the format of nodetool tablestats change
     as it is looking for specific text "Space used (total)" in output.
     @param node: Node in which table size to be checked for
     @param ks: Keyspace name for the table
@@ -426,11 +426,12 @@ def data_size(node, ks, cf):
     regex = re.compile(r'[\t]')
     stats_lines = [regex.sub("", s) for s in tablestats.split('\n')
                   if regex.sub("", s).startswith('Space used (total)')]
-    if not len(stats_lines) == 1:
-        msg = ('Expected output from `nodetool tablestats` to contain exactly 1 '
-               'line starting with "Space used (total)". Found:\n') + tablestats
+    if len(stats_lines) > 2:
+        msg = ('Expected output from `nodetool tablestats` to contain at most 2 '
+               'lines starting with "Space used (total)". Found:\n') + tablestats
         raise RuntimeError(msg)
-    space_used_line = stats_lines[0].split()
+
+    space_used_line = stats_lines[0].split() if len(stats_lines) == 1 else stats_lines[1].split()
 
     if len(space_used_line) == 4:
         return float(space_used_line[3])
