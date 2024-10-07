@@ -1201,7 +1201,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """ % self.get_compaction()
         elif self.cluster.version() >= LooseVersion('4.1'):
             create_table += """
@@ -1222,7 +1224,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """
         elif self.cluster.version() >= LooseVersion('4.0'):
             create_table += """
@@ -1334,7 +1338,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """ % self.get_compaction()
         elif self.cluster.version() >= LooseVersion('4.1'):
             create_table = """
@@ -1359,7 +1365,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """
         elif self.cluster.version() >= LooseVersion('4.0'):
             create_table = """
@@ -1383,7 +1391,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair = 'BLOCKING'
-            AND speculative_retry = '99p';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """
         elif self.cluster.version() >= LooseVersion('3.9'):
             create_table =  """
@@ -1405,7 +1415,9 @@ CREATE TYPE test.address_type (
             AND memtable_flush_period_in_ms = 0
             AND min_index_interval = 128
             AND read_repair_chance = 0.0
-            AND speculative_retry = '99PERCENTILE';
+            AND speculative_retry = '99p'
+            AND repair_full = {'enabled': 'true'}
+            AND repair_incremental = {'enabled': 'true'};
         """
         elif self.cluster.version() >= LooseVersion('3.0'):
             create_table = """
@@ -1497,7 +1509,9 @@ CREATE TYPE test.address_type (
                 AND memtable_flush_period_in_ms = 0
                 AND min_index_interval = 128
                 AND read_repair = 'BLOCKING'
-                AND speculative_retry = '99p';
+                AND speculative_retry = '99p'
+                AND repair_full = {'enabled': 'true'}
+                AND repair_incremental = {'enabled': 'true'};
                """ % self.get_compaction() 
         elif self.cluster.version() >= LooseVersion('4.1'):
             return """
@@ -1522,7 +1536,9 @@ CREATE TYPE test.address_type (
                 AND memtable_flush_period_in_ms = 0
                 AND min_index_interval = 128
                 AND read_repair = 'BLOCKING'
-                AND speculative_retry = '99p';
+                AND speculative_retry = '99p'
+                AND repair_full = {'enabled': 'true'}
+                AND repair_incremental = {'enabled': 'true'};
                """
         elif self.cluster.version() >= LooseVersion('4.0'):
             return """
