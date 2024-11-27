@@ -5,7 +5,8 @@ import logging
 
 from flaky import flaky
 
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadFailure, ReadTimeout
@@ -3442,7 +3443,7 @@ class TestPagingWithDeletions(BasePagingTester, PageAssertionMixin):
         try:
             self.session.execute(SimpleStatement("select * from paging_test", fetch_size=1000, consistency_level=CL.ALL, retry_policy=FallthroughRetryPolicy()))
         except ReadTimeout as exc:
-            assert self.cluster.version() < LooseVersion('2.2')
+            assert self.cluster.version() < parse('2.2')
         except ReadFailure as exc:
             if supports_v5_protocol:
                 assert exc.error_code_map is not None

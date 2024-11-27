@@ -4,7 +4,7 @@ import os
 import stat
 import struct
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
 import pytest
 import logging
 
@@ -172,7 +172,7 @@ class TestCommitLog(Tester):
         @jira_ticket CASSANDRA-11891
         """
         cluster_ver = self.cluster.version()
-        if LooseVersion('3.1') <= cluster_ver < LooseVersion('3.7'):
+        if parse('3.1') <= cluster_ver < parse('3.7'):
             pytest.skip("Fixed in 3.0.7 and 3.7")
 
         node1 = self.node1
@@ -320,7 +320,6 @@ class TestCommitLog(Tester):
         self.prepare()
 
         self._provoke_commitlog_failure()
-        time.sleep(2)
         failure = self.node1.grep_log("Failed .+ commit log segments. Commit disk failure policy is stop; terminating thread")
         logger.debug(failure)
         assert failure, "Cannot find the commitlog failure message in logs"

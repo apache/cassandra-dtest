@@ -21,7 +21,8 @@ from ccmlib.cluster import Cluster
 
 from dtest import (get_ip_from_node, make_execution_profile, get_auth_provider, get_port_from_node,
                    get_eager_protocol_version, hack_legacy_parsing)
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from tools.context import log_filter
 from tools.funcutils import merge_dicts
@@ -94,7 +95,7 @@ class DTestSetup(object):
 
     def install_nodetool_legacy_parsing(self):
         """ Install nodetool legacy parsing on the cluster """
-        if self.cluster.version() < LooseVersion('3.11.13'):
+        if self.cluster.version() < parse('3.11.13'):
             logger.debug("hacking nodetool for legacy parsing on {}".format(self.cluster.version()))
             for node in self.cluster.nodelist():
                 self.install_legacy_parsing(node)
@@ -374,7 +375,7 @@ class DTestSetup(object):
             logger.debug(stderr)
 
     def supports_v5_protocol(self, cluster_version):
-        return cluster_version >= LooseVersion('4.0')
+        return cluster_version >= parse('4.0')
 
     def cleanup_last_test_dir(self):
         if os.path.exists(self.last_test_dir):

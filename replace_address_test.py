@@ -1,12 +1,11 @@
 import os
 import tempfile
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
 import time
-
-from flaky import flaky
 
 from itertools import chain
 from shutil import rmtree
@@ -328,7 +327,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         # the metadata log is replayed at startup, so the message will be logged
         # repeatedly (although the movement only actually happens once). We can address
         # this with smarter logging in Cassandra.
-        if not same_address and self.cluster.version() < LooseVersion('5.1'):
+        if not same_address and self.cluster.version() < parse('5.1'):
             self._verify_tokens_migrated_successfully(previous_log_size)
 
         self._verify_data(initial_data)
@@ -359,7 +358,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         logger.debug("Waiting for replace to fail")
         node_log_str = "/127.0.0.5" if self.cluster.version() < '4.0' else "/127.0.0.5:7000"
         log_message = "java.lang.RuntimeException: Cannot replace_address {} because it doesn't exist in gossip" \
-            if self.cluster.version() < LooseVersion('5.1') \
+            if self.cluster.version() < parse('5.1') \
             else "Cannot replace node {} which is not currently joined"
         self.replacement_node.watch_log_for(log_message.format(node_log_str))
         assert_not_running(self.replacement_node)
@@ -585,7 +584,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             logger.debug("Waiting other nodes to detect node stopped")
             node_log_str = self.replacement_node.address_for_current_version_slashy()
             self.query_node.watch_log_for("FatClient {} has been silent for 30000ms, removing from gossip".format(node_log_str), timeout=120)
-            if self.cluster.version() < LooseVersion('5.1'):
+            if self.cluster.version() < parse('5.1'):
                 self.query_node.watch_log_for("Node {} failed during replace.".format(node_log_str), timeout=120, filename='debug.log')
             else:
                 logger.debug("Calling nodetool abortbootstrap --ip {}".format(self.replacement_node.address()))
@@ -627,7 +626,7 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         # CEP-21: availability is intentionally degraded, so we lower the required number of
         # acks required for the replacement node to progress to a point where it attempts to
         # perform streaming
-        if self.cluster.version() >= LooseVersion('5.1'):
+        if self.cluster.version() >= parse('5.1'):
             options = {'progress_barrier_min_consistency_level': 'ONE',
                        'progress_barrier_default_consistency_level': 'ONE'}
 

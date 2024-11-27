@@ -3,7 +3,8 @@ import pytest
 import logging
 
 from dtest import create_ks
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 from scrub_test import TestHelper
 from tools.assertions import assert_crc_check_chance_equal
 
@@ -81,7 +82,7 @@ class TestCompression(TestHelper):
         assert '256' == meta.options['compression']['chunk_length_in_kb']
         assert_crc_check_chance_equal(session, "compression_opts_table", 0.25)
 
-        if self.cluster.version() < LooseVersion('5.0'):
+        if self.cluster.version() < parse('5.0'):
           warn = node.grep_log("The option crc_check_chance was deprecated as a compression option.")
           assert len(warn) == 0
           session.execute("""

@@ -2,7 +2,6 @@ import os
 import subprocess
 import time
 import distutils.dir_util
-from distutils.version import LooseVersion
 
 import pytest
 import logging

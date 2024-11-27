@@ -19,7 +19,8 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 from dtest import Tester, get_ip_from_node, create_ks, mk_bman_path
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_invalid, assert_none, assert_one,
@@ -53,7 +54,7 @@ class TestMaterializedViews(Tester):
 
     def prepare(self, user_table=False, rf=1, options=None, nodes=3, install_byteman=False, **kwargs):
         cluster = self.cluster
-        cluster.set_configuration_options({'enable_materialized_views': 'true', 'commitlog_sync_period_in_ms': 1000})
+        cluster.set_configuration_options({'enable_materialized_views': 'true'})
         cluster.populate([nodes, 0], install_byteman=install_byteman)
         if options:
             cluster.set_configuration_options(values=options)
@@ -978,7 +979,7 @@ class TestMaterializedViews(Tester):
         node = self.cluster.nodelist()[0]
 
         self._insert_data(session)
-        time.sleep(1)
+
         assert_one(
             session,
             "SELECT * FROM users_by_state WHERE state = 'TX' AND username = 'user1'",
@@ -988,7 +989,7 @@ class TestMaterializedViews(Tester):
         # Rename a column with an injected byteman rule to kill the node after the first schema update
         self.fixture_dtest_setup.allow_log_errors = True
 
-        script_version = '5_1' if self.cluster.version() >= LooseVersion('5.1') else '4x' if self.cluster.version() >= '4' else '3x'
+        script_version = '5_1' if self.cluster.version() >= parse('5.1') else '4x' if self.cluster.version() >= '4' else '3x'
         node.byteman_submit([mk_bman_path('merge_schema_failure_{}.btm'.format(script_version))])
         with pytest.raises(NoHostAvailable):
             session.execute("ALTER TABLE users RENAME username TO user")
@@ -2040,12 +2041,12 @@ class TestMaterializedViews(Tester):
         logger.debug('Shutdown node1')
         node1.stop(wait_other_notice=True)
         logger.debug('Delete node1 data')
-        clear_data_only = True if self.cluster.version() >= LooseVersion('5.1') else False
+        clear_data_only = True if self.cluster.version() >= parse('5.1') else False
         node1.clear(clear_all=True, only_data=clear_data_only)
 
         jvm_args = []
         if fail_mv_lock:
-            if LooseVersion('3.10') <= self.cluster.version() < LooseVersion('5.1'):  # CASSANDRA-10134
+            if parse('3.10') <= self.cluster.version() < parse('5.1'):  # CASSANDRA-10134
                 jvm_args = ['-Dcassandra.allow_unsafe_replace=true', '-Dcassandra.replace_address={}'.format(node1.address())]
             jvm_args.append("-Dcassandra.test.fail_mv_locks_count=1000")
             # this should not make Keyspace.apply throw WTE on failure to acquire lock
@@ -2987,7 +2988,7 @@ class TestMaterializedViewsLockcontention(Tester):
             for y in range(records2):
                 params.append([x, y])
 
-        if self.cluster.version() < LooseVersion('5.0'):
+        if self.cluster.version() < parse('5.0'):
             insert = 'INSERT INTO test (int1, int2, date) VALUES (?, ?, toTimestamp(now()))'
         else:
             insert = 'INSERT INTO test (int1, int2, date) VALUES (?, ?, to_timestamp(now()))'

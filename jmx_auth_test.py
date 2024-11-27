@@ -2,7 +2,8 @@ import random
 import string
 import pytest
 import logging
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from ccmlib.node import ToolError
 from dtest import Tester
@@ -108,7 +109,7 @@ class TestJMXAuth(Tester):
 
     def authentication_fail_message(self, node, username):
         return "Provided username {user} and/or password are incorrect".format(user=username) \
-            if node.cluster.version() >= LooseVersion('3.10') else "Username and/or password are incorrect"
+            if node.cluster.version() >= parse('3.10') else "Username and/or password are incorrect"
 
     def username(self):
         return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))

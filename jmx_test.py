@@ -8,7 +8,8 @@ import logging
 import ccmlib.common
 from ccmlib.node import ToolError
 
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean)
@@ -62,7 +63,7 @@ class TestJMX(Tester):
                 if not isinstance(e, ToolError):
                     raise
                 else:
-                    if cluster.version() >= LooseVersion('5.1'):
+                    if cluster.version() >= parse('5.1'):
                         assert re.search("Server is not initialized yet, cannot run nodetool", repr(e)), str(e)
                     else:
                         assert re.search("ConnectException: 'Connection refused( \(Connection refused\))?'.", repr(e)), str(e)
@@ -201,9 +202,9 @@ class TestJMX(Tester):
         # Run a major compaction. This will be the compaction whose
         # progress we track.
         node.nodetool_process('compact keyspace1')
-        if self.cluster.version() >= LooseVersion('4.0'):
+        if self.cluster.version() >= parse('4.0'):
             node.watch_log_for("Compacting")
-        elif self.cluster.version() >= LooseVersion('3.11'):
+        elif self.cluster.version() >= parse('3.11'):
             node.watch_log_for("Major compaction")
         else:
             node.watch_log_for("Compacting", filename="debug.log")
@@ -223,7 +224,7 @@ class TestJMX(Tester):
 
             updated_progress_string = jmx.read_attribute(compaction_manager, 'CompactionSummary')[0]
             var = 'Compaction@{uuid}(keyspace1, standard1, {progress}/{total})bytes'
-            if self.cluster.version() >= LooseVersion('4.0'): # CASSANDRA-15954
+            if self.cluster.version() >= parse('4.0'): # CASSANDRA-15954
                 var = 'Compaction({taskUuid}, {progress} / {total} bytes)@{uuid}(keyspace1, standard1)'
             parsed = parse.search(var, progress_string) 
             if parsed is None:

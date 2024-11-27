@@ -1,13 +1,10 @@
 import logging
-import os
-import os.path
+
 import pytest
-import shutil
 import string
 import time
+from packaging.version import parse
 
-from ccmlib.node import TimeoutError
-from distutils.version import LooseVersion
 from dtest import Tester
 from tools import sslkeygen
 
@@ -50,7 +47,7 @@ class TestClientNetworkStopStart(Tester):
     def _assert_client_enable(self, node, native_enabled=True, thrift_enabled=False):
         out = node.nodetool("info")
         self._assert_client_active_msg("Native Transport", native_enabled, out.stdout)
-        if node.get_cassandra_version() >= LooseVersion('4.0'):
+        if node.get_cassandra_version() >= parse('4.0'):
             assert "Thrift" not in out.stdout, "Thrift found in output: {}".format(out.stdout)
         else:
             self._assert_client_active_msg("Thrift", thrift_enabled, out.stdout)

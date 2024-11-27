@@ -4,7 +4,8 @@ import re
 import string
 import tempfile
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 import pytest
 import parse
 import logging
@@ -150,7 +151,7 @@ class TestCompaction(Tester):
             dir_count = len(node1.data_directories())
             logger.debug("sstable_count is: {}".format(sstable_count))
             logger.debug("dir_count is: {}".format(dir_count))
-            if node1.get_cassandra_version() < LooseVersion('3.2'):
+            if node1.get_cassandra_version() < parse('3.2'):
                 size_factor = sstable_count
             else:
                 size_factor = sstable_count / float(dir_count)
@@ -226,7 +227,7 @@ class TestCompaction(Tester):
         time.sleep(40)
         expired_sstables = node1.get_sstables('ks', 'cf')
         expected_sstable_count = 1
-        if self.cluster.version() > LooseVersion('3.1'):
+        if self.cluster.version() > parse('3.1'):
             expected_sstable_count = cluster.data_dir_count
         assert len(expired_sstables) == expected_sstable_count
         # write a new sstable to make DTCS check for expired sstables:
@@ -290,7 +291,7 @@ class TestCompaction(Tester):
             "B": 1. / (1024 * 1024),
         }
 
-        units = ['MB'] if cluster.version() < LooseVersion('3.6') else ['B', 'KiB', 'MiB', 'GiB']
+        units = ['MB'] if cluster.version() < parse('3.6') else ['B', 'KiB', 'MiB', 'GiB']
         assert found_units in units
 
         logger.debug(avgthroughput)
@@ -376,7 +377,7 @@ class TestCompaction(Tester):
 
         node.nodetool('compact ks large')
         verb = 'Writing' if self.cluster.version() > '2.2' else 'Compacting'
-        sizematcher = '\d+ bytes' if self.cluster.version() < LooseVersion('3.6') else '\d+\.\d{3}(K|M|G)iB'
+        sizematcher = '\d+ bytes' if self.cluster.version() < parse('3.6') else '\d+\.\d{3}(K|M|G)iB'
         node.watch_log_for('{} large partition ks/large:user \({}'.format(verb, sizematcher), from_mark=mark, timeout=180)
 
         ret = list(session.execute("SELECT properties from ks.large where userid = 'user'"))

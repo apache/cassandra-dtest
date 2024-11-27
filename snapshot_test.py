@@ -4,7 +4,8 @@ import os
 import shutil
 import subprocess
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
@@ -340,7 +341,7 @@ class TestArchiveCommitlog(SnapshotTester):
 
         systemlocal_dirs = self.make_snapshot(node1, 'system', 'local', 'local')
 
-        if self.cluster.version() >= LooseVersion('5.1'):
+        if self.cluster.version() >= parse('5.1'):
             local_dirs = self.make_snapshot(node1, 'system', 'local_metadata_log', 'local_metadata_log')
             metadata_snapshot_dirs = self.make_snapshot(node1, 'system', 'metadata_snapshots', 'metadata_snapshots')
             cluster_metadata_snapshot_dirs = self.make_snapshot(node1, 'system_cluster_metadata', 'distributed_metadata_log', 'distributed_metadata_log')
@@ -420,7 +421,7 @@ class TestArchiveCommitlog(SnapshotTester):
             for local_dir in systemlocal_dirs:
                 self.restore_snapshot(local_dir, node1, 'system', 'local', 'local')
 
-            if self.cluster.version() >= LooseVersion('5.1'):
+            if self.cluster.version() >= parse('5.1'):
                 for local_dir in local_dirs:
                     self.restore_snapshot(local_dir, node1, 'system', 'local_metadata_log', 'local_metadata_log')
                 for snapshot_dir in metadata_snapshot_dirs:
@@ -495,7 +496,7 @@ class TestArchiveCommitlog(SnapshotTester):
             for systemlocal_snapshot_dir in systemlocal_dirs:
                 shutil.rmtree(systemlocal_snapshot_dir)
 
-            if self.cluster.version() >= LooseVersion('5.1'):
+            if self.cluster.version() >= parse('5.1'):
                 logger.debug("removing snapshot_dir: " + ",".join(local_dirs))
                 for local_snapshot_dir in local_dirs:
                     shutil.rmtree(local_snapshot_dir)

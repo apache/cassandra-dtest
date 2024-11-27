@@ -6,7 +6,8 @@ import pytest
 import logging
 
 from collections import OrderedDict
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.query import SimpleStatement
@@ -590,8 +591,8 @@ class TestRecoverNegativeExpirationDate(TestHelper):
         """
         session.execute(query)
 
-        version = '2.1' if self.cluster.version() < LooseVersion('3.0') else \
-                  ('3.0' if self.cluster.version() < LooseVersion('3.11') else '3.11')
+        version = '2.1' if self.cluster.version() < parse('3.0') else \
+                  ('3.0' if self.cluster.version() < parse('3.11') else '3.11')
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         corrupt_sstable_dir = os.path.join(base_dir, 'sstables', 'ttl_test', version)

@@ -2,7 +2,8 @@ from contextlib import contextmanager
 import glob
 import os
 import time
-from distutils.version import LooseVersion
+from packaging.version import parse
+
 
 import pytest
 import logging
@@ -394,7 +395,7 @@ class TestReadRepair(Tester):
         cluster = self.cluster
         cluster.populate(3)
         opts = {'write_request_timeout_in_ms': 30000, 'read_request_timeout_in_ms': 30000}
-        if cluster.version() >= LooseVersion('4.1'):
+        if cluster.version() >= parse('4.1'):
             opts['native_transport_timeout'] = '30s'
         cluster.set_configuration_options(values=opts)
         cluster.set_partitioner("org.apache.cassandra.dht.RandomPartitioner")
@@ -537,7 +538,7 @@ class TestSpeculativeReadRepair(Tester):
 
         node2.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
         node3.byteman_submit([mk_bman_path('read_repair/stop_writes.btm')])
-        script_version = '_5_1' if self.cluster.version() >= LooseVersion('5.1') else ''
+        script_version = '_5_1' if self.cluster.version() >= parse('5.1') else ''
         node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes{}.btm'.format(script_version))])
         node3.byteman_submit([mk_bman_path('read_repair/stop_rr_writes{}.btm'.format(script_version))])
 
@@ -661,7 +662,7 @@ class TestSpeculativeReadRepair(Tester):
         session.execute("INSERT INTO ks.tbl (k, c, v) VALUES (1, 1, 2)")
 
         # re-enable writes on node 3, leave them off on node2
-        script_version = '_5_1' if self.cluster.version() >= LooseVersion('5.1') else ''
+        script_version = '_5_1' if self.cluster.version() >= parse('5.1') else ''
         node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes{}.btm'.format(script_version))])
 
         node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
@@ -705,7 +706,7 @@ class TestSpeculativeReadRepair(Tester):
         node1.byteman_submit([mk_bman_path('read_repair/sorted_live_endpoints.btm')])
 
         node2.byteman_submit([mk_bman_path('read_repair/stop_data_reads.btm')])
-        script_version = '_5_1' if self.cluster.version() >= LooseVersion('5.1') else ''
+        script_version = '_5_1' if self.cluster.version() >= parse('5.1') else ''
         node3.byteman_submit([mk_bman_path('read_repair/stop_rr_writes{}.btm'.format(script_version))])
 
         with StorageProxy(node1) as storage_proxy:
@@ -751,7 +752,7 @@ class TestSpeculativeReadRepair(Tester):
 
         node2.byteman_submit([mk_bman_path('read_repair/stop_digest_reads.btm')])
         node3.byteman_submit([mk_bman_path('read_repair/stop_data_reads.btm')])
-        script_version = '_5_1' if self.cluster.version() >= LooseVersion('5.1') else ''
+        script_version = '_5_1' if self.cluster.version() >= parse('5.1') else ''
         node2.byteman_submit([mk_bman_path('read_repair/stop_rr_writes{}.btm'.format(script_version))])
 
         with StorageProxy(node1) as storage_proxy:
