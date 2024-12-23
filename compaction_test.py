@@ -16,7 +16,7 @@ since = pytest.mark.since
 ported_to_in_jvm = pytest.mark.ported_to_in_jvm
 logger = logging.getLogger(__name__)
 
-strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
+strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy', 'UnifiedCompactionStrategy']
 
 
 class TestCompaction(Tester):
@@ -262,17 +262,17 @@ class TestCompaction(Tester):
         node1.nodetool('disableautocompaction')
 
         stress_write(node1, keycount=200000 * cluster.data_dir_count)
+        node1.flush()
 
         threshold = "5"
         node1.nodetool('setcompactionthroughput -- ' + threshold)
 
-        node1.flush()
         if node1.get_cassandra_version() < '2.2':
             log_file = 'system.log'
         else:
             log_file = 'debug.log'
         mark = node1.mark_log(filename=log_file)
-        node1.compact()
+        node1.nodetool('compact keyspace1 standard1')
         matches = node1.watch_log_for('Compacted', from_mark=mark, filename=log_file)
 
         stringline = matches[0]
@@ -296,10 +296,12 @@ class TestCompaction(Tester):
         logger.debug(avgthroughput)
         avgthroughput_mb = unit_conversion_dct[found_units] * float(avgthroughput)
 
-        # The throughput in the log is computed independantly from the throttling and on the output files while
-        # throttling is on the input files, so while that throughput shouldn't be higher than the one set in
-        # principle, a bit of wiggle room is expected
-        assert float(threshold) + 0.5 >= avgthroughput_mb
+        # The rate limiter accumulates a second of burst time before starting to throttle, so we should expect
+        # the duration of the first operation to be one second shorter than what the limit sets. In this case it's
+        # a 40 MiB file, so we need to accept the difference between 40MiB/7s and 40MiB/8s
+        lenience = 8.0 / 7 * 1.05
+
+        assert float(threshold) * lenience >= avgthroughput_mb
 
     @pytest.mark.parametrize("strategy", strategies)
     def test_compaction_strategy_switching(self, strategy):
@@ -593,6 +595,8 @@ class TestCompaction(Tester):
     def skip_if_not_supported(self, strategy):
         if self.cluster.version() >= '5.0' and strategy == 'DateTieredCompactionStrategy':
             pytest.skip('DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
+        if self.cluster.version() < '5.0' and strategy == 'UnifiedCompactionStrategy':
+            pytest.skip('UnifiedCompactionStrategy is only supported in Cassandra 5.0 and later')
 
 def grep_sstables_in_each_level(node, table_name):
     output = node.nodetool('tablestats').stdout
