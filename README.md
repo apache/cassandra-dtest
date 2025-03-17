@@ -230,7 +230,7 @@ ps aux | grep -ie CassandraDaemon | grep java | awk '{print $2}' | xargs kill
 
 Links
 -------
- * [ccm](https://github.com/pcmanus/ccm)
+ * [ccm](https://github.com/apache/cassandra-ccm)
  * [pytest](https://docs.pytest.org/)
  * [Python Driver](http://datastax.github.io/python-driver/installation.html)
  * [CQL over Thrift Driver](http://code.google.com/a/apache-extras.org/p/cassandra-dbapi2/)
