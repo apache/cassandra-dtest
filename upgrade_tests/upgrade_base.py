@@ -1,13 +1,15 @@
 from distutils.version import LooseVersion
 
+import logging
+import pytest
 import os
+import shutil
 import sys
 import time
-import pytest
-import logging
 
 from abc import ABCMeta
 
+from ccmlib import extension, repository
 from ccmlib.common import get_version_from_build, is_win
 
 from .upgrade_manifest import CASSANDRA_4_0
@@ -81,11 +83,18 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
 
         assert nodes, 2 >= "backwards compatibility tests require at least two nodes"
 
-        self.protocol_version = protocol_version
+        self.protocol_version = protocol_version if protocol_version is not None else self.UPGRADE_PATH.starting_meta.max_proto_v
 
         cluster = self.cluster
 
         cluster.set_install_dir(version=self.UPGRADE_PATH.starting_version)
+
+        install_dir_class = extension.get_cluster_class(cluster.get_install_dir())
+        if cluster.__class__ != install_dir_class:
+            logger.info("changing cluster type to {} (from {} bc {})".format(install_dir_class, cluster.__class__, cluster.get_install_dir()))
+            cluster.__class__ = install_dir_class
+            cluster._cassandra_version = cluster.dse_username = cluster.dse_password = None
+
         self.install_nodetool_legacy_parsing()
         self.fixture_dtest_setup.reinitialize_cluster_for_different_version()
 
@@ -102,7 +111,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         if start_rpc:
             cluster.set_configuration_options(values={'start_rpc': True})
 
-        cluster.set_configuration_options(values={'internode_compression': 'none'})
+        cluster.set_configuration_options(values={'internode_compression': 'none', 'endpoint_snitch': 'SimpleSnitch'})
 
         if extra_config_options:
             cluster.set_configuration_options(values=extra_config_options)
@@ -113,10 +122,11 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
         node1 = cluster.nodelist()[0]
         time.sleep(0.2)
 
+        logger.info("nodes started on {}, connecting with protocol_version: {}; cl: ".format(cluster.version(), self.protocol_version, cl))
         if cl:
-            session = self.patient_cql_connection(node1, protocol_version=protocol_version, consistency_level=cl, **kwargs)
+            session = self.patient_cql_connection(node1, protocol_version=self.protocol_version, consistency_level=cl, **kwargs)
         else:
-            session = self.patient_cql_connection(node1, protocol_version=protocol_version, **kwargs)
+            session = self.patient_cql_connection(node1, protocol_version=self.protocol_version, **kwargs)
         if create_keyspace:
             create_ks(session, 'ks', rf)
 
@@ -150,6 +160,15 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
             node1.mark_log_for_errors()
 
         logger.debug('upgrading node1 to {}'.format(self.UPGRADE_PATH.upgrade_version))
+        (install_dir, _) = repository.setup(self.UPGRADE_PATH.upgrade_version)
+        install_dir_class = extension.get_cluster_class(install_dir)
+        if self.cluster.__class__ != install_dir_class:
+            logger.info("changing cluster type to {} (from {} bc {})".format(install_dir_class, self.cluster.__class__, install_dir))
+            self.cluster.__class__ = install_dir_class
+            self.cluster._cassandra_version = self.cluster.dse_username = self.cluster.dse_password = None
+            old_conf = node1.get_conf_dir()
+            node1.__class__ = install_dir_class.getNodeClass()
+            shutil.copytree(old_conf, node1.get_conf_dir())
 
         node1.set_install_dir(version=self.UPGRADE_PATH.upgrade_version)
         self.install_legacy_parsing(node1)
@@ -175,6 +194,7 @@ class UpgradeTester(Tester, metaclass=ABCMeta):
 
         node1.start(wait_for_binary_proto=True)
 
+        logger.info("node1 started on {}, connecting with protocol_version: {}; cl: ".format(new_version_from_build, self.protocol_version, self.CL))
         sessions_and_meta = []
         if self.CL:
             session = self.patient_exclusive_cql_connection(node1, protocol_version=self.protocol_version, consistency_level=self.CL, **kwargs)
