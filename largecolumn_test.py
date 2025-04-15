@@ -54,26 +54,31 @@ class TestLargeColumn(Tester):
         cluster.set_configuration_options(configuration)
 
         # Have Netty allocate memory on heap so it is clear if memory used for large columns is related to intracluster messaging
+        # NOTE: we still have direct memory used by Cassandra for networking cache and other places
         cluster.populate(2).start(jvm_args=[" -Dcassandra.netty_use_heap_allocator=true "])
         node1, node2 = cluster.nodelist()
 
         session = self.patient_cql_connection(node1)
-        logger.debug("Before stress {0}".format(self.directbytes(node1)))
+        logger.info("Before stress, direct memory: {0}".format(self.directbytes(node1)))
         logger.debug("Running stress")
         # Run the full stack to see how much memory is utilized for "small" columns
         self.stress_with_col_size(cluster, node1, 1)
-        beforeStress = self.directbytes(node1)
-        logger.debug("Ran stress once {0}".format(beforeStress))
+        beforeLargeStress = self.directbytes(node1)
+        logger.info("Ran small column stress once, direct memory: {0}".format(beforeLargeStress))
 
-        # Now run the full stack to see how much memory is utilized for "large" columns
+        # Now run the full stack to warm up internal caches/pools
         LARGE_COLUMN_SIZE = 1024 * 1024 * 63
         self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
+        after1stLargeStress = self.directbytes(node1)
+        logger.info("After 1st large column stress, direct memory: {0}".format(after1stLargeStress))
 
-        output, err, _ = node1.nodetool("gcstats")
-        afterStress = self.directbytes(node1)
-        logger.debug("After stress {0}".format(afterStress))
+        # Now run the full stack to see how much memory is allocated for the second "large" columns request
+        self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
+        after2ndLargeStress = self.directbytes(node1)
+        logger.info("After 2nd large column stress, direct memory: {0}".format(after2ndLargeStress))
 
-        # Any growth in memory usage should not be proportional column size. Really almost no memory should be used
-        # since Netty was instructed to use a heap allocator
-        diff = int(afterStress) - int(beforeStress)
+        # We may allocate direct memory proportional to size of a request
+        # but we want to ensure that when we do subsequent calls the used direct memory is not growing
+        diff = int(after2ndLargeStress) - int(after1stLargeStress)
+        logger.info("Direct memory delta: {0}".format(diff))
         assert diff < LARGE_COLUMN_SIZE
