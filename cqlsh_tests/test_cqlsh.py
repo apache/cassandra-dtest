@@ -1158,9 +1158,14 @@ CREATE TYPE test.address_type (
 
 
     def get_keyspace_output(self):
-        return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
-                self.get_test_table_output(),
-                self.get_users_table_output()]
+        if self.cluster.version() >= LooseVersion('5.1'):
+            return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true  AND fast_path = 'simple';",
+                    self.get_test_table_output(),
+                    self.get_users_table_output()]
+        else:
+            return ["CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}  AND durable_writes = true;",
+                    self.get_test_table_output(),
+                    self.get_users_table_output()]
 
     def get_test_table_output(self, has_val=True, has_val_idx=True):
         create_table = None
@@ -1180,7 +1185,33 @@ CREATE TYPE test.address_type (
                 PRIMARY KEY (id, col)
                 """
 
-        if self.cluster.version() >= LooseVersion('4.2'):
+        if self.cluster.version() >= LooseVersion('5.1'):
+            create_table += """
+        ) WITH CLUSTERING ORDER BY (col ASC)
+            AND additional_write_policy = '99p'
+            AND allow_auto_snapshot = true
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND cdc = false
+            AND comment = ''
+            %s
+            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND memtable = 'default'
+            AND crc_check_chance = 1.0
+            AND fast_path = 'keyspace'
+            AND default_time_to_live = 0
+            AND extensions = {}
+            AND gc_grace_seconds = 864000
+            AND incremental_backups = true
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair = 'BLOCKING'
+            AND transactional_mode = 'off'
+            AND transactional_migration_from = 'none'
+            AND speculative_retry = '99p';
+        """ % self.get_compaction()
+        elif self.cluster.version() >= LooseVersion('4.2'):
             create_table += """
         ) WITH CLUSTERING ORDER BY (col ASC)
             AND additional_write_policy = '99p'
@@ -1309,7 +1340,37 @@ CREATE TYPE test.address_type (
         myindex_output = self.get_index_output('myindex', 'test', 'users', 'age')
         create_table = None
 
-        if self.cluster.version() >= LooseVersion('4.2'):
+        if self.cluster.version() >= LooseVersion('5.1'):
+            create_table = """
+        CREATE TABLE test.users (
+            userid text PRIMARY KEY,
+            age int,
+            firstname text,
+            lastname text
+        ) WITH additional_write_policy = '99p'
+            AND allow_auto_snapshot = true
+            AND bloom_filter_fp_chance = 0.01
+            AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+            AND cdc = false
+            AND comment = ''
+            %s
+            AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+            AND memtable = 'default'
+            AND crc_check_chance = 1.0
+            AND fast_path = 'keyspace'
+            AND default_time_to_live = 0
+            AND extensions = {}
+            AND gc_grace_seconds = 864000
+            AND incremental_backups = true
+            AND max_index_interval = 2048
+            AND memtable_flush_period_in_ms = 0
+            AND min_index_interval = 128
+            AND read_repair = 'BLOCKING'
+            AND transactional_mode = 'off'
+            AND transactional_migration_from = 'none'
+            AND speculative_retry = '99p';
+        """ % self.get_compaction()
+        elif self.cluster.version() >= LooseVersion('4.2'):
             create_table = """
         CREATE TABLE test.users (
             userid text PRIMARY KEY,
