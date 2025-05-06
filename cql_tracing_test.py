@@ -27,7 +27,7 @@ class TestCqlTracing(Tester):
 
         cluster = self.cluster
         opts = {'write_request_timeout_in_ms': 30000, 'read_request_timeout_in_ms': 30000}
-        if self.cluster.version() >= LooseVersion('4.1'):
+        if str(cluster.cassandra_version()) >= '4.1.6' and not str(cluster.cassandra_version()).startswith(('5.0-alpha', '5.0-beta')):
             opts['native_transport_timeout'] = '30s'
         cluster.set_configuration_options(values=opts);
 

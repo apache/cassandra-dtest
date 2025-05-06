@@ -392,7 +392,7 @@ class TestVariousNotifications(Tester):
             'read_request_timeout_in_ms': 30000,  # 30 seconds
             'range_request_timeout_in_ms': 40000
         }
-        if self.cluster.version() >= LooseVersion('4.1'):
+        if self.cluster.cassandra_version() >= LooseVersion('4.1.6') and not str(self.cluster.cassandra_version()).startswith(('5.0-alpha', '5.0-beta')):
             opts['native_transport_timeout'] = '30s'
         self.cluster.set_configuration_options(values=opts)
         self.cluster.populate(3).start()
