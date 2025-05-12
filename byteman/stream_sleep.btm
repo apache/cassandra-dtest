@@ -9,5 +9,5 @@ AT ENTRY
 IF NOT flagged("done")
 DO
    flag("done");
-   Thread.sleep(60000)
+   Thread.sleep(60000L)
 ENDRULE

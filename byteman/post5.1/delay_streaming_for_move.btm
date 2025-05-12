@@ -7,5 +7,5 @@ METHOD movementMap
 AT ENTRY
 IF TRUE
 DO
-    Thread.sleep(60000);
+    Thread.sleep(60000L);
 ENDRULE

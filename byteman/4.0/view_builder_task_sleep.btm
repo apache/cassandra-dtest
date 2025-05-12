@@ -7,5 +7,5 @@ METHOD buildKey
 AT ENTRY
 IF TRUE
 DO
-   Thread.sleep(50);
+   Thread.sleep(50L);
 ENDRULE

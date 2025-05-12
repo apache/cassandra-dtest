@@ -7,5 +7,5 @@ METHOD open
 AT ENTRY
 IF TRUE
 DO
-    Thread.sleep(10000);
+    Thread.sleep(10000L);
 ENDRULE

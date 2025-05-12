@@ -9,5 +9,5 @@ METHOD realMarkAlive
 AT ENTRY
 IF TRUE
 DO
-   Thread.sleep(2000);
+   Thread.sleep(2000L);
 ENDRULE

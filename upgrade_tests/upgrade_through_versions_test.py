@@ -983,7 +983,7 @@ for upgrade in MULTI_UPGRADES:
                 # replace matching meta with current version
                 for idx, meta in enumerate(metas):
                     if meta.matches_current_env_version_family:
-                        assert CURRENT_JAVA_VERSION in meta.java_versions, "Incompatible JDK {} for version {}".format(java_version, meta.family)
+                        assert CURRENT_JAVA_VERSION in meta.java_versions, "Incompatible JDK {} for version {}".format(CURRENT_JAVA_VERSION, meta.family)
                         newmeta = meta.clone_with_local_env_version()
                         logger.debug("{} appears applicable to current env. Overriding version from {} to {}".format(upgrade.name, meta.version, newmeta.version))
                         metas[idx] = newmeta

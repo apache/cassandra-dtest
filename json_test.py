@@ -10,12 +10,22 @@ import logging
 from ccmlib.version import LooseVersion
 
 from ccmlib import common
-from ccmlib.common import is_win
+from ccmlib.common import is_win, get_jdk_version_int
 
 from dtest import Tester
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)
+
+"""
+We skip a few of these tests entirely on JDK19+; the compliance with the JDK spec tightened in JDK19 to better adhere to
+the minimum required precision on mantissa format to support conversion toString() and fromString(). These tests were
+originally authored as a giant block of text we effectively string compare, combining all the data type comparisons
+together; if one changed, the entire test fails for all types. We extensively test the fundamentals underlying this in
+JsonTest.java, JsonConversionTest.java, EmptyValuesTest.java, and the other methods here, so the skipped are almost
+purely redundant. Effectively these are cqlsh tests masquerading as cassandra python dtests, leveraging standing up the
+entire stack just to test that the calcified representations of json data expected here still come out of the tools.
+"""
 
 
 def build_doc_context(tester, test_name, prepare=True, connection=None, nodes=None):
@@ -203,6 +213,9 @@ class TestToJsonSelect(Tester):
     Tests using toJson with a SELECT statement
     """
 
+    @pytest.mark.skipif(get_jdk_version_int() >= 19,
+                        reason='JDK21+ uses minimum mantissa representation for floats in scientific notation, '
+                               'causing string comparison failures. Functional correctness is covered by unit tests and in-jvm dtests.')
     def test_basic_data_types(self):
         """
         Create our schema:
@@ -306,6 +319,9 @@ class TestToJsonSelect(Tester):
         """
         run_func_docstring(tester=self, test_func=self.test_counters)
 
+    @pytest.mark.skipif(get_jdk_version_int() >= 21,
+                        reason='JDK21+ uses minimum mantissa representation for floats in scientific notation, '
+                               'causing string comparison failures. Functional correctness is covered by unit tests and in-jvm dtests.')
     def test_complex_data_types(self):
         """
         Build some user types and a schema that uses them:
@@ -463,6 +479,9 @@ class TestFromJsonUpdate(Tester):
     Tests using fromJson within UPDATE statements.
     """
 
+    @pytest.mark.skipif(get_jdk_version_int() >= 19,
+                        reason='JDK21+ uses minimum mantissa representation for floats in scientific notation, '
+                               'causing string comparison failures. Functional correctness is covered by unit tests and in-jvm dtests.')
     def test_basic_data_types(self):
         """
         Create a table with the primitive types:
@@ -846,6 +865,9 @@ class TestFromJsonInsert(Tester):
     Tests using fromJson within INSERT statements.
     """
 
+    @pytest.mark.skipif(get_jdk_version_int() >= 19,
+                        reason='JDK21+ uses minimum mantissa representation for floats in scientific notation, '
+                               'causing string comparison failures. Functional correctness is covered by unit tests and in-jvm dtests.')
     def test_basic_data_types(self):
         """
         Create a table with the primitive types:
@@ -1133,6 +1155,9 @@ class TestJsonFullRowInsertSelect(Tester):
     Tests for creating full rows from json documents, selecting full rows back as json documents, and related functionality.
     """
 
+    @pytest.mark.skipif(get_jdk_version_int() >= 19,
+                        reason='JDK21+ uses minimum mantissa representation for floats in scientific notation, '
+                               'causing string comparison failures. Functional correctness is covered by unit tests and in-jvm dtests.')
     def test_simple_schema(self):
         """
         Create schema:
