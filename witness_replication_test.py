@@ -37,7 +37,6 @@ class TableMetrics(object):
         self.jmx = JolokiaAgent(node)
         self.write_latency_mbean = make_mbean("metrics", type="Table", name="WriteLatency", keyspace=keyspace, scope=table)
         self.speculative_reads_mbean = make_mbean("metrics", type="Table", name="SpeculativeRetries", keyspace=keyspace, scope=table)
-        self.transient_writes_mbean = make_mbean("metrics", type="Table", name="TransientWrites", keyspace=keyspace, scope=table)
 
     @property
     def write_count(self):
@@ -46,10 +45,6 @@ class TableMetrics(object):
     @property
     def speculative_reads(self):
         return self.jmx.read_attribute(self.speculative_reads_mbean, "Count")
-
-    @property
-    def transient_writes(self):
-        return self.jmx.read_attribute(self.transient_writes_mbean, "Count")
 
     def start(self):
         self.jmx.start()
@@ -160,8 +155,8 @@ def get_sstable_data(cls, node, keyspace):
     assert len(names) == len(repaired_times) == len(pending_repairs)
     return [SSTable(*a) for a in zip(names, repaired_times, pending_repairs)]
 
-@since('4.0')
-class TransientReplicationBase(Tester):
+@since('5.1')
+class WitnessReplicationBase(Tester):
 
     keyspace = "ks"
     table = "tbl"
@@ -179,7 +174,7 @@ class TransientReplicationBase(Tester):
     def set_nodes(self):
         self.node1, self.node2, self.node3 = self.nodes
 
-        # Make sure digest is not attempted against the transient node
+        # Make sure digest is not attempted against the witness node
         self.node3.byteman_submit([mk_bman_path('throw_on_digest.btm')])
 
     def use_lcs(self):
@@ -277,12 +272,12 @@ class TransientReplicationBase(Tester):
     def generate_rows(self, partitions, rows):
         return [[pk, ck, pk+ck] for ck in range(rows) for pk in range(partitions)]
 
-@since('4.0')
-class TestTransientReplication(TransientReplicationBase):
+@since('5.1')
+class TestWitnessReplication(WitnessReplicationBase):
 
     @pytest.mark.no_vnodes
-    def test_transient_noop_write(self):
-        """ If both full replicas are available, nothing should be written to the transient replica """
+    def test_witness_noop_write(self):
+        """ If both full replicas are available, nothing should be written to the witness replica """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -301,8 +296,8 @@ class TestTransientReplication(TransientReplicationBase):
         self.assert_has_no_sstables(self.node3, flush=True)
 
     @pytest.mark.no_vnodes
-    def test_transient_write(self):
-        """ If write can't succeed on full replica, it's written to the transient node instead """
+    def test_witness_write(self):
+        """ If write can't succeed on full replica, it's written to the witness node instead """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -322,13 +317,13 @@ class TestTransientReplication(TransientReplicationBase):
         self.assert_local_rows(self.node2,
                                [[1, 1, 1]])
 
-        # transient replica should hold only the second row
+        # witness replica should hold only the second row
         self.assert_local_rows(self.node3,
                                [[1, 2, 2]])
 
     @pytest.mark.no_vnodes
-    def test_transient_full_merge_read(self):
-        """ When reading, transient replica should serve a missing read """
+    def test_witness_full_merge_read(self):
+        """ When reading, witness replica should serve a missing read """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -341,7 +336,7 @@ class TestTransientReplication(TransientReplicationBase):
         # Stop reads from the node that will hold the second row
         self.node1.stop()
 
-        # Whether we're reading from the full node or from the transient node, we should get consistent results
+        # Whether we're reading from the full node or from the witness node, we should get consistent results
         for node in [self.node2, self.node3]:
             assert_all(self.exclusive_cql_connection(node),
                        "SELECT * FROM %s.%s" % (self.keyspace, self.table),
@@ -351,7 +346,7 @@ class TestTransientReplication(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
     def test_srp(self):
-        """ When reading, transient replica should serve a missing read """
+        """ When reading, witness replica should serve a missing read """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -366,23 +361,23 @@ class TestTransientReplication(TransientReplicationBase):
         # Stop reads from the node that will hold the second row
         self.node1.stop()
 
-        # Whether we're reading from the full node or from the transient node, we should get consistent results
+        # Whether we're reading from the full node or from the witness node, we should get consistent results
         assert_all(self.exclusive_cql_connection(self.node3),
                    "SELECT * FROM %s.%s LIMIT 1" % (self.keyspace, self.table),
                    [[1, 2, 2]],
                    cl=ConsistencyLevel.QUORUM)
 
     @pytest.mark.no_vnodes
-    def test_transient_full_merge_read_with_delete_transient_coordinator(self):
-        self._test_transient_full_merge_read_with_delete(self.node3)
+    def test_witness_full_merge_read_with_delete_witness_coordinator(self):
+        self._test_witness_full_merge_read_with_delete(self.node3)
 
     @pytest.mark.no_vnodes
-    def test_transient_full_merge_read_with_delete_full_coordinator(self):
-        self._test_transient_full_merge_read_with_delete(self.node2)
+    def test_witness_full_merge_read_with_delete_full_coordinator(self):
+        self._test_witness_full_merge_read_with_delete(self.node2)
 
     @pytest.mark.no_vnodes
-    def _test_transient_full_merge_read_with_delete(self, coordinator):
-        """ When reading, transient replica should serve a missing read """
+    def _test_witness_full_merge_read_with_delete(self, coordinator):
+        """ When reading, witness replica should serve a missing read """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -405,7 +400,7 @@ class TestTransientReplication(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
     def test_cheap_quorums(self):
-        """ writes shouldn't make it to transient nodes """
+        """ writes shouldn't make it to witness nodes """
         session = self.exclusive_cql_connection(self.node1)
         for node in self.nodes:
             self.assert_has_no_sstables(node)
@@ -423,7 +418,7 @@ class TestTransientReplication(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
     def test_speculative_write(self):
-        """ if a full replica isn't responding, we should send the write to the transient replica """
+        """ if a full replica isn't responding, we should send the write to the witness replica """
         session = self.exclusive_cql_connection(self.node1)
         self.node2.byteman_submit([mk_bman_path('slow_writes.btm')])
 
@@ -444,14 +439,14 @@ class TestTransientReplication(TransientReplicationBase):
         with pytest.raises(ConfigurationException):
             session.execute("ALTER KEYSPACE %s WITH REPLICATION={%s}" % (self.keyspace, replication_params))
 
-@since('4.0')
-class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase):
+@since('5.1')
+class TestWitnessReplicationRepairStreamEntireSSTable(WitnessReplicationBase):
 
     stream_entire_sstables = True
 
     def _test_speculative_write_repair_cycle(self, primary_range, optimized_repair, repair_coordinator, expect_node3_data, use_lcs=False):
         """
-        if one of the full replicas is not available, data should be written to the transient replica, but removed after incremental repair
+        if one of the full replicas is not available, data should be written to the witness replica, but removed after incremental repair
         """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
@@ -524,8 +519,8 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
                                                   use_lcs=True)
 
     @pytest.mark.no_vnodes
-    def test_transient_incremental_repair(self):
-        """ transiently replicated ranges should be skipped when coordinating repairs """
+    def test_witness_incremental_repair(self):
+        """ witnessly replicated ranges should be skipped when coordinating repairs """
         self._test_speculative_write_repair_cycle(primary_range=True,
                                                   optimized_repair=False,
                                                   repair_coordinator=self.node1,
@@ -533,7 +528,7 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
 
     @pytest.mark.no_vnodes
     def test_full_repair_from_full_replica(self):
-        """ full repairs shouldn't replicate data to transient replicas """
+        """ full repairs shouldn't replicate data to witness replicas """
         session = self.exclusive_cql_connection(self.node1)
         for node in self.nodes:
             self.assert_has_no_sstables(node)
@@ -551,8 +546,8 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
         self.assert_has_no_sstables(self.node3, flush=True)
 
     @pytest.mark.no_vnodes
-    def test_full_repair_from_transient_replica(self):
-        """ full repairs shouldn't replicate data to transient replicas """
+    def test_full_repair_from_witness_replica(self):
+        """ full repairs shouldn't replicate data to witness replicas """
         session = self.exclusive_cql_connection(self.node1)
         for node in self.nodes:
             self.assert_has_no_sstables(node)
@@ -569,13 +564,13 @@ class TestTransientReplicationRepairStreamEntireSSTable(TransientReplicationBase
         self.assert_has_sstables(self.node2, flush=True)
         self.assert_has_no_sstables(self.node3, flush=True)
 
-@since('4.0')
-class TestTransientReplicationRepairLegacyStreaming(TestTransientReplicationRepairStreamEntireSSTable):
+@since('5.1')
+class TestWitnessReplicationRepairLegacyStreaming(TestWitnessReplicationRepairStreamEntireSSTable):
 
     stream_entire_sstables = False
 
-@since('4.0')
-class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
+@since('5.1')
+class TestWitnessReplicationSpeculativeQueries(WitnessReplicationBase):
     def setup_schema(self):
         session = self.exclusive_cql_connection(self.node1)
         replication_params = OrderedDict()
@@ -587,7 +582,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
     def test_always_speculate(self):
-        """ If write can't succeed on full replica, it's written to the transient node instead """
+        """ If write can't succeed on full replica, it's written to the witness node instead """
         session = self.exclusive_cql_connection(self.node1)
         session.execute("ALTER TABLE %s.%s WITH speculative_retry = 'ALWAYS';" % (self.keyspace, self.table))
         self.insert_row(1, 1, 1)
@@ -604,7 +599,7 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
 
     @pytest.mark.no_vnodes
     def test_custom_speculate(self):
-        """ If write can't succeed on full replica, it's written to the transient node instead """
+        """ If write can't succeed on full replica, it's written to the witness node instead """
         session = self.exclusive_cql_connection(self.node1)
         session.execute("ALTER TABLE %s.%s WITH speculative_retry = '99.99PERCENTILE';" % (self.keyspace, self.table))
         self.insert_row(1, 1, 1)
@@ -619,8 +614,8 @@ class TestTransientReplicationSpeculativeQueries(TransientReplicationBase):
                         [1, 2, 2]],
                        cl=ConsistencyLevel.QUORUM)
 
-@since('4.0')
-class TestMultipleTransientNodes(TransientReplicationBase):
+@since('5.1')
+class TestMultipleWitnessNodes(WitnessReplicationBase):
 
     replication_factor = '5/2'
     tokens = [0, 1, 2, 3, 4]
@@ -635,8 +630,8 @@ class TestMultipleTransientNodes(TransientReplicationBase):
 
     @pytest.mark.resource_intensive
     @pytest.mark.no_vnodes
-    def test_transient_full_merge_read(self):
-        """ When reading, transient replica should serve a missing read """
+    def test_witness_full_merge_read(self):
+        """ When reading, witness replica should serve a missing read """
         for node in self.nodes:
             self.assert_has_no_sstables(node)
 
@@ -661,7 +656,7 @@ class TestMultipleTransientNodes(TransientReplicationBase):
         # Stop reads from the node that will hold the second row
         self.node1.stop()
 
-        # Whether we're reading from the full node or from the transient node, we should get consistent results
+        # Whether we're reading from the full node or from the witness node, we should get consistent results
         for node in [self.node2, self.node3, self.node4, self.node5]:
             assert_all(self.exclusive_cql_connection(node),
                        "SELECT * FROM %s.%s" % (self.keyspace, self.table),
