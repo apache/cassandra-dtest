@@ -31,6 +31,7 @@ bootstrap your development environment and then use [Homebrew](https://brew.sh)
 
 1. (Optional) Make sure brew is in a good state on your system ``brew doctor``
 2. ``brew install python3 libev``
+3. Make sure that AirPlay receiver is turned off because it also listens to port 7000
 
 ### Python Dependencies
 There are multiple external Python dependencies required to run DTests. 
