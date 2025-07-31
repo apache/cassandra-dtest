@@ -599,7 +599,7 @@ UPDATE varcharmaptable SET varcharvarintmap['Vitrum edere possum, mihi non nocet
             err = node1.run_cqlsh(cmds=cmd, cqlsh_options=options).stderr
 
         if self.cluster.version() >= LooseVersion('4.0'):
-            assert "Keyspace name must not be empty, more than 48 characters long, or contain non-alphanumeric-underscore characters (got 'ä')" in err
+            assert 'Keyspace name must not be empty and must contain alphanumeric or underscore characters only (got "ä")' in err
         else:
             assert '"ä" is not a valid keyspace name' in err
 
