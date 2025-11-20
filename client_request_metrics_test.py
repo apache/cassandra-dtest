@@ -623,7 +623,7 @@ def validate_sane_histogram_values(prefix, values, cassandra_version):
 def validate_zero_histogram_values(prefix, values):
     validators = defaultdict(lambda: is_zero)
     validators['RecentValues'] = is_zero_list
-    validators['Mean'] = is_none
+    validators['Mean'] = is_none_or_zero
     validators['DurationUnit'] = is_microseconds
     for k, v in values.items():
         validators[k](f"{prefix}{k}", v)
@@ -763,8 +763,8 @@ def is_non_negative(k, v):
     assert v >= 0, k
 
 
-def is_none(k, v):
-    assert v is None, k
+def is_none_or_zero(k, v):
+    assert v is None or v == 0 , k
 
 
 def is_microseconds(k, v):
