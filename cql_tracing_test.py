@@ -1,7 +1,7 @@
 import pytest
 import logging
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from dtest import Tester, create_ks
 

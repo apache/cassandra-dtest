@@ -9,7 +9,7 @@ from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks, mk_bman_path
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 logger = logging.getLogger(__name__)
 

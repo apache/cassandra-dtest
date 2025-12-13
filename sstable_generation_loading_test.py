@@ -2,7 +2,7 @@ import os
 import subprocess
 import time
 import distutils.dir_util
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import logging

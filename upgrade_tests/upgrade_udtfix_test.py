@@ -2,7 +2,7 @@ import pytest
 import logging
 
 from dtest import Tester
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from tools.misc import add_skip
 from .upgrade_manifest import build_upgrade_pairs, CASSANDRA_3_0, RUN_STATIC_UPGRADE_MATRIX
 

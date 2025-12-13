@@ -19,7 +19,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from dtest import Tester, get_ip_from_node, create_ks, mk_bman_path
 from tools.assertions import (assert_all, assert_crc_check_chance_equal,
                               assert_invalid, assert_none, assert_one,

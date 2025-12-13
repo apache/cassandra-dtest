@@ -7,7 +7,7 @@ import pytest
 import logging
 
 from collections import OrderedDict
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from uuid import UUID, uuid4
 
 from cassandra import ConsistencyLevel, InvalidRequest

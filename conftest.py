@@ -10,7 +10,7 @@ import re
 import shutil
 import time
 from datetime import datetime
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 # Python 3 imports
 from itertools import zip_longest
 

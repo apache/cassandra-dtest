@@ -4,7 +4,7 @@ import os
 import stat
 import struct
 import time
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 import pytest
 import logging
 

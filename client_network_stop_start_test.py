@@ -7,7 +7,7 @@ import string
 import time
 
 from ccmlib.node import TimeoutError
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from dtest import Tester
 from tools import sslkeygen
 

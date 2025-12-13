@@ -4,7 +4,7 @@ import re
 import string
 import tempfile
 import time
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 import pytest
 import parse
 import logging

@@ -3,7 +3,7 @@ import pytest
 import logging
 
 from datetime import datetime
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from threading import Event
 
 from cassandra import ConsistencyLevel as CL

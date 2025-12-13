@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import logging

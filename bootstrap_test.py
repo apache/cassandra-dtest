@@ -7,7 +7,7 @@ import threading
 import time
 import logging
 import signal
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from cassandra import ConsistencyLevel
 from cassandra.concurrent import execute_concurrent_with_args

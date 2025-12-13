@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 import traceback
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import cassandra

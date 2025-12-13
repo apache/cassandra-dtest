@@ -16,7 +16,7 @@ import tempfile
 
 import pytest
 from decimal import Decimal
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 

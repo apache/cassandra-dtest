@@ -7,7 +7,7 @@ import sys
 import pytest
 import logging
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from ccmlib import common
 from ccmlib.common import is_win

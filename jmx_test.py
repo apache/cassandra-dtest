@@ -8,7 +8,7 @@ import logging
 import ccmlib.common
 from ccmlib.node import ToolError
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, enable_jmx_ssl, make_mbean)

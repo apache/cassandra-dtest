@@ -3,7 +3,7 @@ import random
 import re
 import time
 import uuid
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import logging

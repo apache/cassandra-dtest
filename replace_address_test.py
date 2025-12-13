@@ -1,6 +1,6 @@
 import os
 import tempfile
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import logging

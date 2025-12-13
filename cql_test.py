@@ -13,7 +13,7 @@ from cassandra.policies import FallthroughRetryPolicy
 from cassandra.query import SimpleStatement
 
 from dtest import Tester, create_ks, mk_bman_path
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from thrift_bindings.thrift010.ttypes import \
     ConsistencyLevel as ThriftConsistencyLevel
 from thrift_bindings.thrift010.ttypes import (CfDef, Column, ColumnOrSuperColumn,

@@ -3,7 +3,7 @@ import logging
 import os
 import subprocess
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from cassandra import ConsistencyLevel
 from ccmlib.common import is_win

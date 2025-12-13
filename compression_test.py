@@ -3,7 +3,7 @@ import pytest
 import logging
 
 from dtest import create_ks
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from scrub_test import TestHelper
 from tools.assertions import assert_crc_check_chance_equal
 

@@ -2,7 +2,7 @@ import random
 import string
 import pytest
 import logging
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from ccmlib.node import ToolError
 from dtest import Tester

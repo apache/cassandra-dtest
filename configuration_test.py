@@ -8,7 +8,7 @@ from cassandra.concurrent import execute_concurrent_with_args
 
 from dtest import Tester, create_ks
 from tools.jmxutils import (JolokiaAgent, make_mbean)
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 logger = logging.getLogger(__name__)
 ported_to_in_jvm = pytest.mark.ported_to_in_jvm

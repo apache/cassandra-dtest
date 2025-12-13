@@ -10,7 +10,7 @@ from cassandra.query import SimpleStatement
 from tools.assertions import assert_invalid, assert_length_equal, assert_one
 from dtest import Tester, create_ks, create_cf, mk_bman_path
 from tools.data import rows_to_list
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 since = pytest.mark.since
 logger = logging.getLogger(__name__)

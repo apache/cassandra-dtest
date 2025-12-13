@@ -6,7 +6,7 @@ import pytest
 import logging
 
 from collections import OrderedDict
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from cassandra import ConsistencyLevel, InvalidRequest
 from cassandra.query import SimpleStatement

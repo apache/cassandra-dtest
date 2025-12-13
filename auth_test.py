@@ -3,7 +3,7 @@ import string
 import time
 from collections import namedtuple
 from datetime import datetime, timedelta
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 import re
 import pytest
 import logging

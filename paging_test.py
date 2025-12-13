@@ -5,7 +5,7 @@ import logging
 
 from flaky import flaky
 
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 from cassandra import ConsistencyLevel as CL
 from cassandra import InvalidRequest, ReadFailure, ReadTimeout

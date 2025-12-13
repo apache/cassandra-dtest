@@ -12,7 +12,7 @@ import re
 import time
 from collections import namedtuple
 from decimal import Decimal
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 from tempfile import NamedTemporaryFile, gettempdir, template
 from uuid import uuid1, uuid4
 

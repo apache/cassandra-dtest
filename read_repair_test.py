@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import glob
 import os
 import time
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import pytest
 import logging

@@ -1,4 +1,4 @@
-from distutils.version import LooseVersion
+from ccmlib.version import LooseVersion
 
 import logging
 import pytest
