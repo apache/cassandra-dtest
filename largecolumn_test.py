@@ -1,6 +1,8 @@
 import pytest
 import re
 import logging
+import subprocess
+import time
 
 from dtest import Tester
 
@@ -69,16 +71,28 @@ class TestLargeColumn(Tester):
         # Now run the full stack to warm up internal caches/pools
         LARGE_COLUMN_SIZE = 1024 * 1024 * 63
         self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
-        after1stLargeStress = self.directbytes(node1)
+        after1stLargeStress = self.directbytes_post_gc(node1)
         logger.info("After 1st large column stress, direct memory: {0}".format(after1stLargeStress))
 
         # Now run the full stack to see how much memory is allocated for the second "large" columns request
         self.stress_with_col_size(cluster, node1, LARGE_COLUMN_SIZE)
-        after2ndLargeStress = self.directbytes(node1)
+        after2ndLargeStress = self.directbytes_post_gc(node1)
         logger.info("After 2nd large column stress, direct memory: {0}".format(after2ndLargeStress))
 
         # We may allocate direct memory proportional to size of a request
         # but we want to ensure that when we do subsequent calls the used direct memory is not growing
-        diff = int(after2ndLargeStress) - int(after1stLargeStress)
+        diff = after2ndLargeStress - after1stLargeStress
         logger.info("Direct memory delta: {0}".format(diff))
         assert diff < LARGE_COLUMN_SIZE
+
+    def directbytes_post_gc(self, node):
+        """Trigger GC and wait for the Cleaner thread to release DirectByteBuffers.
+
+        Generational ZGC (JDK 21) only processes PhantomReferences during major
+        collections which may not run during short tests. After GC, the Cleaner
+        daemon thread decrements TOTAL_CAPACITY asynchronously, so we sleep to
+        allow it to complete.
+        """
+        subprocess.check_call(['jcmd', str(node.pid), 'GC.run'])
+        time.sleep(3)
+        return int(self.directbytes(node))
