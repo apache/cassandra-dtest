@@ -45,6 +45,17 @@ class BootstrapTester(Tester):
             r'Streaming error occurred'
         )
 
+    def _start_cluster_sequentially(self, cluster):
+        """Start all nodes one at a time, waiting for each to be ready.
+
+        Sequential startup is required for all Cassandra versions:
+          <= 5.0: simultaneous start causes token assignment conflicts (CASSANDRA-19097)
+          >= 5.1: seed must be reachable before non-seeds begin CMS discovery (CASSANDRA-21185)
+        """
+        for node in cluster.nodelist():
+            node.start(wait_for_binary_proto=True)
+        cluster.start()
+
     def _base_bootstrap_test(self, bootstrap=None, bootstrap_from_version=None,
                              enable_ssl=None):
         def default_bootstrap(cluster, token):
@@ -251,12 +262,7 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
-        if cluster.version() <= '5.0':
-            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
-            cluster.nodelist()[0].start(wait_for_binary_proto=True)
-            cluster.nodelist()[1].start(wait_for_binary_proto=True)
-            cluster.nodelist()[2].start(wait_for_binary_proto=True)
-        cluster.start()
+        self._start_cluster_sequentially(cluster)
 
         node1 = cluster.nodes['node1']
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor=2)'])
@@ -524,11 +530,7 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(2)
-        if cluster.version() <= '5.0':
-            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
-            cluster.nodelist()[0].start(wait_for_binary_proto=True)
-            cluster.nodelist()[1].start(wait_for_binary_proto=True)
-        cluster.start()
+        self._start_cluster_sequentially(cluster)
         (node1, node2) = cluster.nodelist()
 
         node1.stress(['write', 'n=1K', 'no-warmup', '-schema', 'replication(factor=2)',
@@ -630,12 +632,7 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
-        if cluster.version() <= '5.0':
-            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
-            cluster.nodelist()[0].start(wait_for_binary_proto=True)
-            cluster.nodelist()[1].start(wait_for_binary_proto=True)
-            cluster.nodelist()[2].start(wait_for_binary_proto=True)
-        cluster.start()
+        self._start_cluster_sequentially(cluster)
 
         stress_table = 'keyspace1.standard1'
 
@@ -671,12 +668,7 @@ class BootstrapTester(Tester):
         cluster = self.cluster
         cluster.set_environment_variable('CASSANDRA_TOKEN_PREGENERATION_DISABLED', 'True')
         cluster.populate(3)
-        if cluster.version() <= '5.0':
-            # Nodes need to be started one by one pre-TCM, not all at once. See CASSANDRA-19097
-            cluster.nodelist()[0].start(wait_for_binary_proto=True)
-            cluster.nodelist()[1].start(wait_for_binary_proto=True)
-            cluster.nodelist()[2].start(wait_for_binary_proto=True)
-        cluster.start()
+        self._start_cluster_sequentially(cluster)
 
         stress_table = 'keyspace1.standard1'
 
