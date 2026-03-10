@@ -1132,7 +1132,7 @@ class TestAuth(AbstractTestAuth):
         if self.dtest_config.cassandra_version_from_build >= '4.0':
             config['network_authorizer'] = 'org.apache.cassandra.auth.CassandraNetworkAuthorizer'
         self.cluster.set_configuration_options(values=config)
-        self.cluster.populate(nodes).start()
+        self.cluster.populate(nodes).start(jvm_args=['-Dcassandra.role_password_update_min_interval_in_ms=0'])
 
         n = self.cluster.wait_for_any_log('Created default superuser', 25)
         logger.debug("Default role created by " + n.name)
@@ -1189,7 +1189,8 @@ class TestAuthRoles(AbstractTestAuth):
                 'roles_validity_in_ms': 0,
                 'num_tokens': 1
             })
-        fixture_dtest_setup.cluster.populate(1, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem'])
+        fixture_dtest_setup.cluster.populate(1, debug=True).start(jvm_args=['-XX:-PerfDisableSharedMem',
+                                                                            '-Dcassandra.role_password_update_min_interval_in_ms=0'])
         nodes = fixture_dtest_setup.cluster.nodelist()
         fixture_dtest_setup.superuser = fixture_dtest_setup.patient_exclusive_cql_connection(nodes[0], user='cassandra', password='cassandra')
 

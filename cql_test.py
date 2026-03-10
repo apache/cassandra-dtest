@@ -54,7 +54,7 @@ class CQLTester(Tester):
             cluster.set_configuration_options(values=config)
 
         if not cluster.nodelist():
-            cluster.populate(nodes).start()
+            cluster.populate(nodes).start(jvm_args=['-Dcassandra.role_password_update_min_interval_in_ms=0'])
         node1 = cluster.nodelist()[0]
 
         session = self.patient_cql_connection(node1, protocol_version=protocol_version, user=user, password=password)
