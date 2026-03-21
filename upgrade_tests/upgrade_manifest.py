@@ -28,8 +28,8 @@ CASSANDRA_3_11 = '3.11'
 CASSANDRA_4_0 = '4.0'
 CASSANDRA_4_1 = '4.1'
 CASSANDRA_5_0 = '5.0'
-CASSANDRA_5_1 = '5.1'
-TRUNK = CASSANDRA_5_1
+CASSANDRA_6_0 = '6.0'
+TRUNK = CASSANDRA_6_0
 
 RUN_STATIC_UPGRADE_MATRIX = os.environ.get('RUN_STATIC_UPGRADE_MATRIX', '').lower() in ('yes', 'true')
 
@@ -111,8 +111,8 @@ def set_version_family():
         version_family = CASSANDRA_4_1
     elif current_version.vstring.startswith('5.0'):
         version_family = CASSANDRA_5_0
-    elif current_version.vstring.startswith('5.1'):
-        version_family = CASSANDRA_5_1
+    elif current_version.vstring.startswith('6.0'):
+        version_family = CASSANDRA_6_0
     else:
         # when this occurs, it's time to update this manifest a bit!
         raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
@@ -183,8 +183,8 @@ indev_5_0_x = VersionMeta(name='indev_5_0_x', family=CASSANDRA_5_0, variant='ind
 current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0.6', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
 
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
-# TODO – add current_5_1_x when this gets uncommented (when 5.1-alpha1 is released)
-# current_5_1_x = VersionMeta(name='current_5_1_x', family=CASSANDRA_5_1, variant='current', version='5.1-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+# TODO – add current_6_0_x when this gets uncommented (when 6.0-alpha1 is released)
+# current_6_0_x = VersionMeta(name='current_6_0_x', family=CASSANDRA_6_0, variant='current', version='6.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
 
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
