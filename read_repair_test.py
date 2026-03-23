@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import glob
 import os
 import time
+import re
 from ccmlib.version import LooseVersion
 
 import pytest
@@ -37,8 +38,11 @@ def byteman_validate(node, script, verbose=False, opts=None):
         os.path.join(cdir, 'build', '*'),
     ]
 
+    pattern = re.compile(r'accord-core-[0-9]+\.[0-9]+(\.[0-9]+)?(-(alpha|beta|rc)[0-9]+)?(-SNAPSHOT)?\.jar$')
+
     if os.path.exists(os.path.join(cdir, 'modules', 'accord')):
-        jars.append(glob.glob(os.path.join(cdir, 'modules', 'accord', 'accord-core', 'build', 'libs', 'accord-core-*-SNAPSHOT.jar'))[0])
+        candidates = glob.glob(os.path.join(cdir, 'modules', 'accord', 'accord-core', 'build', 'libs', 'accord-core-*.jar'))
+        jars.append([c for c in candidates if pattern.search(c)][0])
 
     byteman_cmd.append(':'.join(jars))
     byteman_cmd.append('org.jboss.byteman.check.TestScript')
