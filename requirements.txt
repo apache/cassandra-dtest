@@ -28,7 +28,7 @@ psutil==5.9.8
 py==1.11.0
 pycodestyle==2.10.0
 pyparsing==3.1.2
-pytest==7.0.1
+pytest==9.0.3
 pytest-repeat==0.9.1
 pytest-timeout==2.1.0
 PyYAML==6.0.1
