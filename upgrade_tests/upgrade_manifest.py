@@ -29,7 +29,8 @@ CASSANDRA_4_0 = '4.0'
 CASSANDRA_4_1 = '4.1'
 CASSANDRA_5_0 = '5.0'
 CASSANDRA_6_0 = '6.0'
-TRUNK = CASSANDRA_6_0
+CASSANDRA_7_0 = '7.0'
+TRUNK = CASSANDRA_7_0
 
 RUN_STATIC_UPGRADE_MATRIX = os.environ.get('RUN_STATIC_UPGRADE_MATRIX', '').lower() in ('yes', 'true')
 
@@ -113,6 +114,8 @@ def set_version_family():
         version_family = CASSANDRA_5_0
     elif current_version.vstring.startswith('6.0'):
         version_family = CASSANDRA_6_0
+    elif current_version.vstring.startswith('7.0'):
+        version_family = CASSANDRA_7_0
     else:
         # when this occurs, it's time to update this manifest a bit!
         raise RuntimeError("Testing upgrades from/to version %s is not supported. Please use a custom manifest (see upgrade_manifest.py)" % current_version.vstring)
@@ -180,12 +183,15 @@ indev_4_1_x = VersionMeta(name='indev_4_1_x', family=CASSANDRA_4_1, variant='ind
 current_4_1_x = VersionMeta(name='current_4_1_x', family=CASSANDRA_4_1, variant='current', version='4.1.11', min_proto_v=4, max_proto_v=5, java_versions=(8,11))
 
 indev_5_0_x = VersionMeta(name='indev_5_0_x', family=CASSANDRA_5_0, variant='indev', version='github:apache/cassandra-5.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
-current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0.7', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+current_5_0_x = VersionMeta(name='current_5_0_x', family=CASSANDRA_5_0, variant='current', version='5.0.8', min_proto_v=4, max_proto_v=5, java_versions=(11,17))
+
+indev_6_0_x = VersionMeta(name='indev_6_0_x', family=CASSANDRA_6_0, variant='indev', version='github:apache/cassandra-6.0', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
+current_6_0_x = VersionMeta(name='current_6_0_x', family=CASSANDRA_6_0, variant='current', version='6.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
+
 
 indev_trunk = VersionMeta(name='indev_trunk', family=TRUNK, variant='indev', version='github:apache/trunk', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
-# TODO – add current_6_0_x when this gets uncommented (when 6.0-alpha1 is released)
-# current_6_0_x = VersionMeta(name='current_6_0_x', family=CASSANDRA_6_0, variant='current', version='6.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
-
+# TODO – add current_7_0_x when this gets uncommented (when 7.0-alpha1 is released)
+# current_7_0_x = VersionMeta(name='current_7_0_x', family=CASSANDRA_7_0, variant='current', version='7.0-alpha1', min_proto_v=4, max_proto_v=5, java_versions=(11,17,21))
 
 # MANIFEST maps a VersionMeta representing a line/variant to a list of other VersionMeta's representing supported upgrades
 # Note on versions: 2.0 must upgrade to 2.1. Once at 2.1 or newer, upgrade is supported to any later version, including trunk (for now).
@@ -200,17 +206,19 @@ MANIFEST = {
     current_2_2_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     current_3_0_x: [indev_3_0_x, indev_3_11_x, indev_4_0_x, indev_4_1_x],
     current_3_11_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
-    current_4_0_x:  [indev_4_0_x, indev_4_1_x, indev_5_0_x, indev_trunk],
-    current_4_1_x:  [indev_4_1_x, indev_5_0_x, indev_trunk],
-    current_5_0_x:  [indev_5_0_x, indev_trunk],
+    current_4_0_x:  [indev_4_0_x, indev_4_1_x, indev_5_0_x, indev_6_0_x],
+    current_4_1_x:  [indev_4_1_x, indev_5_0_x, indev_6_0_x, indev_trunk],
+    current_5_0_x:  [indev_5_0_x, indev_6_0_x, indev_trunk],
+    current_6_0_x:  [indev_6_0_x, indev_trunk],
 
     indev_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
     indev_3_0_x: [indev_3_11_x, indev_4_0_x, indev_4_1_x],
     indev_3_11_x: [indev_4_0_x, indev_4_1_x],
-    indev_4_0_x:  [indev_4_1_x, indev_5_0_x, indev_trunk],
-    indev_4_1_x:  [indev_5_0_x, indev_trunk],
-    indev_5_0_x:  [indev_trunk]
+    indev_4_0_x:  [indev_4_1_x, indev_5_0_x, indev_6_0_x],
+    indev_4_1_x:  [indev_5_0_x, indev_6_0_x, indev_trunk],
+    indev_5_0_x:  [indev_6_0_x, indev_trunk],
+    indev_6_0_x:  [indev_trunk]
 }
 
 def _have_common_proto(origin_meta, destination_meta):
