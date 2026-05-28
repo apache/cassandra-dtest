@@ -48,6 +48,7 @@ if len(config.read(os.path.expanduser('~/.cassandra-dtest'))) > 0:
 
 MAJOR_VERSION_4 = LooseVersion('4.0')
 MAJOR_VERSION_5 = LooseVersion('5.0')
+MAJOR_VERSION_6 = LooseVersion('6.0')
 
 logger = logging.getLogger(__name__)
 
@@ -557,3 +558,11 @@ def hack_legacy_parsing(node):
             fd.seek(0)
             fd.writelines(contents)
 
+def needs_cms_initialize(cluster):
+    node = cluster.nodelist()[0]
+    if node.get_cassandra_version() < MAJOR_VERSION_6:
+        return False
+
+    res = node.nodetool("cms").stdout
+    logger.debug(res)
+    return any(line.strip() == "Service State: GOSSIP" for line in res.splitlines())
