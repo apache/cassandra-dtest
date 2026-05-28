@@ -18,7 +18,7 @@ from queue import Empty, Full
 from cassandra import ConsistencyLevel, WriteTimeout, DriverException, OperationTimedOut
 from cassandra.query import SimpleStatement
 
-from dtest import Tester
+from dtest import Tester, needs_cms_initialize
 from tools.misc import generate_ssl_stores, new_node
 from .upgrade_manifest import (build_upgrade_pairs, jdk_compatible_steps, current_2_2_x,
                                current_3_0_x, current_3_11_x,
@@ -499,7 +499,7 @@ class TestUpgrade(Tester):
                 self._check_counters()
                 self._check_select_count()
 
-        if self.cluster.version() >= '5.1':
+        if needs_cms_initialize(self.cluster):
             self.cluster.nodelist()[0].nodetool("cms initialize")
         # run custom post-upgrade callables
         for call in after_upgrade_call:
