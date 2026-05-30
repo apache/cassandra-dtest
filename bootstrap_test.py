@@ -396,8 +396,11 @@ class BootstrapTester(Tester):
             node2.set_configuration_options(values={'initial_token': tokens[2]})
             node3_token = tokens[1]  # Add node 3 between node1 and node2
 
-        cluster.start()
+        # Skip paxos repair during topology changes when testing with replicas down,
+        # as paxos repair requires reaching other nodes. This is necessary with Paxos v2 enabled.
+        jvm_args = ["-Dcassandra.skip_paxos_repair_on_topology_change=true"]
 
+        cluster.start(jvm_args=jvm_args)
         node1.stress(['write', 'n=10K', 'no-warmup', '-rate', 'threads=8', '-schema', 'replication(factor={})'.format(rf)])
 
         # change system_auth keyspace to 2 (default is 1) to avoid
@@ -416,9 +419,12 @@ class BootstrapTester(Tester):
 
         node3 = new_node(cluster, token=node3_token)
 
-        jvmargs = ["-Dcassandra.consistent.rangemovement={}".format(consistent_range_movement)]
+        jvmargs = ["-Dcassandra.consistent.rangemovement={}".format(consistent_range_movement),
+                   "-Dcassandra.skip_paxos_repair_on_topology_change=true"]
+
         if cluster.version() >= LooseVersion('5.1'):
             node3.set_configuration_options(values={'progress_barrier_min_consistency_level': 'NODE_LOCAL', 'progress_barrier_default_consistency_level': 'NODE_LOCAL', 'progress_barrier_timeout': '2000ms'})
+
         node3.start(wait_for_binary_proto=successful_bootstrap_expected,
                     wait_other_notice=successful_bootstrap_expected,
                     jvm_args=jvmargs)

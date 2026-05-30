@@ -46,7 +46,7 @@ class BaseReplaceAddressTest(Tester):
             r'peer 127.0.0.1:7000 is probably down'
         )
 
-    def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False):
+    def _setup(self, n=3, opts=None, enable_byteman=False, mixed_versions=False, jvm_args=None):
         logger.debug("Starting cluster with {} nodes.".format(n))
         self.cluster.populate(n)
         if opts is not None:
@@ -69,7 +69,9 @@ class BaseReplaceAddressTest(Tester):
             self.cluster.set_install_dir(version="2.2.4")
             self.install_nodetool_legacy_parsing()
 
-        jvm_args = []
+        if jvm_args is None:
+            jvm_args = []
+
         if self.cluster.cassandra_version() >= '4.0':
             jvm_args.append("-Dcassandra.failed_bootstrap_timeout_ms=30000")
 
@@ -614,7 +616,8 @@ class TestReplaceAddress(BaseReplaceAddressTest):
         self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [
             r'Unable to find sufficient sources for streaming range']
 
-        self._setup(n=3)
+        # Skip paxos repair during topology changes when testing with replicas down (necessary w/ Paxos v2)
+        self._setup(n=3, jvm_args=["-Dcassandra.skip_paxos_repair_on_topology_change=true"])
         self._insert_data(rf=2)
 
         self._stop_node_to_replace()
@@ -631,9 +634,11 @@ class TestReplaceAddress(BaseReplaceAddressTest):
             options = {'progress_barrier_min_consistency_level': 'ONE',
                        'progress_barrier_default_consistency_level': 'ONE'}
 
+        # Skip paxos repair during topology changes when testing with replicas down (necessary w/ Paxos v2)
         self._do_replace(wait_for_binary_proto=False,
                          wait_other_notice=False,
-                         opts=options)
+                         opts=options,
+                         extra_jvm_args=["-Dcassandra.skip_paxos_repair_on_topology_change=true"])
 
         # replace should fail due to insufficient replicas
         self.replacement_node.watch_log_for("Unable to find sufficient sources for streaming range")

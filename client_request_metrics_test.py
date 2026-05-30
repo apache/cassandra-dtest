@@ -379,7 +379,13 @@ class TestClientRequestMetrics(Tester):
 
         assert diff['Latency.Count'] == query_count
         assert diff['TotalLatency.Count'] > 0
-        assert 0 < diff['ContentionHistogram.Count'] <= query_count
+
+        # Only check contention for Paxos v1
+        node = self.cluster.nodelist()[0]
+        paxos_variant = node.get_conf_option('paxos_variant')
+        # XXX if Config.paxos_variant changes from v1 so must this assumption about None
+        if paxos_variant is None or paxos_variant.startswith('v1'):
+            assert 0 < diff['ContentionHistogram.Count'] <= query_count
 
     def cas_read_failures(self):
         self.read_failures_variant('CASRead', f"WHERE k={TOMBSTONE_FAIL_KEY}",
