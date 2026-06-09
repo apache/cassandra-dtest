@@ -1,4 +1,5 @@
 import os
+import socket
 import subprocess
 import time
 import hashlib
@@ -66,9 +67,15 @@ def generate_ssl_stores(base_dir, passphrase='cassandra'):
         return
 
     logger.debug("generating keystore.jks in [{0}]".format(base_dir))
+    local_ip = socket.gethostbyname(socket.gethostname())
+    ips = ['127.0.0.{}'.format(i) for i in range(1, 17)]
+    if local_ip not in ips:
+        ips.append(local_ip)
+    san = 'dns:localhost,' + ','.join('ip:' + ip for ip in ips)
     subprocess.check_call(['keytool', '-genkeypair', '-alias', 'ccm_node', '-keyalg', 'RSA', '-validity', '365',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'), '-storepass', passphrase,
-                           '-dname', 'cn=Cassandra Node,ou=CCMnode,o=DataStax,c=US', '-keypass', passphrase])
+                           '-dname', 'cn=Cassandra Node,ou=CCMnode,o=DataStax,c=US', '-keypass', passphrase,
+                           '-ext', 'SAN=' + san])
     logger.debug("exporting cert from keystore.jks in [{0}]".format(base_dir))
     subprocess.check_call(['keytool', '-export', '-rfc', '-alias', 'ccm_node',
                            '-keystore', os.path.join(base_dir, 'keystore.jks'),
