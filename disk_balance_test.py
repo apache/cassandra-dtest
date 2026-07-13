@@ -97,8 +97,11 @@ class TestDiskBalance(Tester):
                      jmx_port='7500', remote_debug_port='0', initial_token=None,
                      binary_interface=(node5_address, 9042))
         self.cluster.add(node5, False, data_center="dc1")
+        # Paxos v2 (dtest-latest) paxos repair (while bootstrapping replacement node) can time out and retry
+        paxos_variant = node1.get_conf_option('paxos_variant')
+        startup_timeout = 600 if paxos_variant is not None and paxos_variant.startswith('v2') else 180
         node5.start(jvm_args=["-Dcassandra.replace_address_first_boot={}".format(node2.address())],
-                    wait_for_binary_proto=180,
+                    wait_for_binary_proto=startup_timeout,
                     wait_other_notice=True)
 
         logger.debug("Checking replacement node is balanced")
@@ -108,9 +111,15 @@ class TestDiskBalance(Tester):
         cluster = self.cluster
         if self.dtest_config.use_vnodes:
             cluster.set_configuration_options(values={'num_tokens': 256})
-        cluster.populate(4).start()
+        cluster.populate(4)
         node1 = cluster.nodes['node1']
         node4 = cluster.nodes['node4']
+        paxos_variant = node1.get_conf_option('paxos_variant')
+        if paxos_variant is not None and paxos_variant.startswith('v2'):
+            # Ignore ERROR logging around Paxos v2 (dtest-latest) paxos repairs timing out
+            self.fixture_dtest_setup.ignore_log_patterns = list(self.fixture_dtest_setup.ignore_log_patterns) + [r'Error during paxos repair']
+
+        cluster.start()
         node1.stress(['write', 'n=50k', 'no-warmup', '-rate', 'threads=100', '-schema', 'replication(factor=2)',
                       'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
