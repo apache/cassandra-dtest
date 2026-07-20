@@ -224,9 +224,9 @@ class JolokiaAgent(object):
                     logger.info("Jolokia reports being attached on try %s, returning successfully" % i)
                     return;
                 if i < tries - 1:
-                    logger.warn("Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc))
-                    logger.warn("Exit status was: %d" % (exc.returncode,))
-                    logger.warn("Output was: %s" % (exc.output,))
+                    logger.warning("Failed to start jolokia agent (command was: %s): %s" % (' '.join(args), exc))
+                    logger.warning("Exit status was: %d" % (exc.returncode,))
+                    logger.warning("Output was: %s" % (exc.output,))
                     time.sleep(2)
                 else:
                     raise

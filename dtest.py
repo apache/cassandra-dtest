@@ -363,7 +363,7 @@ def create_cf(session, name, key_type="varchar", speculative_retry=None, read_re
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
     #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
     session.execute('SELECT * FROM %s LIMIT 1' % name);
@@ -373,7 +373,7 @@ def create_cf_simple(session, name, query):
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create cf query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create cf query \'%s\'' % query)
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
     #Going to ignore OperationTimedOut from create CF, so need to validate it was indeed created
     session.execute('SELECT * FROM %s LIMIT 1' % name)
@@ -393,7 +393,7 @@ def create_ks(session, name, rf):
     try:
         retry_till_success(session.execute, query=query, timeout=120, bypassed_exception=cassandra.OperationTimedOut)
     except cassandra.AlreadyExists:
-        logger.warn('AlreadyExists executing create ks query \'%s\'' % query)
+        logger.warning('AlreadyExists executing create ks query \'%s\'' % query)
 
     session.cluster.control_connection.wait_for_schema_agreement(wait_time=120)
     #Also validates it was indeed created even though we ignored OperationTimedOut
