@@ -15,7 +15,7 @@ from ccmlib.node import Node, TimeoutError, NodeError
 from parse import parse
 
 from dtest import Tester, create_ks
-from tools.assertions import (assert_almost_equal, assert_none, assert_one, assert_lists_equal_ignoring_order)
+from tools.assertions import (assert_almost_equal, assert_all, assert_none, assert_one, assert_lists_equal_ignoring_order)
 from tools.data import rows_to_list
 
 since = pytest.mark.since
@@ -34,7 +34,7 @@ class TestCommitLog(Tester):
     def fixture_set_cluster_settings(self, fixture_dtest_setup):
         if fixture_dtest_setup.dtest_config.cassandra_version_from_build >= '3.0':
             fixture_dtest_setup.cluster.set_configuration_options({'enable_materialized_views': 'true'})
-        fixture_dtest_setup.cluster.populate(1)
+        fixture_dtest_setup.cluster.populate(1, install_byteman=True)
         [self.node1] = fixture_dtest_setup.cluster.nodelist()
 
         yield
@@ -286,6 +286,76 @@ class TestCommitLog(Tester):
         session = self.patient_cql_connection(node1)
         res = session.execute("SELECT * FROM Test. users")
         assert_lists_equal_ignoring_order(rows_to_list(res), [['gandalf', 1955, 'male', 'p@$$', 'WA']])
+
+    def verify_commit_log_replay(self, mark=None):
+        node = self.node1
+
+        logger.debug("Verify commitlog was written before abrupt stop")
+        commitlog_dir = os.path.join(node.get_path(), 'commitlogs')
+        commitlog_files = os.listdir(commitlog_dir)
+        assert len(commitlog_files) > 0
+
+        logger.debug("Verify commit log was replayed on startup")
+        node.watch_log_for("Startup complete", from_mark=mark)
+        replays = [x[0] for x in node.grep_log(r" \d+ replayed mutations", from_mark=mark)]
+        assert 0 < sum([parse('{} {num_mutations:d} replayed mutations{}', x).named['num_mutations'] for x in replays])
+
+    def test_commitlog_replay_schema_mutation_ordering(self):
+        """
+        Test commit log replay schema mutation ordering
+
+        @jira_ticket CASSANDRA-16878
+        """
+        node = self.node1
+        node.set_batch_commitlog(enabled=True)
+        node.start(jvm_args=["-Dcassandra.test.flush_local_schema_changes=false"])
+
+        logger.debug("Insert data")
+        session = self.patient_cql_connection(node)
+        create_ks(session, 'ks', 1)
+        session.execute("CREATE TABLE t (k int PRIMARY KEY, a int, b int)")
+        session.execute("INSERT INTO ks.t (k, a, b) VALUES(1, 10, 100)")
+
+        logger.debug("Verify data is present")
+        session = self.patient_cql_connection(node)
+        assert_one(session, "SELECT * FROM ks.t", [1, 10, 100])
+
+        logger.debug("Verify no SSTables were flushed before abrupt stop")
+        assert 0 == len(node.get_sstables('ks', 't'))
+
+        logger.debug("Kill the node and restart it to produce a commitlog replay")
+        mark = node.mark_log()
+        node.stop(gently=False)
+        node.start(jvm_args=["-Dcassandra.test.flush_local_schema_changes=false"])
+        self.verify_commit_log_replay(mark)
+
+        logger.debug("Verify that the replayed data is present")
+        session = self.patient_cql_connection(node)
+        assert_one(session, "SELECT * FROM ks.t", [1, 10, 100])
+
+        logger.debug("Insert data with interleaved schema changes")
+        session.execute("INSERT INTO ks.t (k, a, b) VALUES(2, 20, 100)")
+        session.execute("ALTER TABLE ks.t ADD c int")
+        session.execute("INSERT INTO ks.t (k, a, b, c) VALUES(3, 30, 300, 3000)")
+        session.execute("ALTER TABLE ks.t DROP b")
+        session.execute("INSERT INTO ks.t (k, a, c) VALUES(4, 40, 4000)")
+
+        logger.debug("Restart the node using a byteman script that slows down schema reloads")
+        mark = node.mark_log()
+        node.stop(gently=False)
+        if self.cluster.version() < '4.0':
+            node.update_startup_byteman_script('./byteman/pre4.0/delay_schema_reload.btm')
+        else:
+            node.update_startup_byteman_script('./byteman/4.0/delay_schema_reload.btm')
+        node.start(jvm_args=["-Dcassandra.test.flush_local_schema_changes=false"])
+        node.watch_log_for("Byteman-injected delay before schema reload", from_mark=mark)
+        self.verify_commit_log_replay(mark)
+
+        logger.debug("Verify that the replayed data and schema are present")
+        session = self.patient_cql_connection(node)
+        expected_rows = [[1, 10, None], [2, 20, None], [4, 40, 4000], [3, 30, 3000]]
+        assert_all(session, "SELECT * FROM ks.t", ignore_order=False, expected=expected_rows)
+        assert_all(session, "SELECT k, a, c FROM ks.t", ignore_order=False, expected=expected_rows)
 
     def test_default_segment_size(self):
         """

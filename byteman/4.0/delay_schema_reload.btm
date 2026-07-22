@@ -1,0 +1,12 @@
+#
+# Delay schema reloading
+#
+RULE delay reload scheme
+CLASS org.apache.cassandra.schema.Schema
+METHOD reloadSchema
+AT ENTRY
+IF TRUE
+DO
+org.slf4j.LoggerFactory.getLogger("byteman").info("Byteman-injected delay before schema reload");
+java.lang.Thread.sleep(2000);
+ENDRULE
