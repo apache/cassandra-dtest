@@ -153,7 +153,7 @@ class TestMaterializedViews(Tester):
 
             elapsed = (time.time() - start) / 60
             if elapsed > wait_minutes:
-                pytest.fail("The MV build hasn't started in 2 minutes.")
+                pytest.fail(reason="The MV build hasn't started in 2 minutes.")
 
     def _insert_data(self, session):
         # insert data
@@ -1419,7 +1419,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 4, 1])
         except AssertionError as ae:
             if (time.time() - start) >= 100:
-                pytest.fail("Please increase the 100 TTL which expired before we could test due to a slow env.")
+                pytest.fail(reason="Please increase the 100 TTL which expired before we could test due to a slow env.")
             else:
                 raise ae
 
@@ -1430,7 +1430,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 5, 1])
         except AssertionError as ae:
             if (time.time() - start) >= 80:
-                pytest.fail("Please increase the 80 TTL which expired before we could test due to a slow env.")
+                pytest.fail(reason="Please increase the 80 TTL which expired before we could test due to a slow env.")
             else:
                 raise ae
 
@@ -1441,7 +1441,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 6, 1])
         except AssertionError as ae:
             if (time.time() - start) >= 60:
-                pytest.fail("Please increase the 60 TTL which expired before we could test due to a slow env.")
+                pytest.fail(reason="Please increase the 60 TTL which expired before we could test due to a slow env.")
             else:
                 raise ae
 
@@ -1452,7 +1452,7 @@ class TestMaterializedViews(Tester):
                 assert_one(session, "SELECT * FROM mv", [1, 6, 1])
             except AssertionError as ae:
                 if (time.time() - start) >= 60:
-                    pytest.fail("Please increase the 60 TTL which expired before we could test due to a slow env.")
+                    pytest.fail(reason="Please increase the 60 TTL which expired before we could test due to a slow env.")
                 else:
                     raise ae
 
@@ -1555,7 +1555,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 1, 1, None])
         except AssertionError as ae:
             if (time.time() - start) >= 30:
-                pytest.fail("Please increase the 30 TTL which expired before we could test due to a slow env.")
+                pytest.fail(reason="Please increase the 30 TTL which expired before we could test due to a slow env.")
             else:
                 raise ae
 
@@ -1571,7 +1571,7 @@ class TestMaterializedViews(Tester):
             assert_one(session, "SELECT * FROM mv", [1, 1, None, None])
         except AssertionError as ae:
             if (time.time() - start) >= 30:
-                pytest.fail("Please increase the 30 TTL which expired before we could test due to a slow env.")
+                pytest.fail(reason="Please increase the 30 TTL which expired before we could test due to a slow env.")
             else:
                 raise ae
 
@@ -1926,10 +1926,10 @@ class TestMaterializedViews(Tester):
                 if expect_digest:
                     break
                 else:
-                    pytest.fail("Encountered digest mismatch when we shouldn't")
+                    pytest.fail(reason="Encountered digest mismatch when we shouldn't")
         else:
             if expect_digest:
-                pytest.fail("Didn't find digest mismatch")
+                pytest.fail(reason="Didn't find digest mismatch")
 
     def test_simple_repair_by_base(self):
         self._simple_repair_test(repair_base=True)
@@ -2922,7 +2922,7 @@ class TestMaterializedViewsConsistency(Tester):
             try:
                 mm = queues[i % processes].get(timeout=60)
             except Empty as e:
-                pytest.skip("Failed to get range {range} within timeout from queue. {error}".format(range=i, error=str(e)))
+                pytest.skip(reason="Failed to get range {range} within timeout from queue. {error}".format(range=i, error=str(e)))
 
             if not mm.out() is None:
                 logger.debug("\r{}\n" .format(mm.out()))

@@ -182,7 +182,7 @@ class DTestSetup(object):
                 message += "\n{nodename}: {error}".format(nodename=nodename, error=error)
 
         logger.debug('Errors were just seen in logs, ending test (if not ending already)!')
-        pytest.fail("Error details: \n{message}".format(message=message))
+        pytest.fail(reason="Error details: \n{message}".format(message=message))
 
     def copy_logs(self, directory=None, name=None):
         """Copy the current cluster's log files somewhere, by default to LOG_SAVED_DIR with a name of 'last'"""

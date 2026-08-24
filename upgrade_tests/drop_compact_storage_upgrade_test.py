@@ -45,7 +45,7 @@ class TestDropCompactStorage(Tester):
     def drop_compact_storage(self, session, *args):
         try:
             session.execute("ALTER TABLE drop_compact_storage_test.test DROP COMPACT STORAGE")
-            pytest.fail("No exception has been thrown")
+            pytest.fail(reason="No exception has been thrown")
         except InvalidRequest as e:
             for _ in args:
                 assert _ in str(e)

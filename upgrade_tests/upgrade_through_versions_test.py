@@ -356,10 +356,10 @@ class TestUpgrade(Tester):
 
     def prepare(self):
         if type(self).__name__ == "TestUpgrade":
-            pytest.skip("Skip base class, only generated classes run the tests")
+            pytest.skip(reason="Skip base class, only generated classes run the tests")
 
         if len(self.test_version_metas) < 2: # need at least two versions to upgrade through - if it is less, it means that we cannot find needed JDKs for running all versions
-            pytest.skip("Skipping upgrade test, not enough versions to upgrade through: {} - see the previous messages for more information".format(metas))
+            pytest.skip(reason="Skipping upgrade test, not enough versions to upgrade through: {} - see the previous messages for more information".format(metas))
 
         logger.debug("Upgrade test beginning, setting CASSANDRA_VERSION to {}, and jdk to {}. (Prior values will be restored after test)."
               .format(self.test_version_metas[0].version, self.test_version_metas[0].java_version))
@@ -804,7 +804,7 @@ class TestUpgrade(Tester):
             actual_num_rows = result[0][0]
             assert actual_num_rows == expected_num_rows, "SELECT COUNT(*) returned %s when expecting %s" % (actual_num_rows, expected_num_rows)
         else:
-            pytest.fail("Count query did not return")
+            pytest.fail(reason="Count query did not return")
 
 class BootstrapMixin(object):
     """

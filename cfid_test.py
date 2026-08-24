@@ -32,7 +32,7 @@ class TestCFID(Tester):
         try:
             cfs = os.listdir(node1.get_path() + "/data0/ks")
         except OSError:
-            pytest.fail("Path to sstables not valid.")
+            pytest.fail(reason="Path to sstables not valid.")
 
         # check that there are 5 unique directories
         assert len(cfs) == 5

@@ -1025,7 +1025,7 @@ class BootstrapTester(Tester):
 
         try:
             node2.nodetool('join')
-            pytest.fail('nodetool should have errored and failed to join ring')
+            pytest.fail(reason='nodetool should have errored and failed to join ring')
         except ToolError as t:
             assert "Cannot join the ring until bootstrap completes" in t.stdout
 
@@ -1050,7 +1050,7 @@ class BootstrapTester(Tester):
 
         try:
             node3.nodetool('join')
-            pytest.fail('nodetool should have errored and failed to join ring')
+            pytest.fail(reason='nodetool should have errored and failed to join ring')
         except ToolError as t:
             assert "Cannot join the ring until bootstrap completes" in t.stdout
 

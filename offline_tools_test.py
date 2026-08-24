@@ -355,7 +355,7 @@ class TestOfflineTools(Tester):
             #   Error opening zip file or JAR manifest missing : /home/mshuler/git/cassandra/lib/jamm-0.2.5.jar
             # The 2.1 installed jamm version is 0.3.0, but bin/cassandra.in.sh used by nodetool still has 0.2.5
             # (when this is fixed in CCM issue #463, install version='github:apache/cassandra-2.0' as below)
-            pytest.skip('Skipping 2.1 test due to jamm.jar version upgrade problem in CCM node configuration.')
+            pytest.skip(reason='Skipping 2.1 test due to jamm.jar version upgrade problem in CCM node configuration.')
         elif testversion < '3.0':
             logger.debug('Test version: {} - installing github:apache/cassandra-2.1'.format(testversion))
             cluster.set_install_dir(version='github:apache/cassandra-2.1')

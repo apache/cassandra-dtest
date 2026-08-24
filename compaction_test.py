@@ -194,7 +194,7 @@ class TestCompaction(Tester):
                     assert not "Data" in afile, afile
 
         except OSError:
-            pytest.fail("Path to sstables not valid.")
+            pytest.fail(reason="Path to sstables not valid.")
 
     @pytest.mark.parametrize("strategy", ['DateTieredCompactionStrategy'])
     def test_dtcs_deletion(self, strategy):
@@ -208,7 +208,7 @@ class TestCompaction(Tester):
         self.skip_if_not_supported(strategy)
 
         if strategy != 'DateTieredCompactionStrategy':
-            pytest.skip('Not implemented unless DateTieredCompactionStrategy is used')
+            pytest.skip(reason='Not implemented unless DateTieredCompactionStrategy is used')
 
         cluster = self.cluster
         cluster.populate(1).start()
@@ -546,7 +546,7 @@ class TestCompaction(Tester):
         @jira_ticket CASSANDRA-11550
         """
         if not hasattr(self, 'strategy') or strategy != 'LeveledCompactionStrategy':
-            pytest.skip('Not implemented unless LeveledCompactionStrategy is used')
+            pytest.skip(reason='Not implemented unless LeveledCompactionStrategy is used')
 
         cluster = self.cluster
         cluster.populate(1).start()
@@ -590,13 +590,13 @@ class TestCompaction(Tester):
 
     def skip_if_no_major_compaction(self, strategy):
         if self.cluster.version() < '2.2' and strategy == 'LeveledCompactionStrategy':
-            pytest.skip('major compaction not implemented for LCS in this version of Cassandra')
+            pytest.skip(reason='major compaction not implemented for LCS in this version of Cassandra')
 
     def skip_if_not_supported(self, strategy):
         if self.cluster.version() >= '5.0' and strategy == 'DateTieredCompactionStrategy':
-            pytest.skip('DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
+            pytest.skip(reason='DateTieredCompactionStrategy is not supported in Cassandra 5.0 and later')
         if self.cluster.version() < '5.0' and strategy == 'UnifiedCompactionStrategy':
-            pytest.skip('UnifiedCompactionStrategy is only supported in Cassandra 5.0 and later')
+            pytest.skip(reason='UnifiedCompactionStrategy is only supported in Cassandra 5.0 and later')
 
 def grep_sstables_in_each_level(node, table_name):
     output = node.nodetool('tablestats').stdout

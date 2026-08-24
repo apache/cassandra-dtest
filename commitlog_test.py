@@ -173,7 +173,7 @@ class TestCommitLog(Tester):
         """
         cluster_ver = self.cluster.version()
         if LooseVersion('3.1') <= cluster_ver < LooseVersion('3.7'):
-            pytest.skip("Fixed in 3.0.7 and 3.7")
+            pytest.skip(reason="Fixed in 3.0.7 and 3.7")
 
         node1 = self.node1
         node1.set_batch_commitlog(enabled=True, use_batch_window = self.cluster.version() < '5.0')

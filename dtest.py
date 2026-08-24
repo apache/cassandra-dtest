@@ -260,7 +260,7 @@ class Tester(object):
         for path in build_upgrade_pairs():
             if from_version.startswith(path.starting_meta.family) and to_version.startswith(path.upgrade_meta.family):
                 return None
-        pytest.fail("Upgrades from {} to {} are not supported and should not be tested".format(from_version, to_version))
+        pytest.fail(reason="Upgrades from {} to {} are not supported and should not be tested".format(from_version, to_version))
 
     def set_node_to_current_version(self, node):
         version = os.environ.get('CASSANDRA_VERSION')
@@ -290,7 +290,7 @@ class Tester(object):
         try:
             node.watch_log_for(msg, timeout=timeout, **kwargs)
         except TimeoutError:
-            pytest.fail("Log message was not seen within timeout:\n{0}".format(msg))
+            pytest.fail(reason="Log message was not seen within timeout:\n{0}".format(msg))
 
 
 def get_eager_protocol_version(cassandra_version):

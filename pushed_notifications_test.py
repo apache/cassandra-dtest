@@ -431,7 +431,7 @@ class TestVariousNotifications(Tester):
             except Exception:
                 raise
             else:
-                pytest.fail('Expected ReadFailure')
+                pytest.fail(reason='Expected ReadFailure')
 
         read_failure_query()
 
@@ -463,7 +463,7 @@ class TestVariousNotifications(Tester):
             except Exception:
                 raise
             else:
-                pytest.fail('Expected ReadFailure')
+                pytest.fail(reason='Expected ReadFailure')
 
         range_request_failure_query()
 

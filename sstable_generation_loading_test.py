@@ -44,7 +44,7 @@ class BaseSStableLoaderTester(Tester):
 
     def skip_base_class_test(self):
         if self.__class__.__name__ != 'TestBasedSSTableLoader' and self.upgrade_from is None:
-            pytest.skip("Don't need to run base class test, only derived classes")
+            pytest.skip(reason="Don't need to run base class test, only derived classes")
 
     def create_schema_40(self, session, ks, compression):
         create_ks(session, ks, rf=2)

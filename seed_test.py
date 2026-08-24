@@ -38,7 +38,7 @@ class TestGossiper(Tester):
         except Exception as e:
             raise e
         else:
-            pytest.fail("Expecting startup to raise a TimeoutError, but nothing was raised.")
+            pytest.fail(reason="Expecting startup to raise a TimeoutError, but nothing was raised.")
 
     @since('3.11.2', max_version='5.0.x')
     def test_startup_non_seed_with_peers(self):

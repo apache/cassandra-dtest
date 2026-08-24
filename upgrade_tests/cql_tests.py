@@ -88,7 +88,7 @@ class TestCQL(UpgradeTester):
         """ For large collections, make sure that we are printing warnings """
         for version in self.get_node_versions():
             if version >= '3.0':
-                pytest.skip('version {} not compatible with protocol version 2'.format(version))
+                pytest.skip(reason='version {} not compatible with protocol version 2'.format(version))
 
         # We only warn with protocol 2
         cursor = self.prepare(protocol_version=2)
@@ -1572,9 +1572,9 @@ class TestCQL(UpgradeTester):
 
             upgrade_to_version = self.get_node_version(is_upgraded=True)
             if LooseVersion('3.0.0') <= upgrade_to_version <= LooseVersion('3.0.6'):
-                pytest.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
+                pytest.skip(reason='CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
             elif LooseVersion('3.1') <= upgrade_to_version <= LooseVersion('3.6'):
-                pytest.skip('CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
+                pytest.skip(reason='CASSANDRA-11930 was fixed in 3.0.7 and 3.7')
 
             session.execute("TRUNCATE ks.cf")
 
@@ -5211,7 +5211,7 @@ class TestCQL(UpgradeTester):
             # since the protocol requires strings to be valid UTF-8, the error response to this is a ProtocolError
             try:
                 cursor.execute("insert into ks.invalid_string_literals (k, b) VALUES (0, '\xc2\x01')")
-                pytest.fail("Expected error")
+                pytest.fail(reason="Expected error")
             except ProtocolException as e:
                 assert "Cannot decode string as UTF8" in str(e)
 

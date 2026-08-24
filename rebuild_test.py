@@ -225,14 +225,14 @@ class TestRebuild(Tester):
         with pytest.raises(ToolError):
             logger.debug('Executing first rebuild -> '),
             node3.nodetool('rebuild dc1')
-            pytest.fail("Expected: FAILED")
+            pytest.fail(reason="Expected: FAILED")
 
         session.execute('USE ks')
         with pytest.raises(AssertionError):
             logger.debug('Checking data is complete -> '),
             for i in range(0, 20000):
                 query_c1c2(session, i, ConsistencyLevel.LOCAL_ONE)
-            pytest.fail('Expected: INCOMPLETE')
+            pytest.fail(reason='Expected: INCOMPLETE')
 
         logger.debug('Executing second rebuild -> '),
         node3.nodetool('rebuild dc1')
@@ -343,7 +343,7 @@ class TestRebuild(Tester):
 
         with pytest.raises(ToolError):
             node1.nodetool('rebuild -ks ks1 -ts (%s,%s]' % (node1_token, node2_token))
-            pytest.fail("range should not be owned by this node")
+            pytest.fail(reason="range should not be owned by this node")
 
     @since('3.10')
     @pytest.mark.no_vnodes
@@ -380,7 +380,7 @@ class TestRebuild(Tester):
 
         with pytest.raises(ToolError):
             node1.nodetool('rebuild -ks ks1 -ts (%s,%s] -s %s' % (node3_token, node1_token, node3_address))
-            pytest.fail("should not find sufficient sources")
+            pytest.fail(reason="should not find sufficient sources")
 
     @since('3.10')
     @pytest.mark.no_vnodes

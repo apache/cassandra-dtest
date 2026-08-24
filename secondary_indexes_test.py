@@ -130,7 +130,7 @@ class TestSecondaryIndexes(Tester):
                     assert expected_per_range > 0
                     break
             else:
-                pytest.fail("Didn't find matching trace event")
+                pytest.fail(reason="Didn't find matching trace event")
 
         query = SimpleStatement("SELECT * FROM ks.cf WHERE b='1';")
         result = session.execute(query, trace=True)
@@ -304,7 +304,7 @@ class TestSecondaryIndexes(Tester):
     def _execute_and_fail(self, operation, cql_string):
         try:
             operation()
-            pytest.fail("Expecting query {} to be invalid".format(cql_string))
+            pytest.fail(reason="Expecting query {} to be invalid".format(cql_string))
         except AssertionError as e:
             raise e
         except InvalidRequest:
@@ -591,10 +591,10 @@ class TestSecondaryIndexes(Tester):
                     on_failure(trace, regex, expected_matches, match_counts, event_source, min_matches, max_matches)
 
         def halt_on_failure(trace, regex, expected_matches, match_counts, event_source, min_expected, max_expected):
-            pytest.fail("Expected to find between {min} and {max} trace events matching {pattern} from {source}, "
-                      "but actually found {actual}. (Full counts: {all})"
-                      .format(min=min_expected, max=max_expected, pattern=regex, source=event_source,
-                              actual=match_counts[event_source], all=match_counts))
+            pytest.fail(reason="Expected to find between {min} and {max} trace events matching {pattern} from {source}, "
+                               "but actually found {actual}. (Full counts: {all})"
+                               .format(min=min_expected, max=max_expected, pattern=regex, source=event_source,
+                                       actual=match_counts[event_source], all=match_counts))
 
         def retry_on_failure(trace, regex, expected_matches, match_counts, event_source, min_expected, max_expected):
             logger.debug("Trace event inspection did not match expected, sleeping before re-fetching trace events. "

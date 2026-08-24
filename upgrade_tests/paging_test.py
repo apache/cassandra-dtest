@@ -660,8 +660,8 @@ class TestPagingData(BasePagingTester, PageAssertionMixin):
             min_version = min(self.get_node_versions())
             latest_version_with_bug = '2.2.3'
             if min_version <= latest_version_with_bug:
-                pytest.skip('known bug released in {latest_ver} and earlier (current min version {min_ver}); '
-                               'skipping'.format(latest_ver=latest_version_with_bug, min_ver=min_version))
+                pytest.skip(reason='known bug released in {latest_ver} and earlier (current min version {min_ver}); '
+                                      'skipping'.format(latest_ver=latest_version_with_bug, min_ver=min_version))
 
             logger.debug("Querying %s node" % ("upgraded" if is_upgraded else "old",))
             cursor.execute("TRUNCATE test")

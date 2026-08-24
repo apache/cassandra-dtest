@@ -221,8 +221,8 @@ def fixture_maybe_skip_tests_requiring_novnodes(request):
     """
     if request.node.get_closest_marker('no_vnodes'):
         if request.config.getoption("--use-vnodes"):
-            pytest.skip("Skipping test marked with no_vnodes as tests executed with vnodes enabled via the "
-                        "--use-vnodes command line argument")
+            pytest.skip(reason="Skipping test marked with no_vnodes as tests executed with vnodes enabled via the "
+                               "--use-vnodes command line argument")
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -369,8 +369,8 @@ def fixture_dtest_setup(request,
             errors = check_logs_for_errors(dtest_setup)
             if len(errors) > 0:
                 failed = True
-                pytest.fail('Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
-                            .format(errors=str.join(", ", errors)), pytrace=False)
+                pytest.fail(reason='Unexpected error found in node logs (see stdout for full details). Errors: [{errors}]'
+                                   .format(errors=str.join(", ", errors)), pytrace=False)
     finally:
         try:
             # save the logs for inspection
@@ -545,7 +545,7 @@ def fixture_skip_version(request, fixture_dtest_setup):
     if marker is not None:
         version_to_skip = LooseVersion(marker.args[0])
         if version_to_skip == fixture_dtest_setup.dtest_config.cassandra_version_from_build:
-            pytest.skip("Test marked not to run on version %s" % version_to_skip)
+            pytest.skip(reason="Test marked not to run on version %s" % version_to_skip)
 
 
 @pytest.fixture(scope='session', autouse=True)

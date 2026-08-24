@@ -390,7 +390,7 @@ class TestTTL(Tester):
             result = self.session1.execute_async(query + ";")
             result.result()
             if policy == 'REJECT' and overflow_policy_applies:
-                pytest.fail("should throw InvalidRequest")
+                pytest.fail(reason="should throw InvalidRequest")
             if self.cluster.version() >= '3.0' and overflow_policy_applies:  # client warn only on 3.0+
                 if policy == 'CAP':
                     logger.debug("Warning is {}".format(result.warnings[0]))

@@ -882,7 +882,7 @@ class TestAuth(AbstractTestAuth):
         def check_caching(attempt=0):
             attempt += 1
             if attempt > 3:
-                pytest.fail("Unable to verify cache expiry in 3 attempts, failing")
+                pytest.fail(reason="Unable to verify cache expiry in 3 attempts, failing")
 
             logger.debug("Attempting to verify cache expiry, attempt #{i}".format(i=attempt))
             # grant SELECT to cathy
@@ -903,7 +903,7 @@ class TestAuth(AbstractTestAuth):
                         check_caching(attempt)
                     else:
                         # legit failure
-                        pytest.fail("Expecting query to raise an exception, but nothing was raised.")
+                        pytest.fail(reason="Expecting query to raise an exception, but nothing was raised.")
                 except Unauthorized as e:
                     assert re.search("User cathy has no SELECT permission on <table ks.cf> or any of its parents", str(e))
 
@@ -2830,7 +2830,7 @@ class TestAuthUnavailable(AbstractTestAuth):
 
         try:
             self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
-            pytest.fail("Expected login attempt to raise an exception.")
+            pytest.fail(reason="Expected login attempt to raise an exception.")
         except NoHostAvailable as e:
             # From driver
             assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
@@ -2869,7 +2869,7 @@ class TestAuthUnavailable(AbstractTestAuth):
 
         try:
             self.patient_exclusive_cql_connection(node0, timeout=2, user='cassandra', password='cassandra')
-            pytest.fail("Expected login attempt to raise an exception.")
+            pytest.fail(reason="Expected login attempt to raise an exception.")
         except NoHostAvailable as e:
             # From driver
             assert isinstance(list(e.errors.values())[0], AuthenticationFailed)
@@ -3151,7 +3151,7 @@ class TestNetworkAuth(AbstractTestAuth):
     def assertUnauthorized(self, func):
         try:
             func()
-            pytest.fail("Expecting Unauthorized exception")
+            pytest.fail(reason="Expecting Unauthorized exception")
         except Unauthorized as _:
             pass
         except NoHostAvailable as e:

@@ -31,7 +31,7 @@ class TestSchemaChanges(Tester):
         elif original_version.vstring.startswith('2.1'):
             upgraded_version = 'github:apache/cassandra-2.2'
         else:
-            pytest.skip("This test is only designed to work with 2.0 and 2.1 right now")
+            pytest.skip(reason="This test is only designed to work with 2.0 and 2.1 right now")
 
         # start out with a major behind the previous version
 
@@ -55,7 +55,7 @@ class TestSchemaChanges(Tester):
 
         try:
             session.execute(SimpleStatement("SELECT * FROM test_upgrades.foo", consistency_level=ConsistencyLevel.ALL))
-            pytest.fail("expected failure")
+            pytest.fail(reason="expected failure")
         except (ReadTimeout, OperationTimedOut):
             logger.debug("Checking node2 for warning in log")
             node2.watch_log_for(pattern, timeout=10)
@@ -64,7 +64,7 @@ class TestSchemaChanges(Tester):
         try:
             session.execute(SimpleStatement("SELECT * FROM test_upgrades.foo", consistency_level=ConsistencyLevel.ALL,
                                             fetch_size=None))
-            pytest.fail("expected failure")
+            pytest.fail(reason="expected failure")
         except (ReadTimeout, OperationTimedOut):
             logger.debug("Checking node2 for warning in log")
             pattern = r".*Got .* command for nonexistent table test_upgrades.foo.*"
@@ -75,7 +75,7 @@ class TestSchemaChanges(Tester):
             for i in range(20):
                 session.execute(SimpleStatement("SELECT * FROM test_upgrades.foo WHERE a = %d" % (i,),
                                                 consistency_level=ConsistencyLevel.ALL, fetch_size=None))
-            pytest.fail("expected failure")
+            pytest.fail(reason="expected failure")
         except (ReadTimeout, OperationTimedOut):
             logger.debug("Checking node2 for warning in log")
             pattern = r".*Got .* command for nonexistent table test_upgrades.foo.*"

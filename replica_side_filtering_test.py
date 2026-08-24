@@ -103,11 +103,11 @@ class ReplicaSideFiltering(Tester):
 
     def _skip_if_index_on_static_is_not_supported(self):
         if self.create_index() and self.cluster.version() < '3.4':
-            pytest.skip('Secondary indexes on static column are not supported before 3.4 (CASSANDRA-8103)')
+            pytest.skip(reason='Secondary indexes on static column are not supported before 3.4 (CASSANDRA-8103)')
 
     def _skip_if_filtering_partition_columns_is_not_supported(self):
         if not self.create_index() and self.cluster.version() < '3.11':
-            pytest.skip('Filtering of partition key parts is not supported before 3.11 (CASSANDRA-13275)')
+            pytest.skip(reason='Filtering of partition key parts is not supported before 3.11 (CASSANDRA-13275)')
 
     @abstractmethod
     def create_index(self):
