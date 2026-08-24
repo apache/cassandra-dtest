@@ -9,8 +9,8 @@ table_definition: |
         col1 text,
         val blob,
         PRIMARY KEY(key, col1)
-  ) 
-    WITH compaction = { 'class':'LeveledCompactionStrategy' }
+  )
+    WITH compaction = { 'class':'{{ compaction_strategy }}' }
     AND compression = {'chunk_length_in_kb': '1', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'};
 
 #
@@ -18,7 +18,7 @@ table_definition: |
 # The min and max only apply to text and blob types
 # The distribution field represents the total unique population
 # distribution of that column across rows.  Supported types are
-# 
+#
 #      EXP(min..max)                        An exponential distribution over the range [min..max]
 #      EXTREME(min..max,shape)              An extreme value (Weibull) distribution over the range [min..max]
 #      GAUSSIAN(min..max,stdvrng)           A gaussian/normal distribution, where mean=(min+max)/2, and stdev is (mean-min)/stdvrng

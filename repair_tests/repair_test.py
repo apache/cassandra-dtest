@@ -1,6 +1,7 @@
 import os
 import os.path
 import threading
+import tempfile
 import time
 import re
 import pytest
@@ -1168,8 +1169,7 @@ class TestRepair(BaseRepairTest):
         _, _, rc = node2.stress(['read', 'n=1M', 'no-warmup', '-rate', 'threads=30'], whitelist=True)
         assert rc == 0
 
-    @since('4.0')
-    def test_wide_row_repair(self):
+    def _test_wide_row_repair(self, compaction_strategy):
         """
         @jira_ticket CASSANDRA-13899
         Make sure compressed vs uncompressed blocks are handled correctly when stream decompressing
@@ -1179,12 +1179,25 @@ class TestRepair(BaseRepairTest):
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         node2.stop(wait_other_notice=True)
-        profile_path = os.path.join(os.getcwd(), 'stress_profiles/repair_wide_rows.yaml')
-        logger.info(("yaml = " + profile_path))
-        node1.stress(['user', 'profile=' + profile_path, 'n=50', 'ops(insert=1)', 'no-warmup', '-rate', 'threads=8',
-                      '-insert', 'visits=FIXED(100K)', 'revisit=FIXED(100K)'])
+        template_path = os.path.join(os.getcwd(), 'stress_profiles/repair_wide_rows.yaml.tmpl')
+        with open(template_path) as profile_template:
+            profile = profile_template.read().replace("{{ compaction_strategy }}", compaction_strategy)
+            with tempfile.NamedTemporaryFile(mode='w+') as stress_profile:
+                stress_profile.write(profile)
+                stress_profile.flush()
+                logger.info(("yaml = " + stress_profile.name))
+                node1.stress(['user', 'profile=' + stress_profile.name, 'n=50', 'ops(insert=1)', 'no-warmup', '-rate', 'threads=8',
+                              '-insert', 'visits=FIXED(100K)', 'revisit=FIXED(100K)'])
         node2.start(wait_for_binary_proto=True)
         node2.repair()
+
+    @since('4.0')
+    def test_wide_row_repair_lcs(self):
+        self._test_wide_row_repair('LeveledCompactionStrategy')
+
+    @since('5.0')
+    def test_wide_row_repair_ucs(self):
+        self._test_wide_row_repair('UnifiedCompactionStrategy')
 
     @since('2.1', max_version='4')
     def test_dead_coordinator(self):

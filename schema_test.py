@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class TestSchema(Tester):
 
-    def test_table_alteration(self):
+    def _test_table_alteration(self, compaction_opts):
         """
         Tests that table alters return as expected with many sstables at different schema points
         """
@@ -24,7 +24,7 @@ class TestSchema(Tester):
         create_ks(session, 'ks', 1)
         session.execute("use ks;")
         session.execute("create table tbl_o_churn (id int primary key, c0 text, c1 text) "
-                        "WITH compaction = {'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 };")
+                        "WITH compaction = " + compaction_opts + ";")
 
         stmt1 = session.prepare("insert into tbl_o_churn (id, c0, c1) values (?, ?, ?)")
         rows_to_insert = 50
@@ -53,6 +53,13 @@ class TestSchema(Tester):
                 assert row.c1 == 'ccc'
                 assert row.c2 == 'ddd'
                 assert not hasattr(row, 'c0')
+
+    def test_table_alteration_stcs(self):
+        self._test_table_alteration("{'class': 'SizeTieredCompactionStrategy', 'min_threshold': 1024, 'max_threshold': 1024 }")
+
+    @since("5.0")
+    def test_table_alteration_ucs(self):
+        self._test_table_alteration("{'class': 'UnifiedCompactionStrategy'}")
 
     @since("2.0", max_version="3.X")  # Compact Storage
     def test_drop_column_compact(self):

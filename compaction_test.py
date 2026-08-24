@@ -118,6 +118,8 @@ class TestCompaction(Tester):
         else:
             if strategy == "DateTieredCompactionStrategy":
                 strategy_string = "strategy=DateTieredCompactionStrategy,base_time_seconds=86400"  # we want a single sstable, so make sure we don't have a tiny first window
+            elif strategy == "UnifiedCompactionStrategy":
+                strategy_string = "strategy=UnifiedCompactionStrategy,max_sstables_to_compact=4"  # disable layout-preserving compaction which can leave more than one sstable
             else:
                 strategy_string = "strategy={}".format(strategy)
             min_bf_size = 100000
@@ -125,18 +127,21 @@ class TestCompaction(Tester):
         cluster = self.cluster
         cluster.populate(1).start()
         [node1] = cluster.nodelist()
+        logger.debug("Compaction: " + strategy_string)
 
         for x in range(0, 5):
             node1.stress(['write', 'n=100K', "no-warmup", "cl=ONE", "-rate",
                           "threads=300", "-schema", "replication(factor=1)",
                           "compaction({},enabled=false)".format(strategy_string)])
             node1.flush()
+        logger.debug(node1.nodetool('tablestats keyspace1.standard1').stdout)
 
         node1.nodetool('enableautocompaction')
         node1.wait_for_compactions()
 
         table_name = 'standard1'
-        output = node1.nodetool('tablestats').stdout
+        output = node1.nodetool('tablestats keyspace1.standard1').stdout
+        logger.debug(output)
         output = output[output.find(table_name):]
         output = output[output.find("Bloom filter space used"):]
         bfSize = int(output[output.find(":") + 1:output.find("\n")].strip())
@@ -157,7 +162,12 @@ class TestCompaction(Tester):
 
         logger.debug("bloom filter size is: {}".format(bfSize))
         logger.debug("size factor = {}".format(size_factor))
-        assert bfSize >= size_factor * min_bf_size
+        # In the case where the number of sstables is greater than the number of directories, it's possible this to be
+        # both with unique keys (where the bf size will remain close to the unadjusted limit) or with repetitions
+        # of keys (where the bf size will be a multiple of the expected). Permit both by only using the size factor on
+        # the maximum size. Note that the test is designed to end up with size_factor == 1 and most runs do so, thus
+        # this is not a loosening of the test in the common case, only ensures that we don't end up with flakes.
+        assert bfSize >= min_bf_size
         assert bfSize <= size_factor * max_bf_size
 
     @pytest.mark.parametrize("strategy", strategies)
@@ -313,7 +323,7 @@ class TestCompaction(Tester):
         self.skip_if_not_supported(strategy)
 
         if self.cluster.version() >= '5.0':
-            strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy']
+            strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'UnifiedCompactionStrategy']
         else:
             strategies = ['LeveledCompactionStrategy', 'SizeTieredCompactionStrategy', 'DateTieredCompactionStrategy']
 
@@ -324,6 +334,7 @@ class TestCompaction(Tester):
             [node1] = cluster.nodelist()
 
             for strat in strategies:
+                logger.debug("Switching to {}".format(strat))
                 session = self.patient_cql_connection(node1)
                 create_ks(session, 'ks', 1)
 

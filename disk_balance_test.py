@@ -24,6 +24,10 @@ class TestDiskBalance(Tester):
     @jira_ticket CASSANDRA-6696
     """
 
+    STCS_COMPACTION_OPTS = "SizeTieredCompactionStrategy"
+    LCS_COMPACTION_OPTS = "LeveledCompactionStrategy,sstable_size_in_mb=1"
+    UCS_COMPACTION_OPTS = "UnifiedCompactionStrategy"
+
     @pytest.fixture(scope='function', autouse=True)
     def fixture_set_cluster_settings(self, fixture_dtest_setup):
         cluster = fixture_dtest_setup.cluster
@@ -200,16 +204,23 @@ class TestDiskBalance(Tester):
         """
         @jira_ticket CASSANDRA-13948
         """
-        self._disk_balance_after_boundary_change_test(lcs=False)
+        self._disk_balance_after_boundary_change_test(self.STCS_COMPACTION_OPTS)
 
     @since('3.10')
     def test_disk_balance_after_boundary_change_lcs(self):
         """
         @jira_ticket CASSANDRA-13948
         """
-        self._disk_balance_after_boundary_change_test(lcs=True)
+        self._disk_balance_after_boundary_change_test(self.LCS_COMPACTION_OPTS)
 
-    def _disk_balance_after_boundary_change_test(self, lcs):
+    @since('5.0')
+    def test_disk_balance_after_boundary_change_ucs(self):
+        """
+        @jira_ticket CASSANDRA-13948
+        """
+        self._disk_balance_after_boundary_change_test(self.UCS_COMPACTION_OPTS)
+
+    def _disk_balance_after_boundary_change_test(self, compaction_opts):
         """
             @jira_ticket CASSANDRA-13948
 
@@ -240,7 +251,6 @@ class TestDiskBalance(Tester):
         keys_per_flush = 10000
         keys_to_write = num_flushes * keys_per_flush
 
-        compaction_opts = "LeveledCompactionStrategy,sstable_size_in_mb=1" if lcs else "SizeTieredCompactionStrategy"
         logger.debug("Writing {} keys in {} flushes (compaction_opts={})".format(keys_to_write, num_flushes, compaction_opts))
         total_keys = num_flushes * keys_per_flush
         current_keys = 0
@@ -264,29 +274,36 @@ class TestDiskBalance(Tester):
         node2.start(wait_for_binary_proto=True, jvm_args=["-Dcassandra.migration_task_wait_in_seconds=10"], set_migration_task=False)
         node2.flush()
 
-        self._assert_balanced_after_boundary_change(node1, total_keys, lcs)
+        self._assert_balanced_after_boundary_change(node1, total_keys, compaction_opts)
 
         logger.debug("Decommissioning node1")
         node1.decommission()
         node1.stop()
 
-        self._assert_balanced_after_boundary_change(node2, total_keys, lcs)
+        self._assert_balanced_after_boundary_change(node2, total_keys, compaction_opts)
 
     @since('3.10')
     def test_disk_balance_after_joining_ring_stcs(self):
         """
         @jira_ticket CASSANDRA-13948
         """
-        self._disk_balance_after_joining_ring_test(lcs=False)
+        self._disk_balance_after_joining_ring_test(self.STCS_COMPACTION_OPTS)
 
     @since('3.10')
     def test_disk_balance_after_joining_ring_lcs(self):
         """
         @jira_ticket CASSANDRA-13948
         """
-        self._disk_balance_after_joining_ring_test(lcs=True)
+        self._disk_balance_after_joining_ring_test(self.LCS_COMPACTION_OPTS)
 
-    def _disk_balance_after_joining_ring_test(self, lcs):
+    @since('5.0')
+    def test_disk_balance_after_joining_ring_ucs(self):
+        """
+        @jira_ticket CASSANDRA-13948
+        """
+        self._disk_balance_after_joining_ring_test(self.UCS_COMPACTION_OPTS)
+
+    def _disk_balance_after_joining_ring_test(self, compaction_opts):
         """
             @jira_ticket CASSANDRA-13948
 
@@ -312,7 +329,6 @@ class TestDiskBalance(Tester):
         keys_per_flush = 10000
         keys_to_write = num_flushes * keys_per_flush
 
-        compaction_opts = "LeveledCompactionStrategy,sstable_size_in_mb=1" if lcs else "SizeTieredCompactionStrategy"
         logger.debug("Writing {} keys in {} flushes (compaction_opts={})".format(keys_to_write, num_flushes, compaction_opts))
         total_keys = num_flushes * keys_per_flush
         current_keys = 0
@@ -337,9 +353,9 @@ class TestDiskBalance(Tester):
         node1.nodetool("join")
         node1.nodetool("join")  # Need to run join twice - one to join ring, another to leave write survey mode
 
-        self._assert_balanced_after_boundary_change(node1, total_keys, lcs)
+        self._assert_balanced_after_boundary_change(node1, total_keys, compaction_opts)
 
-    def _assert_balanced_after_boundary_change(self, node, total_keys, lcs):
+    def _assert_balanced_after_boundary_change(self, node, total_keys, compaction_opts):
         logger.debug("Cleanup {}".format(node.name))
         node.cleanup()
 
@@ -361,7 +377,7 @@ class TestDiskBalance(Tester):
         logger.debug("Reading data back ({} keys)".format(total_keys))
         node.stress(['read', 'n={}'.format(total_keys), "no-warmup", "cl=ALL", "-pop", "seq=1...{}".format(total_keys), "-rate", "threads=1"])
 
-        if lcs:
+        if compaction_opts == self.LCS_COMPACTION_OPTS:
             output = grep_sstables_in_each_level(node, "standard1")
             logger.debug("SSTables in each level: {}".format(output))
 
