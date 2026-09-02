@@ -2194,6 +2194,52 @@ Tracing session:""")
         stdout, stderr = self.run_cqlsh(node1, cmds='USE system', cqlsh_options=['--debug', '--connect-timeout=10'])
         assert "Using connect timeout: 10 seconds" in stderr
 
+    @since('5.0')
+    def test_consistency_level_options(self):
+        """
+        Tests for the cmdline consistency options:
+        - consistency-level
+        - serial-consistency-level
+        @jira_ticket CASSANDRA-20626
+        """
+        self.cluster.populate(1)
+        self.cluster.start()
+
+        node1, = self.cluster.nodelist()
+
+        def expect_output_no_errors(cmd, options, output):
+            stdout, stderr = self.run_cqlsh(node1, cmds=cmd, cqlsh_options=options)
+            assert output in stdout, stderr
+            assert stderr == ''
+
+        expect_output_no_errors('CONSISTENCY', [],
+                                'Current consistency level is ONE.')
+
+        expect_output_no_errors('CONSISTENCY', ['--consistency-level', 'quorum'],
+                                'Current consistency level is QUORUM.')
+
+        expect_output_no_errors('SERIAL CONSISTENCY', [],
+                                'Current serial consistency level is SERIAL.')
+
+        expect_output_no_errors('SERIAL CONSISTENCY', ['--serial-consistency-level', 'local_serial'],
+                                'Current serial consistency level is LOCAL_SERIAL.')
+
+        def expect_error(cmd, options, error_msg):
+            stdout, stderr = self.run_cqlsh(node1, cmds=cmd, cqlsh_options=options)
+            assert error_msg in stderr
+
+        expect_error('CONSISTENCY', ['--consistency-level', 'foop'],
+                     '"foop" is not a valid consistency level')
+
+        expect_error('CONSISTENCY', ['--consistency-level', 'serial'],
+                     '"serial" is not a valid consistency level')
+
+        expect_error('SERIAL CONSISTENCY', ['--serial-consistency-level', 'foop'],
+                     '"foop" is not a valid serial consistency level')
+
+        expect_error('SERIAL CONSISTENCY', ['--serial-consistency-level', 'ONE'],
+                     '"ONE" is not a valid serial consistency level')
+
     @since('3.0.19')
     def test_protocol_negotiation(self):
         """
