@@ -57,8 +57,8 @@ def patch_start(startable):
     startable.start = types.MethodType(new_start, startable)
 
 
-@since('4.0')
-class TestTransientReplicationRing(Tester):
+@since('5.1')
+class TestWitnessReplicationRing(Tester):
 
     keyspace = "ks"
     table = "tbl"
@@ -177,8 +177,8 @@ class TestTransientReplicationRing(Tester):
 
         self.check_expected(sessions, expected)
 
-        # Ensure that there is at least some transient data around, because of this if it's missing after bootstrap
-        # We know we failed to get it from the transient replica losing the range entirely
+        # Ensure that there is at least some witness data around, because of this if it's missing after bootstrap
+        # We know we failed to get it from the witness replica losing the range entirely
         nodes[1].stop(wait_other_notice=True)
 
         for i in range(1, 40, 2):
@@ -193,7 +193,7 @@ class TestTransientReplicationRing(Tester):
                     gen_expected(range(0, 21, 2), range(32, 40, 2)),
                     gen_expected(range(1, 11, 2), range(11, 31), range(31, 40, 2))]
 
-        # Every node should have some of its fully replicated data and one and two should have some transient data
+        # Every node should have some of its fully replicated data and one and two should have some witness data
         self.check_expected(sessions, expected)
 
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
@@ -204,20 +204,20 @@ class TestTransientReplicationRing(Tester):
         expected.append(gen_expected(range(11, 20, 2), range(21, 40)))
         sessions.append(self.exclusive_cql_connection(node4))
 
-        # Because repair was never run and nodes had transient data it will have data for transient ranges (node1, 11-20)
+        # Because repair was never run and nodes had witness data it will have data for witness ranges (node1, 11-20)
         assert_all(sessions[3],
                    self.select(),
                    expected[3],
                    cl=NODELOCAL)
 
-        # Node1 no longer transiently replicates 11-20, so cleanup will clean it up
-        # Node1 also now transiently replicates 21-30 and half the values in that range were repaired
+        # Node1 no longer witness replicates 11-20, so cleanup will clean it up
+        # Node1 also now witness replicates 21-30 and half the values in that range were repaired
         expected[0] = gen_expected(range(0, 11), range(21, 30, 2), range(31, 40))
         # Node2 still missing data since it was down during some insertions, it also lost some range (31-40)
         expected[1] = gen_expected(range(0, 21, 2))
         expected[2] = gen_expected(range(1, 11, 2), range(11, 31))
 
-        # Cleanup should only impact if a node lost a range entirely or started to transiently replicate it and the data
+        # Cleanup should only impact if a node lost a range entirely or started to witness it and the data
         # was repaired
         self.check_expected(sessions, expected, nodes, cleanup=True)
 
@@ -249,8 +249,8 @@ class TestTransientReplicationRing(Tester):
         # Make sure at least a little data is repaired
         repair_nodes(nodes)
 
-        # Ensure that there is at least some transient data around, because of this if it's missing after bootstrap
-        # We know we failed to get it from the transient replica losing the range entirely
+        # Ensure that there is at least some witness data around, because of this if it's missing after bootstrap
+        # We know we failed to get it from the witness replica losing the range entirely
         nodes[1].stop(wait_other_notice=True)
 
         for i in range(1, 40, 2):
@@ -357,8 +357,8 @@ class TestTransientReplicationRing(Tester):
         # Make sure at least a little data is repaired
         repair_nodes(nodes)
 
-        # Ensure that there is at least some transient data around, because of this if it's missing after bootstrap
-        # We know we failed to get it from the transient replica losing the range entirely
+        # Ensure that there is at least some witness data around, because of this if it's missing after bootstrap
+        # We know we failed to get it from the witness replica losing the range entirely
         nodes[1].stop(wait_other_notice=True)
 
         for i in range(1, 40, 2):
@@ -375,7 +375,7 @@ class TestTransientReplicationRing(Tester):
 
         self.check_expected(sessions, expected)
 
-        # node1 has transient data we want to see streamed out on move
+        # node1 has witness data we want to see streamed out on move
         nodes[3].nodetool('decommission')
 
         nodes = nodes[:-1]
@@ -392,7 +392,7 @@ class TestTransientReplicationRing(Tester):
 
         repair_nodes(nodes)
 
-        # There should be no transient data anywhere
+        # There should be no witness data anywhere
         expected = [gen_expected(range(0, 11), range(21, 40)),
                     gen_expected(range(0, 21), range(31, 40)),
                     gen_expected(range(11, 31))]
@@ -402,7 +402,7 @@ class TestTransientReplicationRing(Tester):
 
     @pytest.mark.no_vnodes
     def test_remove(self):
-        """Test  a mix of ring change operations across a mix of transient and repaired/unrepaired data"""
+        """Test  a mix of ring change operations across a mix of witness and repaired/unrepaired data"""
         node4 = new_node(self.cluster, bootstrap=True, token='00040')
         patch_start(node4)
         node4.start(wait_for_binary_proto=True)
@@ -423,7 +423,7 @@ class TestTransientReplicationRing(Tester):
                     gen_expected(range(0, 21), range(31, 40)),
                     gen_expected(range(11, 31))]
 
-        # Every node should some of its fully replicated data and one and two should have some transient data
+        # Every node should some of its fully replicated data and one and two should have some witness data
         self.check_expected(sessions, expected)
 
         nodes[0].nodetool('removenode ' + node4_id)
