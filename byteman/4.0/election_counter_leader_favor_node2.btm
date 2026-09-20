@@ -7,8 +7,8 @@ RULE election counter leader cheat
 CLASS org.apache.cassandra.service.StorageProxy
 METHOD findSuitableEndpoint
 AT EXIT
-BIND isthere:boolean = $localEndpoints.contains(org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.2"));
+BIND isthere:boolean = $localReplicas.stream().anyMatch(r -> { try { return r.endpoint().equals(org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.2")); } catch (Throwable t) { return false; } });
 if isthere
 DO
-    return org.apache.cassandra.locator.InetAddressAndPort.getByName("127.0.0.2");
+    return localReplicas.stream().filter(lr -> { try { return lr.endpoint().equals(InetAddressAndPort.getByName("127.0.0.2")); } catch (Throwable t) { return null; } }).findFirst().get();
 ENDRULE
