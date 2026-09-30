@@ -518,6 +518,58 @@ class TestTopology(Tester):
         logger.debug(out)
         return out
 
+    def test_decommission_after_ip_change(self):
+        """
+        Decommissioning a node soon after changing its IP causes the old IP to be resurrected
+        and re-added to the token ring.
+        @jira_ticket CASSANDRA-18319
+        """
+        cluster = self.cluster
+        cluster.populate(6).start()
+        session = self.patient_cql_connection(cluster.nodelist()[0])
+        create_ks(session, 'ks', 1)
+        create_cf(session, 'cf', columns={'c1': 'text', 'c2': 'text'})
+        insert_c1c2(session, n=200, consistency=ConsistencyLevel.ALL)
+        cluster.flush()
+
+        node_to_move = cluster.nodelist()[-1]
+        old_ip = '127.0.0.6'
+        node_to_move.stop(gently=False)
+        set_new_ip(node_to_move, '127.0.0.9')
+        node_to_move.start(no_wait=True)
+
+        for i, node in enumerate(cluster.nodelist()):
+            node.stop()
+            node.start(wait_other_notice=False)
+            time.sleep(10)
+
+        nodes_and_marks = [(node, node.mark_log()) for node in cluster.nodelist()[:-1]]
+        node1, node1_mark = nodes_and_marks[0]
+
+        node_to_move.decommission()
+        node_to_move.stop(wait=False, gently=False)
+
+        # watch node1 so we can fail fast
+        unexpected_str = f"Node /{old_ip} is now part of the cluster"
+        try:
+            node1.watch_log_for(unexpected_str, from_mark=node1_mark, timeout=120)
+            assert False, f"old_ip {old_ip} unexpectedly joined in Node1"
+        except TimeoutError:
+            pass
+
+        # check all nodes for completeness
+        for i, (node, mark) in enumerate(nodes_and_marks[1:]):
+            res = node.grep_log(unexpected_str, from_mark=mark)
+            assert len(res) == 0, f"old_ip {old_ip} unexpectedly joined in Node{i+1}"
+        
+
+def set_new_ip(node, new_address):
+    node.set_configuration_options(values={
+        'listen_address': new_address,
+        'rpc_address': new_address,
+    })
+    node.network_interfaces = { key: (new_address, port) for (key, (address, port)) in node.network_interfaces.items() }
+
 
 class DecommissionInParallel(Thread):
 
