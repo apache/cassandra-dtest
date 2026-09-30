@@ -474,3 +474,28 @@ class TestSSTableGenerationAndLoadingLegacyIndex(BaseSStableLoaderTester):
         assert_one(session, """SELECT * FROM system."IndexInfo" WHERE table_name='k'""", ['k', 'idx', None])
         assert_all(session, "SELECT * FROM k.t", [[0, 1, 8], [0, 2, 8]])
         assert_all(session, "SELECT * FROM k.t WHERE v = 8", [[0, 1, 8], [0, 2, 8]])
+
+    @since("3.0")
+    def test_sstableloader_empty_stream(self):
+        """
+        @jira_ticket CASSANDRA-16349
+
+        Tests that sstableloader does not throw if SSTables it attempts to load do not
+        intersect with the node's ranges.
+        """
+        cluster = self.cluster
+        cluster.populate(2).start()
+        node1, node2 = cluster.nodelist()
+        session = self.patient_cql_connection(node1)
+
+        create_ks(session, 'k', 1)
+        session.execute("CREATE TABLE k.t (k int PRIMARY KEY, v int)")
+        for i in range(10):
+            session.execute("INSERT INTO k.t (k, v) VALUES ({0}, {0})".format(i))
+        node1.nodetool('flush')
+
+        ret = self.load_sstables_from_another_node(cluster, node1, node2, "k")
+        assert len(ret) > 0, "Expected to stream at least 1 table"
+        for exit_status, _, stderr in ret:
+            assert exit_status == 0, "Expected exit code 0, got {}".format(exit_status)
+            assert len(stderr) == 0, "Expected empty stderr, got {}".format(stderr)
