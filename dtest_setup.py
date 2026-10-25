@@ -48,8 +48,9 @@ def retry_till_success(fun, *args, **kwargs):
 def default_ignore_log_patterns():
     # to allow tests to append to the list, make sure to create a new list as the output
     # to this function, else multiple tests could corrupt the default set
-    return ['failed: Connection reset by peer',
-            r'Unknown exception in client networking with peer .* Connection reset by peer.*'
+    # Netty 4.1.130+ reports native IO errors as "(..) failed with error(-104): ...", older versions as "(..) failed: ..."
+    return [r'failed( with error\(-?\d+\))?: (Connection reset by peer|Broken pipe)',
+            r'Unknown exception in client networking with peer .* Connection reset by peer.*',
             r'.*java.net.ConnectException: Connection refused.*',
             r'Invalid or unsupported protocol version \(5\)',
             # See python-driver, SHA a7295e103023e12152fc0940906071b18356def3
