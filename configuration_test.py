@@ -106,7 +106,7 @@ class TestConfiguration(Tester):
         write_to_trigger_fsync(session, 'ks', 'tab')
         assert commitlog_size(node) == init_size, "Commitlog was written with durable writes disabled"
 
-    def test_relative_paths(self):
+    def test_relative_paths(self, monkeypatch):
         """
         @jira_ticket CASSANDRA-17084
         """
@@ -114,7 +114,8 @@ class TestConfiguration(Tester):
         node1 = self.cluster.nodelist()[0]
         cassdir = tempfile.mkdtemp()
         os.mkdir(os.path.join(cassdir, 'bin'))
-        os.chdir(cassdir)
+        # monkeypatch restores the cwd on teardown, so it does not leak into later tests in the same split
+        monkeypatch.chdir(cassdir)
         node1.set_configuration_options({'commitlog_directory': 'bin/../data/commitlog', 'data_file_directories': ['bin/../data/data']})
         self.cluster.start()
         self.cluster.stop()

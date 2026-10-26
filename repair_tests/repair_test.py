@@ -1179,7 +1179,7 @@ class TestRepair(BaseRepairTest):
         cluster.populate(2).start()
         node1, node2 = cluster.nodelist()
         node2.stop(wait_other_notice=True)
-        template_path = os.path.join(os.getcwd(), 'stress_profiles/repair_wide_rows.yaml.tmpl')
+        template_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'stress_profiles', 'repair_wide_rows.yaml.tmpl')
         with open(template_path) as profile_template:
             profile = profile_template.read().replace("{{ compaction_strategy }}", compaction_strategy)
             with tempfile.NamedTemporaryFile(mode='w+') as stress_profile:
