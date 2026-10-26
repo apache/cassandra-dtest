@@ -516,7 +516,7 @@ class TestAllowFiltering(ReplicaSideFiltering):
     def create_index(self):
         return False
 
-    def _test_missed_update_with_transient_replicas(self, missed_by_transient):
+    def _test_missed_update_with_witness_replicas(self, missed_by_witness):
         cluster = self.cluster
         cluster.set_configuration_options(values={'hinted_handoff_enabled': False,
                                                   'num_tokens': 1,
@@ -541,7 +541,7 @@ class TestAllowFiltering(ReplicaSideFiltering):
         self.session.execute("INSERT INTO t(k, v) VALUES (0, 'old')")
 
         # update the previous value with CL=ONE only in one replica
-        node = cluster.nodelist()[1 if missed_by_transient else 0]
+        node = cluster.nodelist()[1 if missed_by_witness else 0]
         node.byteman_submit([mk_bman_path('stop_writes.btm')])
         self.session.execute(SimpleStatement("UPDATE t SET v = 'new' WHERE k = 0", consistency_level=CL.ONE))
 
@@ -549,10 +549,10 @@ class TestAllowFiltering(ReplicaSideFiltering):
         self._assert_none("SELECT * FROM t WHERE v = 'old'")
         self._assert_one("SELECT * FROM t WHERE v = 'new'", row=[0, 'new'])
 
-    @since('4.0')
-    def test_update_missed_by_transient_replica(self):
-        self._test_missed_update_with_transient_replicas(missed_by_transient=True)
+    @since('5.1')
+    def test_update_missed_by_witness_replica(self):
+        self._test_missed_update_with_witness_replicas(missed_by_witness=True)
 
-    @since('4.0')
-    def test_update_only_on_transient_replica(self):
-        self._test_missed_update_with_transient_replicas(missed_by_transient=False)
+    @since('5.1')
+    def test_update_only_on_witness_replica(self):
+        self._test_missed_update_with_witness_replicas(missed_by_witness=False)
