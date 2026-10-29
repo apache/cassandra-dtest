@@ -159,15 +159,22 @@ class Runner(threading.Thread):
             raise self.__error
 
 
-def make_execution_profile(retry_policy=FlakyRetryPolicy(), consistency_level=ConsistencyLevel.ONE, **kwargs):
+# Use a 30s request timeout instead of the driver default of 10s.
+# For a schema change, the driver waits for all nodes to agree on the new schema before
+# the request completes, and this wait counts against the request timeout.
+# On CI agents with slow disks, a DROP or the first CREATE KEYSPACE in a new cluster can take longer than 10s.
+def make_execution_profile(retry_policy=FlakyRetryPolicy(), consistency_level=ConsistencyLevel.ONE,
+                           request_timeout=30, **kwargs):
     if 'load_balancing_policy' in kwargs:
         return ExecutionProfile(retry_policy=retry_policy,
                                 consistency_level=consistency_level,
+                                request_timeout=request_timeout,
                                 **kwargs)
     else:
         return ExecutionProfile(retry_policy=retry_policy,
                                 consistency_level=consistency_level,
                                 load_balancing_policy=RoundRobinPolicy(),
+                                request_timeout=request_timeout,
                                 **kwargs)
 
 
