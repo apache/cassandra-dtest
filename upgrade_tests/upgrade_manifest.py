@@ -209,7 +209,8 @@ MANIFEST = {
     current_4_0_x:  [indev_4_0_x, indev_4_1_x, indev_5_0_x, indev_6_0_x],
     current_4_1_x:  [indev_4_1_x, indev_5_0_x, indev_6_0_x, indev_trunk],
     current_5_0_x:  [indev_5_0_x, indev_6_0_x, indev_trunk],
-    current_6_0_x:  [indev_6_0_x, indev_trunk],
+# TODO uncomment when 6.0-alpha3 is released, ref CASSANDRA-11745
+#    current_6_0_x:  [indev_6_0_x, indev_trunk],
 
     indev_2_1_x: [indev_2_2_x, indev_3_0_x, indev_3_11_x],
     indev_2_2_x: [indev_3_0_x, indev_3_11_x],
