@@ -66,7 +66,9 @@ class TestDiskBalance(Tester):
                       'compaction(strategy=SizeTieredCompactionStrategy,enabled=false)'])
         cluster.flush()
         node5 = new_node(cluster, data_center="dc1")
-        node5.start(wait_for_binary_proto=True)
+        # Paxos v2 repair of 256 vnodes on bootstrap can outlast the binary protocol wait on slow disks
+        node5.start(wait_for_binary_proto=True,
+                    jvm_args=["-Dcassandra.skip_paxos_repair_on_topology_change=true"])
         self.assert_balanced(node5)
 
     def test_disk_balance_replace_same_address(self):
