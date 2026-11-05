@@ -48,6 +48,10 @@ class TestPreviewRepair(Tester):
         assert "Previewed data was in sync" in result.stdout
         assert_no_repair_history(session)
         assert preview_failure_count(node1) == 0
+        assert bytes_previewed_desynchronized_count(node1) == 0
+        assert token_ranges_previewed_desynchronized_count(node1) == 0
+        assert bytes_previewed_count(node1) == 0
+        assert bytes_previewed_desynchronized_count(node1) == 0
 
         # make data inconsistent between nodes
         stmt = SimpleStatement("INSERT INTO ks.tbl (k,v) VALUES (%s, %s)")
@@ -72,15 +76,24 @@ class TestPreviewRepair(Tester):
         node1.start(wait_for_binary_proto=True)
 
         # data should not be in sync for full and unrepaired previews
+        desynchronized_bytes = bytes_previewed_desynchronized_count(node1)
+        previewed_bytes = bytes_previewed_count(node1)
         result = node1.repair(options=['ks', '--preview'])
         assert "Total estimated streaming" in result.stdout
         assert "Previewed data was in sync" not in result.stdout
         assert preview_failure_count(node1) == 1
+        assert token_ranges_previewed_desynchronized_count(node1) == 80
+        assert bytes_previewed_desynchronized_count(node1) > previewed_bytes
 
+        desynchronized_bytes = bytes_previewed_desynchronized_count(node1)
+        previewed_bytes = bytes_previewed_count(node1)
         result = node1.repair(options=['ks', '--preview', '--full'])
         assert "Total estimated streaming" in result.stdout
         assert "Previewed data was in sync" not in result.stdout
         assert preview_failure_count(node1) == 2
+        assert token_ranges_previewed_desynchronized_count(node1) == 160
+        assert bytes_previewed_desynchronized_count(node1) > desynchronized_bytes
+        assert bytes_previewed_count(node1) > previewed_bytes
 
         # repaired data should be in sync anyway
         result = node1.repair(options=['ks', '--validate'])
@@ -94,20 +107,36 @@ class TestPreviewRepair(Tester):
             node.nodetool('compact ks tbl')
 
         # ...and everything should be in sync
+        desynchronized_bytes = bytes_previewed_desynchronized_count(node1)
+        previewed_bytes = bytes_previewed_count(node1)
         result = node1.repair(options=['ks', '--preview'])
         assert "Previewed data was in sync" in result.stdout
         # data is repaired, previewFailure metric should remain same
         assert preview_failure_count(node1) == 2
+        assert token_ranges_previewed_desynchronized_count(node1) == 160
+        assert bytes_previewed_desynchronized_count(node1) == desynchronized_bytes
+        assert bytes_previewed_count(node1) == previewed_bytes
 
+        desynchronized_bytes = bytes_previewed_desynchronized_count(node1)
+        previewed_bytes = bytes_previewed_count(node1)
         result = node1.repair(options=['ks', '--preview', '--full'])
         assert "Previewed data was in sync" in result.stdout
         assert preview_failure_count(node1) == 2
+        assert token_ranges_previewed_desynchronized_count(node1) == 160
+        assert bytes_previewed_desynchronized_count(node1) == desynchronized_bytes
+        assert bytes_previewed_count(node1) > previewed_bytes
 
         result = node1.repair(options=['ks', '--validate'])
         assert "Repaired data is in sync" in result.stdout
 
         assert preview_failure_count(node2) == 0
+        assert bytes_previewed_desynchronized_count(node2) == 0
+        assert token_ranges_previewed_desynchronized_count(node2) == 0
         assert preview_failure_count(node3) == 0
+        assert bytes_previewed_desynchronized_count(node3) == 0
+        assert token_ranges_previewed_desynchronized_count(node3) == 0
+        assert bytes_previewed_count(node2) > 0
+        assert bytes_previewed_count(node3) > 0
 
 
 def assert_no_repair_history(session):
@@ -119,5 +148,20 @@ def assert_no_repair_history(session):
 
 def preview_failure_count(node):
     mbean = make_mbean('metrics', type='Repair', name='PreviewFailures')
+    with JolokiaAgent(node) as jmx:
+        return jmx.read_attribute(mbean, 'Count')
+
+def token_ranges_previewed_desynchronized_count(node):
+    mbean = make_mbean('metrics', type='Table', keyspace='ks', scope='tbl', name='TokenRangesPreviewedDesynchronized')
+    with JolokiaAgent(node) as jmx:
+        return jmx.read_attribute(mbean, 'Count')
+
+def bytes_previewed_desynchronized_count(node):
+    mbean = make_mbean('metrics', type='Table', keyspace='ks', scope='tbl', name='BytesPreviewedDesynchronized')
+    with JolokiaAgent(node) as jmx:
+        return jmx.read_attribute(mbean, 'Count')
+
+def bytes_previewed_count(node):
+    mbean = make_mbean('metrics', type='Table', keyspace='ks', scope='tbl', name='BytesPreviewed')
     with JolokiaAgent(node) as jmx:
         return jmx.read_attribute(mbean, 'Count')
