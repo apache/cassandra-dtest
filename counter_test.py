@@ -114,8 +114,11 @@ class TestCounters(Tester):
 
         # Now stop the node and restart but first install a rule to slow down how fast node 2 will update the list
         # nodes that are alive
-        nodes[1].stop(wait=True, wait_other_notice=False)
-        nodes[1].update_startup_byteman_script(mk_bman_path('gossip_alive_callback_sleep.btm'))
+        nodes[1].stop(wait=True, wait_other_notice=True)
+
+        if cluster.version() < '5.1':
+            nodes[1].update_startup_byteman_script(mk_bman_path('gossip_alive_callback_sleep.btm'))
+
         nodes[1].start(no_wait=True, wait_other_notice=False)
 
         # Until node 2 is fully alive try to force other nodes to pick him as mutation leader.
