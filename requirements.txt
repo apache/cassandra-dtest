@@ -33,6 +33,6 @@ pytest-repeat==0.9.1
 pytest-timeout==2.1.0
 PyYAML==6.0.1
 six==1.16.0
-soupsieve==2.3.2.post1
+soupsieve==2.8.4
 thrift==0.16.0
 tomli==1.2.3
