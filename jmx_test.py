@@ -42,7 +42,7 @@ class TestJMX(Tester):
         node1.flush()
         node1.stop(gently=False)
 
-        with pytest.raises(ToolError, match=r"ConnectException: 'Connection refused( \(Connection refused\))?'."):
+        with pytest.raises(ToolError, match=r"ConnectException: Connection refused"):
             node1.nodetool('netstats')
 
         # don't wait; we're testing for when nodetool is called on a node mid-startup
@@ -65,7 +65,7 @@ class TestJMX(Tester):
                     if cluster.version() >= LooseVersion('5.1'):
                         assert re.search("Server is not initialized yet, cannot run nodetool", repr(e)), str(e)
                     else:
-                        assert re.search("ConnectException: 'Connection refused( \(Connection refused\))?'.", repr(e)), str(e)
+                        assert re.search(r"ConnectException: Connection refused", repr(e)), str(e)
 
         assert running, 'node1 never started'
 
